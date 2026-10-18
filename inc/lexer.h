@@ -1,6 +1,7 @@
 // Implementation of the IFJ26 imperative language compiler
 // lexer.h
 // Author(s): Tadeáš Zonyga (xzonygt00)
+//
 
 #ifndef IFJ_LEXER_H
 #define IFJ_LEXER_H
@@ -19,6 +20,9 @@ typedef struct {
     int current, lookahead;
     size_t line, column; /* Physical position, starting at 1. */
     lexer_status_t status; /* Sticky error, reinitialize to recover. */
+    size_t paren_depth;
+    size_t physical_indentation, logical_indentation;
+    int at_line_start, leading_tab, logical_has_tokens, prefix_complete;
 } lexer_t;
 
 /* Numeric validation uses strtod, keep LC_NUMERIC in the C locale. */

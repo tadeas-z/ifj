@@ -45,7 +45,8 @@ typedef enum {
     TOKEN_LESS,
     TOKEN_LESS_EQUAL,
     TOKEN_GREATER,
-    TOKEN_GREATER_EQUAL
+    TOKEN_GREATER_EQUAL,
+    TOKEN_STRING
 } token_type_t;
 
 typedef struct {
@@ -57,6 +58,10 @@ typedef struct {
     size_t length;
     size_t line;
     size_t column;
+    /* Leading spaces of the logical line; parser checks block structure. */
+    size_t indentation;
+    /* True only for the first non-comment token of a logical line. */
+    int starts_line;
 } token_t;
 
 /* Frees the lexeme and resets the token, safe to call twice. */
