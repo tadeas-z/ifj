@@ -1,3 +1,7 @@
+// Implementation of the IFJ26 imperative language compiler
+// test_lexer.c
+// Author(s): Tadeáš Zonyga (xzonygt00)
+
 #include "lexer.h"
 
 #include <assert.h>
@@ -5,25 +9,25 @@
 #include <string.h>
 
 typedef struct {
-    TokenType type;
-    const char *lexeme;
+    token_type_t type;
+    const char* lexeme;
     size_t line, column;
-} Expected;
+} expected_t;
 
-static FILE *source(const char *text)
+static FILE* source(const char* text)
 {
-    FILE *input = tmpfile();
+    FILE* input = tmpfile();
     assert(input);
     assert(fwrite(text, 1, strlen(text), input) == strlen(text));
     rewind(input);
     return input;
 }
 
-static void sequence(const char *text, const Expected *expected, size_t count)
+static void sequence(const char* text, const expected_t* expected, size_t count)
 {
-    FILE *input = source(text);
-    Lexer lexer;
-    Token token = {0};
+    FILE* input = source(text);
+    lexer_t lexer;
+    token_t token = { 0 };
     assert(lexer_init(&lexer, input) == LEXER_OK);
     for (size_t i = 0; i < count; ++i) {
         assert(lexer_next(&lexer, &token) == LEXER_OK);
@@ -52,50 +56,50 @@ static void sequence(const char *text, const Expected *expected, size_t count)
 
 static void basic_program(void)
 {
-    const Expected expected[] = {
-        {TOKEN_IMPORT, "import", 1, 1}, {TOKEN_IDENTIFIER, "ifj26", 1, 8},
-        {TOKEN_DOT, ".", 1, 13}, {TOKEN_STAR, "*", 1, 14},
-        {TOKEN_NEWLINE, "\n", 1, 15},
-        {TOKEN_MAIN, "@main", 2, 1}, {TOKEN_DEF, "def", 2, 7},
-        {TOKEN_IDENTIFIER, "run", 2, 11}, {TOKEN_LPAREN, "(", 2, 14},
-        {TOKEN_RPAREN, ")", 2, 15}, {TOKEN_COLON, ":", 2, 16},
-        {TOKEN_TYPE_UNIT, "Unit", 2, 18}, {TOKEN_ASSIGN, "=", 2, 23},
-        {TOKEN_NEWLINE, "\n", 2, 24},
-        {TOKEN_VAL, "val", 3, 3}, {TOKEN_IDENTIFIER, "x", 3, 7},
-        {TOKEN_ASSIGN, "=", 3, 9}, {TOKEN_MINUS, "-", 3, 11},
-        {TOKEN_INTEGER, "1_000", 3, 12}, {TOKEN_PLUS, "+", 3, 18},
-        {TOKEN_DOUBLE, ".5e+2D", 3, 20}, {TOKEN_EOF, NULL, 3, 26}
+    const expected_t expected[] = {
+        { TOKEN_IMPORT, "import", 1, 1 }, { TOKEN_IDENTIFIER, "ifj26", 1, 8 },
+        { TOKEN_DOT, ".", 1, 13 }, { TOKEN_STAR, "*", 1, 14 },
+        { TOKEN_NEWLINE, "\n", 1, 15 },
+        { TOKEN_MAIN, "@main", 2, 1 }, { TOKEN_DEF, "def", 2, 7 },
+        { TOKEN_IDENTIFIER, "run", 2, 11 }, { TOKEN_LPAREN, "(", 2, 14 },
+        { TOKEN_RPAREN, ")", 2, 15 }, { TOKEN_COLON, ":", 2, 16 },
+        { TOKEN_TYPE_UNIT, "Unit", 2, 18 }, { TOKEN_ASSIGN, "=", 2, 23 },
+        { TOKEN_NEWLINE, "\n", 2, 24 },
+        { TOKEN_VAL, "val", 3, 3 }, { TOKEN_IDENTIFIER, "x", 3, 7 },
+        { TOKEN_ASSIGN, "=", 3, 9 }, { TOKEN_MINUS, "-", 3, 11 },
+        { TOKEN_INTEGER, "1_000", 3, 12 }, { TOKEN_PLUS, "+", 3, 18 },
+        { TOKEN_DOUBLE, ".5e+2D", 3, 20 }, { TOKEN_EOF, NULL, 3, 26 }
     };
     sequence("import ifj26.*\n@main def run(): Unit =\n  val x = -1_000 + .5e+2D",
-             expected, sizeof expected / sizeof expected[0]);
+        expected, sizeof expected / sizeof expected[0]);
 }
 
 static void operators(void)
 {
-    const Expected expected[] = {
-        {TOKEN_LPAREN, "(", 1, 1}, {TOKEN_RPAREN, ")", 1, 2},
-        {TOKEN_COLON, ":", 1, 3}, {TOKEN_COMMA, ",", 1, 4},
-        {TOKEN_SEMICOLON, ";", 1, 5}, {TOKEN_DOT, ".", 1, 6},
-        {TOKEN_PLUS, "+", 1, 7}, {TOKEN_MINUS, "-", 1, 8},
-        {TOKEN_STAR, "*", 1, 9}, {TOKEN_SLASH, "/", 1, 10},
-        {TOKEN_ASSIGN, "=", 1, 12}, {TOKEN_EQUAL, "==", 1, 14},
-        {TOKEN_NOT_EQUAL, "!=", 1, 17}, {TOKEN_LESS, "<", 1, 20},
-        {TOKEN_LESS_EQUAL, "<=", 1, 22}, {TOKEN_GREATER, ">", 1, 25},
-        {TOKEN_GREATER_EQUAL, ">=", 1, 27}, {TOKEN_EOF, NULL, 1, 29}
+    const expected_t expected[] = {
+        { TOKEN_LPAREN, "(", 1, 1 }, { TOKEN_RPAREN, ")", 1, 2 },
+        { TOKEN_COLON, ":", 1, 3 }, { TOKEN_COMMA, ",", 1, 4 },
+        { TOKEN_SEMICOLON, ";", 1, 5 }, { TOKEN_DOT, ".", 1, 6 },
+        { TOKEN_PLUS, "+", 1, 7 }, { TOKEN_MINUS, "-", 1, 8 },
+        { TOKEN_STAR, "*", 1, 9 }, { TOKEN_SLASH, "/", 1, 10 },
+        { TOKEN_ASSIGN, "=", 1, 12 }, { TOKEN_EQUAL, "==", 1, 14 },
+        { TOKEN_NOT_EQUAL, "!=", 1, 17 }, { TOKEN_LESS, "<", 1, 20 },
+        { TOKEN_LESS_EQUAL, "<=", 1, 22 }, { TOKEN_GREATER, ">", 1, 25 },
+        { TOKEN_GREATER_EQUAL, ">=", 1, 27 }, { TOKEN_EOF, NULL, 1, 29 }
     };
     sequence("():,;.+-*/ = == != < <= > >=", expected,
-             sizeof expected / sizeof expected[0]);
+        sizeof expected / sizeof expected[0]);
 }
 
 static void words(void)
 {
-    const char *names[] = {
+    const char* names[] = {
         "def", "do", "Double", "else", "if", "import", "Int", "return",
         "String", "then", "Unit", "val", "var", "while", "Boolean", "case",
         "class", "extension", "for", "List", "match", "type", "main",
         "IF", "int", "val1", "_name", "a_b2", "readInt"
     };
-    const TokenType types[] = {
+    const token_type_t types[] = {
         TOKEN_DEF, TOKEN_DO, TOKEN_TYPE_DOUBLE, TOKEN_ELSE, TOKEN_IF,
         TOKEN_IMPORT, TOKEN_TYPE_INT, TOKEN_RETURN, TOKEN_TYPE_STRING,
         TOKEN_THEN, TOKEN_TYPE_UNIT, TOKEN_VAL, TOKEN_VAR, TOKEN_WHILE,
@@ -106,38 +110,38 @@ static void words(void)
         TOKEN_IDENTIFIER, TOKEN_IDENTIFIER, TOKEN_IDENTIFIER
     };
     for (size_t i = 0; i < sizeof names / sizeof names[0]; ++i) {
-        const Expected expected[] = {{types[i], names[i], 1, 1}};
+        const expected_t expected[] = { { types[i], names[i], 1, 1 } };
         sequence(names[i], expected, 1);
     }
 }
 
 static void numbers(void)
 {
-    const char *integers[] = {"0", "00", "0_0", "42", "1_000_000", "2147483648"};
-    const char *doubles[] = {
+    const char* integers[] = { "0", "00", "0_0", "42", "1_000_000", "2147483648" };
+    const char* doubles[] = {
         ".5", "0.5", "01.5", "1.0d", "1.0D", "1e2", "1E-2", "1e+2D",
         "1_000.2_5e1_0d", ".5e-2", "0e0", "1.7976931348623157e308",
         "1e-310", "0e-9999"
     };
     for (size_t i = 0; i < sizeof integers / sizeof integers[0]; ++i) {
-        const Expected expected[] = {{TOKEN_INTEGER, integers[i], 1, 1}};
+        const expected_t expected[] = { { TOKEN_INTEGER, integers[i], 1, 1 } };
         sequence(integers[i], expected, 1);
     }
     for (size_t i = 0; i < sizeof doubles / sizeof doubles[0]; ++i) {
-        const Expected expected[] = {{TOKEN_DOUBLE, doubles[i], 1, 1}};
+        const expected_t expected[] = { { TOKEN_DOUBLE, doubles[i], 1, 1 } };
         sequence(doubles[i], expected, 1);
     }
-    const Expected adjacent[] = {
-        {TOKEN_INTEGER, "1", 1, 1}, {TOKEN_DOT, ".", 1, 2},
-        {TOKEN_IDENTIFIER, "foo", 1, 3}, {TOKEN_MINUS, "-", 1, 6},
-        {TOKEN_INTEGER, "2", 1, 7}
+    const expected_t adjacent[] = {
+        { TOKEN_INTEGER, "1", 1, 1 }, { TOKEN_DOT, ".", 1, 2 },
+        { TOKEN_IDENTIFIER, "foo", 1, 3 }, { TOKEN_MINUS, "-", 1, 6 },
+        { TOKEN_INTEGER, "2", 1, 7 }
     };
     sequence("1.foo-2", adjacent, sizeof adjacent / sizeof adjacent[0]);
 }
 
 static void errors(void)
 {
-    const char *bad[] = {
+    const char* bad[] = {
         "_", "01", "0_1", "1_", "1__0", "1e", "1e+", "1e_2", "1e2_",
         "1.0_", "0x12", "12abc", "1L", "1.0f", "1.0Dfoo", "1d",
         "@", "@ main", "@other", "@mainly", "!", "&", "|", "%", "{", "}",
@@ -145,14 +149,15 @@ static void errors(void)
         "1e309", "1e-9999"
     };
     for (size_t i = 0; i < sizeof bad / sizeof bad[0]; ++i) {
-        FILE *input = source(bad[i]);
-        Lexer lexer;
-        Token token = {0};
+        FILE* input = source(bad[i]);
+        lexer_t lexer;
+        token_t token = { 0 };
         assert(lexer_init(&lexer, input) == LEXER_OK);
-        LexerStatus status;
+        lexer_status_t status;
         do {
             status = lexer_next(&lexer, &token);
-            if (status == LEXER_OK) assert(token.type != TOKEN_EOF);
+            if (status == LEXER_OK)
+                assert(token.type != TOKEN_EOF);
             token_dispose(&token);
         } while (status == LEXER_OK);
         assert(status == LEXER_ERROR);
@@ -160,8 +165,8 @@ static void errors(void)
         assert(token.lexeme == NULL);
         fclose(input);
     }
-    Lexer lexer;
-    Token token = {0};
+    lexer_t lexer;
+    token_t token = { 0 };
     assert(lexer_init(NULL, NULL) == LEXER_INTERNAL_ERROR);
     assert(lexer_init(&lexer, NULL) == LEXER_INTERNAL_ERROR);
     assert(lexer_next(&lexer, &token) == LEXER_INTERNAL_ERROR);
@@ -171,17 +176,17 @@ static void errors(void)
 
 static void positions_and_ownership(void)
 {
-    const Expected expected[] = {
-        {TOKEN_IDENTIFIER, "a", 1, 3}, {TOKEN_NEWLINE, "\n", 1, 5},
-        {TOKEN_NEWLINE, "\n", 2, 1}, {TOKEN_IDENTIFIER, "b", 3, 3},
-        {TOKEN_EOF, NULL, 3, 4}
+    const expected_t expected[] = {
+        { TOKEN_IDENTIFIER, "a", 1, 3 }, { TOKEN_NEWLINE, "\n", 1, 5 },
+        { TOKEN_NEWLINE, "\n", 2, 1 }, { TOKEN_IDENTIFIER, "b", 3, 3 },
+        { TOKEN_EOF, NULL, 3, 4 }
     };
     sequence("  a\r\n\n  b", expected, sizeof expected / sizeof expected[0]);
     sequence("", NULL, 0);
     sequence(" \t\r", NULL, 0);
-    FILE *input = source("first second");
-    Lexer lexer;
-    Token first, second;
+    FILE* input = source("first second");
+    lexer_t lexer;
+    token_t first, second;
     assert(lexer_init(&lexer, input) == LEXER_OK);
     assert(lexer_next(&lexer, &first) == LEXER_OK);
     assert(lexer_next(&lexer, &second) == LEXER_OK);
@@ -195,7 +200,7 @@ static void positions_and_ownership(void)
     char long_name[8193];
     memset(long_name, 'a', sizeof long_name - 1);
     long_name[sizeof long_name - 1] = '\0';
-    const Expected long_expected[] = {{TOKEN_IDENTIFIER, long_name, 1, 1}};
+    const expected_t long_expected[] = { { TOKEN_IDENTIFIER, long_name, 1, 1 } };
     sequence(long_name, long_expected, 1);
 }
 
