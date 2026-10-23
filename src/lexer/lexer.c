@@ -314,28 +314,63 @@ static int block_comment(lexer_t* lexer, size_t* first_line, size_t* first_colum
     return multiline;
 }
 
+// AI-generated using: Claude Code
+//              model: Claude Opus 5.5
+// Prompt (summary): "Refactor skip_layout() without changing behavior: extract
+//          horizontal whitespace with indentation tracking and // comment
+//          skipping into small static helpers, simplify the multiline block
+//          comment branch and keep the 1/0/-1 return contract."
+// Scope: skip_horizontal_space, logical_line_end, line_comment, skip_layout.
+
+/* Spaces before the first token of a physical line count as indentation. */
+static void skip_horizontal_space(lexer_t* lexer)
+{
+    while (lexer->status == LEXER_OK && horizontal_space(lexer->current)) {
+        if (lexer->at_line_start && !lexer->prefix_complete) {
+            if (lexer->current == ' ')
+                ++lexer->physical_indentation;
+            if (lexer->current == '\t')
+                lexer->leading_tab = 1;
+        }
+        advance(lexer);
+    }
+}
+
+/* After a physical line break: 1 emits a logical newline, 0 continues. */
+static int logical_line_end(lexer_t* lexer, token_t* output, size_t line, size_t column)
+{
+    if (lexer->status != LEXER_OK)
+        return -1;
+    if (lexer->paren_depth == 0 && lexer->logical_has_tokens)
+        return newline_token(lexer, output, line, column);
+    return 0;
+}
+
+/* Stops before LF; a comment ending at EOF still ends the logical line. */
+static int line_comment(lexer_t* lexer, token_t* output)
+{
+    while (lexer->current != '\n' && lexer->current != EOF && lexer->status == LEXER_OK)
+        advance(lexer);
+    if (lexer->current != EOF)
+        return lexer->status == LEXER_OK ? 0 : -1;
+    return logical_line_end(lexer, output, lexer->line, lexer->column);
+}
+
 /* 1: emitted logical newline, 0: ready for token/EOF, -1: error. */
 static int skip_layout(lexer_t* lexer, token_t* output)
 {
+    int result;
     while (lexer->status == LEXER_OK) {
         if (horizontal_space(lexer->current)) {
-            if (lexer->at_line_start && !lexer->prefix_complete) {
-                if (lexer->current == ' ')
-                    ++lexer->physical_indentation;
-                if (lexer->current == '\t')
-                    lexer->leading_tab = 1;
-            }
-            advance(lexer);
+            skip_horizontal_space(lexer);
             continue;
         }
         if (lexer->current == '\n') {
             size_t line = lexer->line, column = lexer->column;
             advance(lexer);
             begin_physical_line(lexer);
-            if (lexer->status != LEXER_OK)
-                return -1;
-            if (lexer->paren_depth == 0 && lexer->logical_has_tokens)
-                return newline_token(lexer, output, line, column);
+            if ((result = logical_line_end(lexer, output, line, column)) != 0)
+                return result;
             continue;
         }
         if (lexer->current == EOF)
@@ -348,12 +383,8 @@ static int skip_layout(lexer_t* lexer, token_t* output)
         }
         lexer->prefix_complete = 1;
         if (lexer->current == '/' && lexer->lookahead == '/') {
-            while (lexer->current != '\n' && lexer->current != EOF && lexer->status == LEXER_OK)
-                advance(lexer);
-            if (lexer->status != LEXER_OK)
-                return -1;
-            if (lexer->current == EOF && lexer->paren_depth == 0 && lexer->logical_has_tokens)
-                return newline_token(lexer, output, lexer->line, lexer->column);
+            if ((result = line_comment(lexer, output)) != 0)
+                return result;
             continue;
         }
         if (lexer->current == '/' && lexer->lookahead == '*') {
@@ -361,26 +392,25 @@ static int skip_layout(lexer_t* lexer, token_t* output)
             int multiline = block_comment(lexer, &line, &column);
             if (lexer->status != LEXER_OK)
                 return -1;
-            if (multiline) {
-                while (horizontal_space(lexer->current))
-                    advance(lexer);
-                if (lexer->status != LEXER_OK)
-                    return -1;
-                if (lexer->current != '\n' && lexer->current != EOF) {
-                    output->line = lexer->line;
-                    output->column = lexer->column;
-                    invalid(lexer);
-                    return -1;
-                }
-                if (lexer->current == '\n') {
-                    advance(lexer);
-                    begin_physical_line(lexer);
-                }
-                if (lexer->status != LEXER_OK)
-                    return -1;
-                if (lexer->paren_depth == 0 && lexer->logical_has_tokens)
-                    return newline_token(lexer, output, line, column);
+            if (!multiline)
+                continue;
+            /* Only whitespace may follow a multiline comment on its last line. */
+            while (horizontal_space(lexer->current))
+                advance(lexer);
+            if (lexer->status != LEXER_OK)
+                return -1;
+            if (lexer->current != '\n' && lexer->current != EOF) {
+                output->line = lexer->line;
+                output->column = lexer->column;
+                invalid(lexer);
+                return -1;
             }
+            if (lexer->current == '\n') {
+                advance(lexer);
+                begin_physical_line(lexer);
+            }
+            if ((result = logical_line_end(lexer, output, line, column)) != 0)
+                return result;
             continue;
         }
         if (lexer->at_line_start && lexer->logical_has_tokens
