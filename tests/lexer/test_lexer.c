@@ -160,11 +160,47 @@ static void numbers(void)
     sequence("1.foo-2", adjacent, sizeof adjacent / sizeof adjacent[0]);
 }
 
+// AI-generated using: Claude Code
+//              model: Claude Opus 5.5
+// Prompt (summary): "Add regression tests for numeric token boundaries,
+// including 10abc\"y\", lexeme lengths and positions. Assess unsupported
+// numeric suffixes individually and preserve malformed-number checks."
+// Scope: number_boundaries(), numeric cases in errors() and test registration.
+/* A number ends after its longest valid literal; the next character is not
+ * consumed and starts the next token. Unsupported forms (hex, L, f, d on an
+ * integer) therefore split into tokens the parser rejects. */
+static void number_boundaries(void)
+{
+    const expected_t regression[] = {
+        { TOKEN_INTEGER, "10", 1, 1 }, { TOKEN_IDENTIFIER, "abc", 1, 3 },
+        { TOKEN_STRING, "\"y\"", 1, 6 }, { TOKEN_EOF, NULL, 1, 9 }
+    };
+    sequence("10abc\"y\"", regression, sizeof regression / sizeof regression[0]);
+
+    const struct {
+        const char* text;
+        expected_t first, second;
+    } split[] = {
+        { "12abc", { TOKEN_INTEGER, "12", 1, 1 }, { TOKEN_IDENTIFIER, "abc", 1, 3 } },
+        { "0x12", { TOKEN_INTEGER, "0", 1, 1 }, { TOKEN_IDENTIFIER, "x12", 1, 2 } },
+        { "1L", { TOKEN_INTEGER, "1", 1, 1 }, { TOKEN_IDENTIFIER, "L", 1, 2 } },
+        { "1.0f", { TOKEN_DOUBLE, "1.0", 1, 1 }, { TOKEN_IDENTIFIER, "f", 1, 4 } },
+        { "1.0Dfoo", { TOKEN_DOUBLE, "1.0D", 1, 1 }, { TOKEN_IDENTIFIER, "foo", 1, 5 } },
+        { "1d", { TOKEN_INTEGER, "1", 1, 1 }, { TOKEN_IDENTIFIER, "d", 1, 2 } },
+        { "1e2x", { TOKEN_DOUBLE, "1e2", 1, 1 }, { TOKEN_IDENTIFIER, "x", 1, 4 } },
+        { "1_0.5_0dx", { TOKEN_DOUBLE, "1_0.5_0d", 1, 1 }, { TOKEN_IDENTIFIER, "x", 1, 9 } }
+    };
+    for (size_t i = 0; i < sizeof split / sizeof split[0]; ++i) {
+        const expected_t expected[] = { split[i].first, split[i].second };
+        sequence(split[i].text, expected, 2);
+    }
+}
+
 static void errors(void)
 {
     const char* bad[] = {
         "_", "01", "0_1", "1_", "1__0", "1e", "1e+", "1e_2", "1e2_",
-        "1.0_", "0x12", "12abc", "1L", "1.0f", "1.0Dfoo", "1d",
+        "1.0_", "1ex", "1e+x", "1_x", "1.5_d", "01abc", "00_1", "1e2_x",
         "@", "@ main", "@other", "@mainly", "!", "&", "|", "%", "{", "}",
         "`name`", "\x80",
         "1e309", "1e-9999"
@@ -498,6 +534,7 @@ int main(void)
     operators();
     words();
     numbers();
+    number_boundaries();
     errors();
     positions_and_ownership();
     string_literals();
@@ -510,6 +547,6 @@ int main(void)
 #ifdef LEXER_TEST_ALLOC_FAILURES
     allocation_failures();
 #endif
-    puts("Lexer: all 13 test groups passed.");
+    puts("Lexer: all 14 test groups passed.");
     return 0;
 }

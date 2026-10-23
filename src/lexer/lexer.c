@@ -166,10 +166,14 @@ static void number(lexer_t* lexer, buffer_t* buffer, token_type_t* type)
     if (*type == TOKEN_DOUBLE && (lexer->current == 'd' || lexer->current == 'D'))
         if (!take(lexer, buffer))
             return;
-    if (id_part(lexer->current)) {
-        invalid(lexer);
-        return;
-    }
+    // AI-generated using: Claude Code
+    //              model: Claude Opus 5.5
+    // Prompt (summary): "Fix numeric token boundaries so 10abc returns 10
+    // and abc without consuming the next token. Preserve validation of
+    // malformed exponents, separators, leading zeros and numeric range."
+    /* The longest valid literal ends here; a following character starts the
+     * next token (12abc is 12 and abc), so the parser rejects such input.
+     */
     if (*type == TOKEN_INTEGER && leading_zero && nonzero)
         invalid(lexer);
     if (*type == TOKEN_DOUBLE && lexer->status == LEXER_OK) {
