@@ -488,6 +488,181 @@ static void independent_lexers(void)
     fclose(b);
 }
 
+// AI-generated using: Claude Code
+//              model: Claude Opus 5.5
+// Prompt (summary): "Add regression tests for the refactored identifier(),
+//          operator_token() and layout helpers: every operator at EOF,
+//          identifier and keyword boundaries, lone underscore, // comments
+//          at EOF and comments with indentation inside parentheses."
+// Scope: operator_boundaries, identifier_boundaries, comment_layout.
+
+static void operator_boundaries(void)
+{
+    const struct {
+        const char* text;
+        token_type_t type;
+    } single[] = {
+        { "(", TOKEN_LPAREN }, { ")", TOKEN_RPAREN }, { ":", TOKEN_COLON },
+        { ",", TOKEN_COMMA }, { ";", TOKEN_SEMICOLON }, { ".", TOKEN_DOT },
+        { "+", TOKEN_PLUS }, { "-", TOKEN_MINUS }, { "*", TOKEN_STAR },
+        { "/", TOKEN_SLASH }, { "=", TOKEN_ASSIGN }, { "<", TOKEN_LESS },
+        { ">", TOKEN_GREATER }, { "==", TOKEN_EQUAL }, { "!=", TOKEN_NOT_EQUAL },
+        { "<=", TOKEN_LESS_EQUAL }, { ">=", TOKEN_GREATER_EQUAL }
+    };
+    for (size_t i = 0; i < sizeof single / sizeof single[0]; ++i) {
+        const expected_t expected[] = {
+            { single[i].type, single[i].text, 1, 1 },
+            { TOKEN_EOF, NULL, 1, strlen(single[i].text) + 1 }
+        };
+        sequence(single[i].text, expected, 2);
+    }
+
+    /* Two-character operators take at most one '='; the rest starts a new token. */
+    const struct {
+        const char* text;
+        expected_t first, second;
+    } split[] = {
+        { "===", { TOKEN_EQUAL, "==", 1, 1 }, { TOKEN_ASSIGN, "=", 1, 3 } },
+        { "!==", { TOKEN_NOT_EQUAL, "!=", 1, 1 }, { TOKEN_ASSIGN, "=", 1, 3 } },
+        { "<==", { TOKEN_LESS_EQUAL, "<=", 1, 1 }, { TOKEN_ASSIGN, "=", 1, 3 } },
+        { ">==", { TOKEN_GREATER_EQUAL, ">=", 1, 1 }, { TOKEN_ASSIGN, "=", 1, 3 } },
+        { "=!=", { TOKEN_ASSIGN, "=", 1, 1 }, { TOKEN_NOT_EQUAL, "!=", 1, 2 } },
+        { "=<", { TOKEN_ASSIGN, "=", 1, 1 }, { TOKEN_LESS, "<", 1, 2 } },
+        { "=>", { TOKEN_ASSIGN, "=", 1, 1 }, { TOKEN_GREATER, ">", 1, 2 } },
+        { "<>", { TOKEN_LESS, "<", 1, 1 }, { TOKEN_GREATER, ">", 1, 2 } },
+        { "--", { TOKEN_MINUS, "-", 1, 1 }, { TOKEN_MINUS, "-", 1, 2 } },
+        { "*/", { TOKEN_STAR, "*", 1, 1 }, { TOKEN_SLASH, "/", 1, 2 } }
+    };
+    for (size_t i = 0; i < sizeof split / sizeof split[0]; ++i) {
+        const expected_t expected[] = { split[i].first, split[i].second };
+        sequence(split[i].text, expected, 2);
+    }
+
+    /* Unary ! belongs to the Boolean extension; base IFJ26 knows only !=. */
+    const char* bad[] = { "! =", "!a", "a!", "=!", "!\n=" };
+    for (size_t i = 0; i < sizeof bad / sizeof bad[0]; ++i)
+        expect_error(bad[i]);
+}
+
+static void identifier_boundaries(void)
+{
+    /* Keywords match only whole identifiers (section 1.1). */
+    const char* longer[] = {
+        "define", "done", "Doubles", "elsewhere", "iff", "imports", "Integer",
+        "returned", "Stringy", "thenx", "Units", "value", "vars", "whileTrue",
+        "Booleans", "cases", "classy", "extensions", "form", "Lists", "matches",
+        "types", "de", "Do", "els", "whil", "if_", "_val", "Int2", "__", "_1", "a_"
+    };
+    for (size_t i = 0; i < sizeof longer / sizeof longer[0]; ++i) {
+        const expected_t expected[] = { { TOKEN_IDENTIFIER, longer[i], 1, 1 } };
+        sequence(longer[i], expected, 1);
+    }
+
+    const expected_t call[] = {
+        { TOKEN_IF, "if", 1, 1 }, { TOKEN_LPAREN, "(", 1, 3 },
+        { TOKEN_IDENTIFIER, "x", 1, 4 }, { TOKEN_RPAREN, ")", 1, 5 },
+        { TOKEN_EOF, NULL, 1, 6 }
+    };
+    sequence("if(x)", call, sizeof call / sizeof call[0]);
+    const expected_t assignment[] = {
+        { TOKEN_VAL, "val", 1, 1 }, { TOKEN_IDENTIFIER, "x", 1, 5 },
+        { TOKEN_ASSIGN, "=", 1, 6 }, { TOKEN_IDENTIFIER, "y", 1, 7 },
+        { TOKEN_PLUS, "+", 1, 8 }, { TOKEN_IDENTIFIER, "z1", 1, 9 },
+        { TOKEN_EOF, NULL, 1, 11 }
+    };
+    sequence("val x=y+z1", assignment, sizeof assignment / sizeof assignment[0]);
+    const expected_t mixed[] = {
+        { TOKEN_IDENTIFIER, "while_x", 1, 1 }, { TOKEN_LESS_EQUAL, "<=", 1, 8 },
+        { TOKEN_TYPE_INT, "Int", 1, 10 }, { TOKEN_DOT, ".", 1, 13 },
+        { TOKEN_IDENTIFIER, "s", 1, 14 }, { TOKEN_STRING, "\"t\"", 1, 15 },
+        { TOKEN_ELSE, "else", 1, 18 }, { TOKEN_SEMICOLON, ";", 1, 22 },
+        { TOKEN_THEN, "then", 1, 23 }, { TOKEN_EOF, NULL, 1, 27 }
+    };
+    sequence("while_x<=Int.s\"t\"else;then", mixed, sizeof mixed / sizeof mixed[0]);
+    const expected_t underscores[] = {
+        { TOKEN_IDENTIFIER, "__", 1, 1 }, { TOKEN_IDENTIFIER, "_1", 1, 4 },
+        { TOKEN_IDENTIFIER, "a_", 1, 7 }
+    };
+    sequence("__ _1 a_", underscores, sizeof underscores / sizeof underscores[0]);
+
+    /* A lone underscore is not an identifier wherever it appears. */
+    const char* bad[] = {
+        "_ ", "_(", "(_)", "x _", "_+1", "val _ = 1", "_\n", "_// c", "a\n_"
+    };
+    for (size_t i = 0; i < sizeof bad / sizeof bad[0]; ++i)
+        expect_error(bad[i]);
+}
+
+static void comment_layout(void)
+{
+    /* A // comment at EOF ends a non-empty logical line outside parentheses. */
+    const expected_t tight[] = {
+        { TOKEN_IDENTIFIER, "a", 1, 1 }, { TOKEN_NEWLINE, "\n", 1, 7 }
+    };
+    sequence("a//eof", tight, 2);
+    const expected_t after_line[] = {
+        { TOKEN_IDENTIFIER, "a", 1, 1 }, { TOKEN_NEWLINE, "\n", 1, 2 },
+        { TOKEN_EOF, NULL, 2, 7 }
+    };
+    sequence("a\n// eof", after_line, 3);
+    const expected_t after_block[] = {
+        { TOKEN_IDENTIFIER, "a", 1, 1 }, { TOKEN_NEWLINE, "\n", 1, 17 }
+    };
+    sequence("a /* x */ // eof", after_block, 2);
+    const expected_t not_nested[] = {
+        { TOKEN_IDENTIFIER, "a", 1, 1 }, { TOKEN_NEWLINE, "\n", 1, 21 }
+    };
+    sequence("a // x /* not nested", not_nested, 2);
+    const expected_t inside_block[] = {
+        { TOKEN_IDENTIFIER, "a", 1, 1 }, { TOKEN_IDENTIFIER, "b", 1, 12 }
+    };
+    sequence("a /* // */ b", inside_block, 2);
+    const expected_t open_paren[] = {
+        { TOKEN_IDENTIFIER, "f", 1, 1 }, { TOKEN_LPAREN, "(", 1, 2 },
+        { TOKEN_IDENTIFIER, "x", 1, 3 }, { TOKEN_EOF, NULL, 1, 11 }
+    };
+    sequence("f(x // eof", open_paren, 4);
+
+    /* Comment-only lines are ignored; continuation lines inside parentheses
+     * must be indented more than the start of the logical line (1.2). */
+    const char* text = "f(a, // tail\n  /* gap */ b\n// ignored\n  )\n"
+                       "  y = 1 /* multi\n*/\nz // end";
+    const expected_t expected[] = {
+        { TOKEN_IDENTIFIER, "f", 1, 1 }, { TOKEN_LPAREN, "(", 1, 2 },
+        { TOKEN_IDENTIFIER, "a", 1, 3 }, { TOKEN_COMMA, ",", 1, 4 },
+        { TOKEN_IDENTIFIER, "b", 2, 13 }, { TOKEN_RPAREN, ")", 4, 3 },
+        { TOKEN_NEWLINE, "\n", 4, 4 }, { TOKEN_IDENTIFIER, "y", 5, 3 },
+        { TOKEN_ASSIGN, "=", 5, 5 }, { TOKEN_INTEGER, "1", 5, 7 },
+        { TOKEN_NEWLINE, "\n", 5, 17 }, { TOKEN_IDENTIFIER, "z", 7, 1 },
+        { TOKEN_NEWLINE, "\n", 7, 9 }, { TOKEN_EOF, NULL, 7, 9 }
+    };
+    const size_t count = sizeof expected / sizeof expected[0];
+    sequence(text, expected, count);
+    const size_t indentation[] = { 0, 0, 0, 0, 0, 0, 0, 2, 2, 2, 2, 0, 0, 0 };
+    const int starts[] = { 1, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0 };
+    FILE* input = source(text);
+    lexer_t lexer;
+    token_t token = { 0 };
+    assert(lexer_init(&lexer, input) == LEXER_OK);
+    for (size_t i = 0; i < count; ++i) {
+        assert(lexer_next(&lexer, &token) == LEXER_OK);
+        assert(token.indentation == indentation[i]);
+        assert(token.starts_line == starts[i]);
+        token_dispose(&token);
+    }
+    fclose(input);
+
+    const expected_t continued[] = {
+        { TOKEN_IDENTIFIER, "f", 1, 3 }, { TOKEN_LPAREN, "(", 1, 4 },
+        { TOKEN_IDENTIFIER, "x", 2, 4 }, { TOKEN_RPAREN, ")", 2, 5 },
+        { TOKEN_EOF, NULL, 2, 6 }
+    };
+    sequence("  f( // c\n   x)", continued, sizeof continued / sizeof continued[0]);
+    const char* bad[] = { "f(\n// ok\nx)", "  f( // c\n  x)", "  f(\n  /* gap */ x)" };
+    for (size_t i = 0; i < sizeof bad / sizeof bad[0]; ++i)
+        expect_error(bad[i]);
+}
+
 #ifdef LEXER_TEST_ALLOC_FAILURES
 static void allocation_failures(void)
 {
@@ -544,9 +719,12 @@ int main(void)
     indentation_metadata();
     full_program();
     independent_lexers();
+    operator_boundaries();
+    identifier_boundaries();
+    comment_layout();
 #ifdef LEXER_TEST_ALLOC_FAILURES
     allocation_failures();
 #endif
-    puts("Lexer: all 14 test groups passed.");
+    puts("Lexer: all 17 test groups passed.");
     return 0;
 }
