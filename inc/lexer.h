@@ -1,7 +1,6 @@
 // Implementation of the IFJ26 imperative language compiler
 // lexer.h
 // Author(s): Tadeáš Zonyga (xzonygt00)
-//
 
 #ifndef IFJ_LEXER_H
 #define IFJ_LEXER_H

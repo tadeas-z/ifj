@@ -423,6 +423,99 @@ static int skip_layout(lexer_t* lexer, token_t* output)
     return -1;
 }
 
+// AI-generated using: Claude Code
+//              model: Claude Opus 5.5
+// Prompt (summary): "Simplify lexer_next(): extract identifier scanning and
+//          operator recognition into small static helpers, keep the operator
+//          switch and two-character operators, positions, sticky errors and
+//          buffer cleanup unchanged."
+// Scope: identifier, operator_token and their use in lexer_next.
+
+/* On error the returned type is unused; lexer_next frees the buffer. */
+static token_type_t identifier(lexer_t* lexer, buffer_t* buffer)
+{
+    do {
+        if (!take(lexer, buffer))
+            return TOKEN_EOF;
+    } while (id_part(lexer->current));
+    if (strcmp(buffer->data, "_") == 0) {
+        invalid(lexer);
+        return TOKEN_EOF;
+    }
+    return keyword(buffer->data);
+}
+
+static token_type_t operator_token(lexer_t* lexer, buffer_t* buffer)
+{
+    token_type_t type = TOKEN_EOF;
+    int c = lexer->current;
+    switch (c) {
+    case '\n':
+        type = TOKEN_NEWLINE;
+        break;
+    case '(':
+        type = TOKEN_LPAREN;
+        break;
+    case ')':
+        type = TOKEN_RPAREN;
+        break;
+    case ':':
+        type = TOKEN_COLON;
+        break;
+    case ',':
+        type = TOKEN_COMMA;
+        break;
+    case ';':
+        type = TOKEN_SEMICOLON;
+        break;
+    case '.':
+        type = TOKEN_DOT;
+        break;
+    case '+':
+        type = TOKEN_PLUS;
+        break;
+    case '-':
+        type = TOKEN_MINUS;
+        break;
+    case '*':
+        type = TOKEN_STAR;
+        break;
+    case '/':
+        type = TOKEN_SLASH;
+        break;
+    case '=':
+        type = TOKEN_ASSIGN;
+        break;
+    case '<':
+        type = TOKEN_LESS;
+        break;
+    case '>':
+        type = TOKEN_GREATER;
+        break;
+    case '!':
+        if (lexer->lookahead == '=')
+            type = TOKEN_NOT_EQUAL;
+        else
+            invalid(lexer);
+        break;
+    default:
+        invalid(lexer);
+        break;
+    }
+    if (lexer->status == LEXER_OK && take(lexer, buffer)) {
+        if ((c == '=' || c == '!' || c == '<' || c == '>') && lexer->current == '=') {
+            if (c == '=')
+                type = TOKEN_EQUAL;
+            if (c == '<')
+                type = TOKEN_LESS_EQUAL;
+            if (c == '>')
+                type = TOKEN_GREATER_EQUAL;
+            take(lexer, buffer);
+        }
+    }
+    return type;
+}
+
 lexer_status_t lexer_next(lexer_t* lexer, token_t* output)
 {
     if (!output)
@@ -459,16 +552,7 @@ lexer_status_t lexer_next(lexer_t* lexer, token_t* output)
         type = TOKEN_STRING;
         string_literal(lexer, &buffer);
     } else if (id_start(lexer->current)) {
-        do {
-            if (!take(lexer, &buffer))
-                break;
-        } while (id_part(lexer->current));
-        if (lexer->status == LEXER_OK) {
-            if (strcmp(buffer.data, "_") == 0)
-                invalid(lexer);
-            else
-                type = keyword(buffer.data);
-        }
+        type = identifier(lexer, &buffer);
     } else if (digit(lexer->current) || (lexer->current == '.' && digit(lexer->lookahead))) {
         number(lexer, &buffer, &type);
     } else if (lexer->current == '@') {
@@ -485,71 +569,7 @@ lexer_status_t lexer_next(lexer_t* lexer, token_t* output)
             invalid(lexer);
         type = TOKEN_MAIN;
     } else {
-        int c = lexer->current;
-        switch (c) {
-        case '\n':
-            type = TOKEN_NEWLINE;
-            break;
-        case '(':
-            type = TOKEN_LPAREN;
-            break;
-        case ')':
-            type = TOKEN_RPAREN;
-            break;
-        case ':':
-            type = TOKEN_COLON;
-            break;
-        case ',':
-            type = TOKEN_COMMA;
-            break;
-        case ';':
-            type = TOKEN_SEMICOLON;
-            break;
-        case '.':
-            type = TOKEN_DOT;
-            break;
-        case '+':
-            type = TOKEN_PLUS;
-            break;
-        case '-':
-            type = TOKEN_MINUS;
-            break;
-        case '*':
-            type = TOKEN_STAR;
-            break;
-        case '/':
-            type = TOKEN_SLASH;
-            break;
-        case '=':
-            type = TOKEN_ASSIGN;
-            break;
-        case '<':
-            type = TOKEN_LESS;
-            break;
-        case '>':
-            type = TOKEN_GREATER;
-            break;
-        case '!':
-            if (lexer->lookahead == '=')
-                type = TOKEN_NOT_EQUAL;
-            else
-                invalid(lexer);
-            break;
-        default:
-            invalid(lexer);
-            break;
-        }
-        if (lexer->status == LEXER_OK && take(lexer, &buffer)) {
-            if ((c == '=' || c == '!' || c == '<' || c == '>') && lexer->current == '=') {
-                if (c == '=')
-                    type = TOKEN_EQUAL;
-                if (c == '<')
-                    type = TOKEN_LESS_EQUAL;
-                if (c == '>')
-                    type = TOKEN_GREATER_EQUAL;
-                take(lexer, &buffer);
-            }
-        }
+        type = operator_token(lexer, &buffer);
     }
     if (lexer->status != LEXER_OK) {
         free(buffer.data);
