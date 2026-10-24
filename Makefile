@@ -1,0 +1,35 @@
+# Implementation of the IFJ26 imperative language compiler
+# Makefile
+# Author(s): Tadeáš Zonyga (xzonygt00)
+
+CC = gcc
+CPPFLAGS = -Iinc
+CFLAGS = -std=c11 -Wall -Wextra -Wpedantic -Werror -g
+
+TARGET = build/ifj26
+SOURCES = $(wildcard src/*.c src/*/*.c)
+OBJECTS = $(patsubst src/%.c,build/%.o,$(SOURCES))
+DEPS = $(OBJECTS:.o=.d)
+
+.PHONY: all clean
+all: $(TARGET)
+
+$(TARGET): $(OBJECTS)
+	$(CC) $(CFLAGS) $(OBJECTS) -o $@
+
+build/%.o: src/%.c
+ifeq ($(OS),Windows_NT)
+	powershell -NoProfile -Command "New-Item -ItemType Directory -Force -Path '$(@D)' | Out-Null"
+else
+	mkdir -p $(@D)
+endif
+	$(CC) $(CPPFLAGS) $(CFLAGS) -MMD -MP -c $< -o $@
+
+clean:
+ifeq ($(OS),Windows_NT)
+	powershell -NoProfile -Command "if (Test-Path -LiteralPath 'build') { if ((Get-Item -LiteralPath 'build').Attributes -band [IO.FileAttributes]::ReparsePoint) { throw 'Refusing to remove a linked build directory' }; Remove-Item -LiteralPath 'build' -Recurse -Force }"
+else
+	rm -rf build
+endif
+
+-include $(DEPS)
