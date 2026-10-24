@@ -7,7 +7,8 @@
 
 #include <stdio.h>
 #include <stdint.h>
-#include "symtable.h"
+#include "types.h"
+#include "dynamic_array.h"
 
 typedef struct ast_node ast_node_t;
 
@@ -39,15 +40,9 @@ typedef enum {
 
 typedef struct
 {
-    ast_node_t** items;
-    size_t count, capacity;
-} ast_list_t;
-
-typedef struct
-{
-    char* name;         // P
-    type_t* type;       // P
-    int id;             // S
+    char* name;         // (P)
+    type_t* type;       // (P)
+    int id;             // (S)
 }ast_param_t;
 
 typedef enum
@@ -70,23 +65,22 @@ typedef enum {
 
 typedef struct
 {
-    ast_list_t func_list;      // (P) list of functions (AST_FUNC_DEF) nodes in source order
+    dyn_arr_t func_list;      // (P) list of functions (AST_FUNC_DEF) node pointers in source order
 } ast_program_t;
 
 typedef struct
 {
     char* name;             // (P)
     bool is_main;           // (P) semantics must check there is only one function with @main
-    ast_param_t *params;    // (P) array of function params + count
-    int param_count;
+    dyn_arr_t params;      // (P) array of ast_param_t* - also hold the count
     type_t *return_type;    // (P, then S) NULL when not written. Semantics replaces it with the inferred type
     ast_node_t* body;       // (P) AST_BLOCK node.
-    ast_list_t locals;      // (S) every VAR_DEF in the body - pointers are borrowed
+    dyn_arr_t locals;      // (S) every VAR_DEF in the body - pointers are borrowed
 } ast_func_def_t;
 
 typedef struct
 {
-    ast_list_t statements;      // (P) statements of the block in source order
+    dyn_arr_t statements;      // (P) statements of the block in source order
 } ast_block_t;
 
 typedef struct
@@ -94,7 +88,7 @@ typedef struct
     char* name;             // (P) identifier
     bool is_const;          // (P) var - false, val - true
     type_t* declared_type;  // (P) written ": Type" or NULL when omitted
-    ast_node_t* init;       // (P) initializer expression or call - always present
+    ast_node_t* init;       // (P) initializer expression or call - always present (val x: Int = a + 1 -> a+1 is the init)
     int id;                 // (S) unique id of this variable (used for shadowing)
 } ast_var_def_t;
 
@@ -166,7 +160,7 @@ typedef struct
 typedef struct
 {
     char* name;                 // (P) the called functions identifier
-    ast_list_t args;            // (P) argument expressions in order
+    dyn_arr_t args;            // (P) argument expressions in order
     bool is_builtin;            // (S) print, readInt, ...
 } ast_call_t;
 
@@ -206,16 +200,36 @@ struct ast_node {
 // Prompt: "Can you insert the constructor function declarations into this
 //          header file?"
 // Scope: declarations of the ast_new_* constructors, ast_func_def_add_param
-//        and ast_list_append only
 
-// Program structure
+
+/**
+ * @brief Consturcts a node which acts as the root of the tree (program)
+ * @return NULL on memory allocation failure, else the constructed node
+ */
 ast_node_t* ast_new_program(void);
-// Creates a function with no params, return_type = NULL and body = NULL.
-// The parser adds params with ast_func_def_add_param and then sets
-// func_def.return_type and func_def.body directly.
+
+/**
+ * @brief Constructs a node that represents a function definiton and fills it with default values
+ * @param name function identifier
+ * @param is_main true if this function was marked with @main
+ * @param line line of the definition
+ * @param column column of the function deifiniton
+ * @return NULL on memory allocation failure, else the new node
+ * @note functions params can be added using ast_func_def_add_param and
+ *      return_type and the body is added directly by the parser
+ */
 ast_node_t* ast_new_func_def(const char* name, bool is_main, size_t line, size_t column);
-bool ast_func_def_add_param(ast_node_t* func_def, const char* name, type_t* type);
-// Creates an empty block, statements are added with ast_list_append.
+
+/**
+ * @brief Add a praam to an already existing function definition node
+ * @param func_def_node function definition node
+ * @param name name of the param you want to insert (copied to the heap by the function)
+ * @param type type struct fot the new param
+ * @return false on invalid input parameters or memory allocation failure, else true
+ * @note sets the parameters (ast_param_t) id to -1
+ */
+bool ast_func_def_add_param(ast_node_t* func_def_node, const char* name, type_t* type);
+// Creates an empty block, statements are added with dyn_arr_append.
 ast_node_t* ast_new_block(size_t line, size_t column);
 
 // Statements
@@ -237,19 +251,16 @@ ast_node_t* ast_new_unit_lit(size_t line, size_t column);
 ast_node_t* ast_new_var_ref(const char* name, size_t line, size_t column);
 ast_node_t* ast_new_unary(ast_unary_op_t op, ast_node_t* operand, size_t line, size_t column);
 ast_node_t* ast_new_binary(ast_binary_op_t op, ast_node_t* left, ast_node_t* right, size_t line, size_t column);
-// Creates a call with no arguments, arguments are added with ast_list_append.
+// Creates a call with no arguments, arguments are added with dyn_arr_append.
 ast_node_t* ast_new_call(const char* name, size_t line, size_t column);
 // Used only by semantics. Takes line and column from operand, type is TYPE_DOUBLE.
 ast_node_t* ast_new_convert(ast_node_t* operand);
 
-// Appends node to the end of list, growing it when full. Returns false if
-// allocation fails, the node is then still owned by the caller.
-bool ast_list_append(ast_list_t* list, ast_node_t* node);
-
-
-
-// Frees node, all its children, lists and strings. NULL is allowed.
-// Nodes in func_def.locals are borrowed, only the list's array is freed.
+/**
+ * @brief Recursively frees the entire abstract syntax tree
+ * @param node pointer to the root of the AST
+ * @note this function is implemented as a recursive finite state machine
+ */
 void ast_free(ast_node_t* node);
 
 // Debug output: prints the tree one node per line, children indented.
