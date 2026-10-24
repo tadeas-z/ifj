@@ -44,9 +44,9 @@ void* __real_realloc(void* ptr, size_t size);
 void __real_free(void* ptr);
 
 static bool g_track = false;
-static long g_live = 0;     // allocations minus frees while tracking
-static long g_count = 0;    // allocation attempts while tracking
-static long g_fail_at = 0;  // 0 = never fail, else fail the g_fail_at-th attempt
+static long g_live = 0; // allocations minus frees while tracking
+static long g_count = 0; // allocation attempts while tracking
+static long g_fail_at = 0; // 0 = never fail, else fail the g_fail_at-th attempt
 
 static bool should_fail(void)
 {
@@ -370,7 +370,7 @@ TEST_F(AstConstructorTest, UnaryNegation)
 TEST_F(AstConstructorTest, BinaryEveryOperator)
 {
     const ast_binary_op_t ops[] = { AST_OP_ADD, AST_OP_SUB, AST_OP_MUL, AST_OP_DIV, AST_OP_LT,
-                                    AST_OP_LE, AST_OP_GT, AST_OP_GE, AST_OP_EQ, AST_OP_NE };
+        AST_OP_LE, AST_OP_GT, AST_OP_GE, AST_OP_EQ, AST_OP_NE };
     for (ast_binary_op_t op : ops) {
         ast_node_t* left = ast_new_int_lit(1, 1, 1);
         ast_node_t* right = ast_new_int_lit(2, 1, 5);
@@ -962,20 +962,14 @@ static ast_node_t* build_every_kind_tree(void)
     dyn_arr_append(&call->call.args, ast_new_unit_lit(6, 17));
     dyn_arr_append(&else_block->block.statements, ast_new_expr_stmt(call, 6, 5));
     dyn_arr_append(&else_block->block.statements, ast_new_return(NULL, 7, 5));
-    dyn_arr_append(&body->block.statements, ast_new_if(
-        ast_new_binary(AST_OP_LT, ast_new_var_ref("x", 3, 6), ast_new_int_lit(5, 3, 10), 3, 8),
-        then_block, else_block, 3, 3));
+    dyn_arr_append(&body->block.statements, ast_new_if(ast_new_binary(AST_OP_LT, ast_new_var_ref("x", 3, 6), ast_new_int_lit(5, 3, 10), 3, 8), then_block, else_block, 3, 3));
 
     ast_node_t* loop_body = ast_new_block(9, 5);
     dyn_arr_append(&loop_body->block.statements,
         ast_new_assign("x", ast_new_unary(AST_OP_NEG, ast_new_var_ref("x", 9, 10), 9, 9), 9, 5));
-    dyn_arr_append(&body->block.statements, ast_new_while(
-        ast_new_binary(AST_OP_GT, ast_new_var_ref("x", 8, 9), ast_new_int_lit(0, 8, 13), 8, 11),
-        loop_body, 8, 3));
+    dyn_arr_append(&body->block.statements, ast_new_while(ast_new_binary(AST_OP_GT, ast_new_var_ref("x", 8, 9), ast_new_int_lit(0, 8, 13), 8, 11), loop_body, 8, 3));
 
-    dyn_arr_append(&body->block.statements, ast_new_expr_stmt(
-        ast_new_binary(AST_OP_MUL, ast_new_convert(ast_new_var_ref("x", 10, 3)), ast_new_double_lit(1.5, 10, 7), 10, 5),
-        10, 3));
+    dyn_arr_append(&body->block.statements, ast_new_expr_stmt(ast_new_binary(AST_OP_MUL, ast_new_convert(ast_new_var_ref("x", 10, 3)), ast_new_double_lit(1.5, 10, 7), 10, 5), 10, 3));
 
     dyn_arr_append(&program->program.func_list, fn);
     return program;
@@ -1022,8 +1016,8 @@ TEST_F(AstFreeTest, HalfBuiltNodesAreFreed)
     ast_node_t* right = ast_new_int_lit(2, 1, 5);
     ast_node_t* binary = ast_new_binary(AST_OP_ADD, ast_new_int_lit(1, 1, 1), right, 1, 3);
     binary->binary.right = nullptr; // pretend the right side was never attached
-    ast_free(binary);               // must not crash on the missing child
-    ast_free(right);                // the detached child is freed by its owner
+    ast_free(binary); // must not crash on the missing child
+    ast_free(right); // the detached child is freed by its owner
 
     ast_node_t* fn = ast_new_func_def("f", false, 1, 1); // no body
     ast_free(fn);
@@ -1209,8 +1203,8 @@ TEST_F(AstPrintTest, EveryKindTreeIsPrinted)
     ast_node_t* program = build_every_kind_tree();
     std::string text = print_to_string(program);
     const char* kinds[] = { "PROGRAM", "FUNC_DEF", "BLOCK", "VAR_DEF", "ASSIGN", "RETURN", "IF", "WHILE",
-                            "EXPR_STMT", "INT_LIT", "DOUBLE_LIT", "STRING_LIT", "UNIT_LIT", "VAR_REF",
-                            "UNARY", "BINARY", "CALL", "CONVERT" };
+        "EXPR_STMT", "INT_LIT", "DOUBLE_LIT", "STRING_LIT", "UNIT_LIT", "VAR_REF",
+        "UNARY", "BINARY", "CALL", "CONVERT" };
     for (const char* kind : kinds)
         EXPECT_NE(text.find(kind), std::string::npos) << kind << " missing from ast_print output";
 

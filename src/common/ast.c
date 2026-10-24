@@ -72,7 +72,6 @@ ast_node_t* ast_new_program(void)
     return node;
 }
 
-
 // ----------------------------------------
 //  Functions
 // ----------------------------------------
@@ -127,7 +126,8 @@ bool ast_func_def_add_param(ast_node_t* func_def_node, const char* name, type_t*
     return true;
 }
 
-ast_node_t* ast_new_block(size_t line, size_t column) {
+ast_node_t* ast_new_block(size_t line, size_t column)
+{
     ast_node_t* node = new_node(AST_BLOCK, line, column);
     if (node == NULL)
         return NULL;
@@ -140,12 +140,11 @@ ast_node_t* ast_new_block(size_t line, size_t column) {
 //  Statements constructors
 // ----------------------------------------
 
-
-ast_node_t* ast_new_var_def(const char* name, bool is_const, type_t* declared_type, ast_node_t* init, size_t line, size_t column) {
+ast_node_t* ast_new_var_def(const char* name, bool is_const, type_t* declared_type, ast_node_t* init, size_t line, size_t column)
+{
     // Declared type can be NULL whne ": Type" is omitted
     if (name == NULL || init == NULL)
         return NULL;
-
 
     ast_node_t* node = new_node(AST_VAR_DEF, line, column);
     if (node == NULL)
@@ -160,7 +159,8 @@ ast_node_t* ast_new_var_def(const char* name, bool is_const, type_t* declared_ty
     return node;
 }
 
-ast_node_t* ast_new_assign(const char* name, ast_node_t* value, size_t line, size_t column) {
+ast_node_t* ast_new_assign(const char* name, ast_node_t* value, size_t line, size_t column)
+{
     if (name == NULL || value == NULL)
         return NULL;
 
@@ -175,7 +175,8 @@ ast_node_t* ast_new_assign(const char* name, ast_node_t* value, size_t line, siz
     return node;
 }
 
-ast_node_t* ast_new_return(ast_node_t* value, size_t line, size_t column) {
+ast_node_t* ast_new_return(ast_node_t* value, size_t line, size_t column)
+{
     // NULL is a valid return value
     ast_node_t* node = new_node(AST_RETURN, line, column);
     if (node == NULL)
@@ -185,7 +186,8 @@ ast_node_t* ast_new_return(ast_node_t* value, size_t line, size_t column) {
     return node;
 }
 
-ast_node_t* ast_new_if(ast_node_t* cond, ast_node_t* then_block, ast_node_t* else_block, size_t line, size_t column) {
+ast_node_t* ast_new_if(ast_node_t* cond, ast_node_t* then_block, ast_node_t* else_block, size_t line, size_t column)
+{
     // else_block can be NULL IF BOOLTHEN extension is being implemented
     if (cond == NULL || then_block == NULL)
         return NULL;
@@ -200,8 +202,8 @@ ast_node_t* ast_new_if(ast_node_t* cond, ast_node_t* then_block, ast_node_t* els
     return node;
 }
 
-
-ast_node_t* ast_new_while(ast_node_t* cond, ast_node_t* body, size_t line, size_t column) {
+ast_node_t* ast_new_while(ast_node_t* cond, ast_node_t* body, size_t line, size_t column)
+{
     if (cond == NULL || body == NULL)
         return NULL;
 
@@ -214,7 +216,8 @@ ast_node_t* ast_new_while(ast_node_t* cond, ast_node_t* body, size_t line, size_
     return node;
 }
 
-ast_node_t* ast_new_expr_stmt(ast_node_t* expr, size_t line, size_t column) {
+ast_node_t* ast_new_expr_stmt(ast_node_t* expr, size_t line, size_t column)
+{
     if (expr == NULL)
         return NULL;
 
@@ -226,12 +229,12 @@ ast_node_t* ast_new_expr_stmt(ast_node_t* expr, size_t line, size_t column) {
     return node;
 }
 
-
 // ----------------------------------------
 //  Expressions
 // ----------------------------------------
 
-ast_node_t* ast_new_int_lit(int64_t value, size_t line, size_t column) {
+ast_node_t* ast_new_int_lit(int64_t value, size_t line, size_t column)
+{
     ast_node_t* node = new_node(AST_INT_LIT, line, column);
     if (node == NULL)
         return NULL;
@@ -240,7 +243,8 @@ ast_node_t* ast_new_int_lit(int64_t value, size_t line, size_t column) {
     return node;
 }
 
-ast_node_t* ast_new_double_lit(double value, size_t line, size_t column) {
+ast_node_t* ast_new_double_lit(double value, size_t line, size_t column)
+{
     ast_node_t* node = new_node(AST_DOUBLE_LIT, line, column);
     if (node == NULL)
         return NULL;
@@ -249,7 +253,8 @@ ast_node_t* ast_new_double_lit(double value, size_t line, size_t column) {
     return node;
 }
 
-ast_node_t* ast_new_string_lit(const char* value, size_t line, size_t column) {
+ast_node_t* ast_new_string_lit(const char* value, size_t line, size_t column)
+{
     if (value == NULL)
         return NULL;
 
@@ -263,14 +268,16 @@ ast_node_t* ast_new_string_lit(const char* value, size_t line, size_t column) {
     return node;
 }
 
-ast_node_t* ast_new_unit_lit(size_t line, size_t column) {
+ast_node_t* ast_new_unit_lit(size_t line, size_t column)
+{
     ast_node_t* node = new_node(AST_UNIT_LIT, line, column);
     if (node == NULL)
         return NULL;
     return node;
 }
 
-ast_node_t* ast_new_var_ref(const char* name, size_t line, size_t column) {
+ast_node_t* ast_new_var_ref(const char* name, size_t line, size_t column)
+{
     if (name == NULL)
         return NULL;
 
@@ -283,7 +290,8 @@ ast_node_t* ast_new_var_ref(const char* name, size_t line, size_t column) {
     return node;
 }
 
-ast_node_t* ast_new_unary(ast_unary_op_t op, ast_node_t* operand, size_t line, size_t column) {
+ast_node_t* ast_new_unary(ast_unary_op_t op, ast_node_t* operand, size_t line, size_t column)
+{
     if (operand == NULL)
         return NULL;
 
@@ -296,7 +304,8 @@ ast_node_t* ast_new_unary(ast_unary_op_t op, ast_node_t* operand, size_t line, s
     return node;
 }
 
-ast_node_t* ast_new_binary(ast_binary_op_t op, ast_node_t* left, ast_node_t* right, size_t line, size_t column) {
+ast_node_t* ast_new_binary(ast_binary_op_t op, ast_node_t* left, ast_node_t* right, size_t line, size_t column)
+{
     if (left == NULL || right == NULL)
         return NULL;
 
@@ -310,7 +319,8 @@ ast_node_t* ast_new_binary(ast_binary_op_t op, ast_node_t* left, ast_node_t* rig
     return node;
 }
 
-ast_node_t* ast_new_call(const char* name, size_t line, size_t column) {
+ast_node_t* ast_new_call(const char* name, size_t line, size_t column)
+{
     if (name == NULL)
         return NULL;
 
@@ -323,7 +333,8 @@ ast_node_t* ast_new_call(const char* name, size_t line, size_t column) {
     return node;
 }
 
-ast_node_t* ast_new_convert(ast_node_t* operand) {
+ast_node_t* ast_new_convert(ast_node_t* operand)
+{
     if (operand == NULL)
         return NULL;
 
@@ -356,7 +367,6 @@ static void free_node(void* ptr)
 {
     ast_free(ptr);
 }
-
 
 void ast_free(ast_node_t* node)
 {
@@ -454,7 +464,6 @@ void ast_free(ast_node_t* node)
     case AST_CONVERT:
         ast_free(node->convert.operand);
         break;
-
     }
 
     free(node);
