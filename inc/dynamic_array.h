@@ -33,7 +33,7 @@ bool  dyn_arr_init(dyn_arr_t* ptr);
  * @brief appends item to the end of the dynamic array
  * @param ptr dynamic array handle
  * @param item pointer to the element you want to append
- * @return flase on invalid params, memory allocation failure
+ * @return false on invalid params, memory allocation failure
  *          else true
  */
 bool  dyn_arr_append(dyn_arr_t* ptr, void* item);
