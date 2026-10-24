@@ -6,6 +6,7 @@
 #define SYMTABLE_H
 
 #include <stdbool.h>
+#include "types.h"
 
 typedef enum {
     SYM_VAR,
@@ -13,32 +14,11 @@ typedef enum {
 } sym_kind_t;
 
 typedef enum {
-    T_INT, // basic, without data
-    T_DOUBLE,
-    T_STRING,
-    T_UNIT,
-    T_BOOL,
-    T_ANY,
-    T_UNION, // composite, with data - EXTENSIONS ONLY
-    T_LIST,
-    T_FUNC,
-    T_CLASS
-} type_kind_t;
-
-typedef enum {
     ST_OK,
     ST_EXISTS,
     ST_NOMEM,
     ST_INVALID
 } st_result_t;
-
-typedef struct type {
-    type_kind_t kind;
-    // will be added based on extensions
-} type_t;
-
-extern type_t *const TYPE_INT, *const TYPE_DOUBLE, *const TYPE_STRING,
-                                                       *const TYPE_UNIT, *const TYPE_BOOL, *const TYPE_ANY;
 
 typedef struct
 {
@@ -57,23 +37,6 @@ typedef struct
 
 // implementation is private
 typedef struct symtable symtable_t;
-
-// ========================================
-//  Type checks
-// ========================================
-
-/**
- * @brief Is type a and type b the same?
- */
-bool type_equal(const type_t* a, const type_t* b);
-
-/**
- * @brief can a value of source be used where target is expected?
- * @return true when both types are the same, or if target is T_ANY or
- *         when trying to assign an int to a double
- *         else false
- */
-bool type_compatible(const type_t* target, const type_t* source);
 
 // ========================================
 //  Symbol table
