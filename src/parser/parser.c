@@ -121,7 +121,7 @@ static int get_precedence_index (TokenType t){
 
 static bool reduce_rules (tstack_t *stack){
     tdata_t control[5];
-    int count_control = 5;
+    int count_control = 0;
     while (stack->top != NULL){
         tdata_t temp = top(stack);
         pop(stack);
@@ -129,13 +129,13 @@ static bool reduce_rules (tstack_t *stack){
         if(count_control > 3)
             return false;
         if (temp.shift_mark)
-            exit(1);     //_______________________________|shift_|________
+            break;     //_______________________________|shift_|________
     }                     //|symbol_type        |token_type|mark  |ast_node|
-    tadata_t non_terminal = {SYMBOL_NON_TERMINAL, TOKEN_EOF, false; NULL}
+    tadata_t non_terminal = {SYMBOL_NON_TERMINAL, TOKEN_EOF, false, NULL};
     if (count_control == 0)
         return false;
     //rule E -> id 
-    if(count_control == 1 && control[0].symbol_type = SYMBOL_TERMINAL){
+    if(count_control == 1 && control[0].symbol_type == SYMBOL_TERMINAL){
             non_terminal.ast_node = control[0].ast_node;
             push(satck, non_terminal);
             return true;
@@ -170,7 +170,6 @@ static bool reduce_rules (tstack_t *stack){
                     return false;
             }
             non_terminal.ast_node = bin_node;
-            free(bin_node)
             push(stack, non_terminal);
             return true;
         }
@@ -230,11 +229,11 @@ int parse_expression(lexer_t *lexer, ast_node_t **out_node) {
                 }
                 tselem_t *first_elem = stack.top;
                 
-                if(first == true && 
-                    first->data.symbol_type == SYMBOL_NON_TERMINAL &&
-                    first->next == true && 
-                    first->data.token_type == TOKEN_EOF &&
-                    col = 6)
+                if(first_elem != NULL && 
+                    first_elem->data.symbol_type == SYMBOL_NON_TERMINAL &&
+                    first_elem->next != NULL && 
+                    first_elem->next->data.token_type == TOKEN_EOF &&
+                    col = index_dollar)
                 {
                     if(out_node != NULL)
                         *out_node = first->data.ast_node;
@@ -249,16 +248,25 @@ int parse_expression(lexer_t *lexer, ast_node_t **out_node) {
                     if(current_token.type == TOKEN_INTEGER || current_token.type == TOKEN_DOUBLE || 
                         current_token.type == TOKEN_STRING || current_token.type == T_INDENTIFIER)
                     {
-                        /*
                         leaf_node = (ast_node_t *) malloc(sizeof(ast_node_t))
-                        if (current_token.type == TOKEN_INTEGER) {
-                            leaf_node->kind = AST_INT_LIT;
-                            leaf_node->int_lit.value = atoll(current_token.attribute ? current_token.attribute : "0");
-                        } else if (current_token.type == TOKEN_IDENTIFIER) {
-                            leaf_node->kind = AST_VAR_REF;
-                            leaf_node->var_ref.name = current_token.attribute;
-                        */
-                    }
+	                    if(lead_node != NULL){    
+							if (current_token.type == TOKEN_INTEGER) {
+	                            leaf_node->kind = AST_INT_LIT;
+	                            leaf_node->int_lit.value = atoll(current_token.attribute ? current_token.attribute : "0");
+	                        } 
+							else if (current_token.type == TOKEN_DOUBLE) {
+				            	leaf_node->kind = AST_DOUBLE_LIT;
+				                leaf_node->double_lit.value = atof(current_token.lexeme ? current_token.lexeme : "0.0");
+				            }
+							else if (current_token.type == TOKEN_STRING) {
+				                leaf_node->kind = AST_STRING_LIT;
+				                leaf_node->string_lit.value = current_token.lexeme;
+							}
+							else if (current_token.type == TOKEN_IDENTIFIER) {
+	                            leaf_node->kind = AST_VAR_REF;
+	                            leaf_node->var_ref.name = current_token.attribute;
+							}
+						}
                 }
             }
             tdata_t data = {
