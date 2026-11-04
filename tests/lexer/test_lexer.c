@@ -663,6 +663,196 @@ static void comment_layout(void)
         expect_error(bad[i]);
 }
 
+// AI-generated using: Claude Code
+//              model: Claude Opus 5.5
+// Prompt (summary): "Add regression tests for block comments after
+//          a multiline block comment: both reported inputs, repeated and
+//          nested comments, EOF, unterminated comments and real tokens."
+// Scope: multiline_comment_tail_layout.
+
+/* Spec 1.1: a block comment without LF is whitespace, so it may follow
+ * a multiline comment; a trailing comment with LF is another line end. */
+static void multiline_comment_tail_layout(void)
+{
+    const expected_t plain[] = {
+        { TOKEN_IDENTIFIER, "a", 1, 1 }, { TOKEN_NEWLINE, "\n", 1, 5 },
+        { TOKEN_IDENTIFIER, "b", 3, 1 }, { TOKEN_EOF, NULL, 3, 2 }
+    };
+    sequence("a /*\n*/ /* x */\nb", plain, sizeof plain / sizeof plain[0]);
+    const expected_t paren[] = {
+        { TOKEN_IDENTIFIER, "f", 1, 1 }, { TOKEN_LPAREN, "(", 1, 2 },
+        { TOKEN_IDENTIFIER, "y", 3, 3 }, { TOKEN_RPAREN, ")", 3, 4 },
+        { TOKEN_EOF, NULL, 3, 5 }
+    };
+    sequence("f( /*\n*/ /* x */\n  y)", paren, sizeof paren / sizeof paren[0]);
+    sequence("a /*\n*/ /* x */  /* y */\t/* /* z */ */\nb", plain,
+        sizeof plain / sizeof plain[0]);
+    const expected_t at_eof[] = {
+        { TOKEN_IDENTIFIER, "a", 1, 1 }, { TOKEN_NEWLINE, "\n", 1, 5 },
+        { TOKEN_EOF, NULL, 2, 11 }
+    };
+    sequence("a /*\n*/ /* x */", at_eof, sizeof at_eof / sizeof at_eof[0]);
+
+    /* A trailing comment with LF adds no second NEWLINE. */
+    const expected_t two_lines[] = {
+        { TOKEN_IDENTIFIER, "a", 1, 1 }, { TOKEN_NEWLINE, "\n", 1, 5 },
+        { TOKEN_IDENTIFIER, "b", 4, 1 }, { TOKEN_EOF, NULL, 4, 2 }
+    };
+    sequence("a /*\n*/ /* y\n*/\nb", two_lines, sizeof two_lines / sizeof two_lines[0]);
+    const expected_t paren_two_lines[] = {
+        { TOKEN_IDENTIFIER, "f", 1, 1 }, { TOKEN_LPAREN, "(", 1, 2 },
+        { TOKEN_IDENTIFIER, "z", 4, 3 }, { TOKEN_RPAREN, ")", 4, 4 },
+        { TOKEN_EOF, NULL, 4, 5 }
+    };
+    sequence("f( /*\n*/ /* y\n*/\n  z)", paren_two_lines,
+        sizeof paren_two_lines / sizeof paren_two_lines[0]);
+
+    const char* text = "  a /*\n*/ /* x */\n  b";
+    const expected_t indented[] = {
+        { TOKEN_IDENTIFIER, "a", 1, 3 }, { TOKEN_NEWLINE, "\n", 1, 7 },
+        { TOKEN_IDENTIFIER, "b", 3, 3 }, { TOKEN_EOF, NULL, 3, 4 }
+    };
+    const size_t count = sizeof indented / sizeof indented[0];
+    sequence(text, indented, count);
+    const size_t indentation[] = { 2, 2, 2, 0 };
+    const int starts[] = { 1, 0, 1, 0 };
+    FILE* input = source(text);
+    lexer_t lexer;
+    token_t token = { 0 };
+    assert(lexer_init(&lexer, input) == LEXER_OK);
+    for (size_t i = 0; i < count; ++i) {
+        assert(lexer_next(&lexer, &token) == LEXER_OK);
+        assert(token.indentation == indentation[i]);
+        assert(token.starts_line == starts[i]);
+        token_dispose(&token);
+    }
+    fclose(input);
+
+    const char* bad[] = {
+        "a /*\n*/ /* x", "a /*\n*/ /* /* x */", "a /*\n*/ /* y\n*/ /* z",
+        "a /*\n*/ /* x */ b", "a /*\n*/ /* y\n*/ b", "f( /*\n*/ /* x */ y)"
+    };
+    for (size_t i = 0; i < sizeof bad / sizeof bad[0]; ++i)
+        expect_error(bad[i]);
+}
+
+// AI-generated using: Claude Code
+//              model: Claude Opus 5.5
+// Prompt (summary): "Add focused regression tests for the enum/switch lexer
+//          automaton: diagram token boundaries (1., 1._5, .5d, 1.2.3,
+//          raw-string quotes, @main suffixes, f26 slash versus comments,
+//          non-overlapping comment delimiters) and the settled layout
+//          decisions: a tab before a comment-only line is ignored, // ends
+//          the line after a multiline block comment, comments accept any
+//          byte."
+// Scope: automaton_boundaries, layout_decisions.
+
+typedef struct {
+    const char* text;
+    expected_t tokens[3];
+    size_t count;
+} case_t;
+
+static void automaton_boundaries(void)
+{
+    const case_t cases[] = {
+        /* f18 enters q8 only with a digit lookahead (footnote 3). */
+        { "1.", { { TOKEN_INTEGER, "1", 1, 1 }, { TOKEN_DOT, ".", 1, 2 } }, 2 },
+        { "1._5", { { TOKEN_INTEGER, "1", 1, 1 }, { TOKEN_DOT, ".", 1, 2 },
+                      { TOKEN_IDENTIFIER, "_5", 1, 3 } }, 3 },
+        { "1.e5", { { TOKEN_INTEGER, "1", 1, 1 }, { TOKEN_DOT, ".", 1, 2 },
+                      { TOKEN_IDENTIFIER, "e5", 1, 3 } }, 3 },
+        { "._5", { { TOKEN_DOT, ".", 1, 1 }, { TOKEN_IDENTIFIER, "_5", 1, 2 } }, 2 },
+        /* f19 has no '.' transition; f22 -0..9-> f19 starts the next Double. */
+        { "1.2.3", { { TOKEN_DOUBLE, "1.2", 1, 1 }, { TOKEN_DOUBLE, ".3", 1, 4 } }, 2 },
+        { ".5d", { { TOKEN_DOUBLE, ".5d", 1, 1 } }, 1 },
+        { "01e5", { { TOKEN_DOUBLE, "01e5", 1, 1 } }, 1 },
+        { "1.0dd", { { TOKEN_DOUBLE, "1.0d", 1, 1 }, { TOKEN_IDENTIFIER, "d", 1, 5 } }, 2 },
+        /* f23 needs a third quote for q16; f25 has no outgoing transition. */
+        { "\"\"x", { { TOKEN_STRING, "\"\"", 1, 1 }, { TOKEN_IDENTIFIER, "x", 1, 3 } }, 2 },
+        { "\"\"\"\"\"x\"\"\"", { { TOKEN_STRING, "\"\"\"\"\"x\"\"\"", 1, 1 } }, 1 },
+        { "\"\"\"\"\"\"\"\"", { { TOKEN_STRING, "\"\"\"\"\"\"", 1, 1 },
+                                  { TOKEN_STRING, "\"\"", 1, 7 } }, 2 },
+        { "\"a\rb\"", { { TOKEN_STRING, "\"a\rb\"", 1, 1 } }, 1 },
+        { "@main(", { { TOKEN_MAIN, "@main", 1, 1 }, { TOKEN_LPAREN, "(", 1, 6 } }, 2 },
+        /* f26 is TOKEN_SLASH unless / or * follows. */
+        { "a/b", { { TOKEN_IDENTIFIER, "a", 1, 1 }, { TOKEN_SLASH, "/", 1, 2 },
+                     { TOKEN_IDENTIFIER, "b", 1, 3 } }, 3 },
+        { "/ /", { { TOKEN_SLASH, "/", 1, 1 }, { TOKEN_SLASH, "/", 1, 3 } }, 2 },
+        { "a/**/b", { { TOKEN_IDENTIFIER, "a", 1, 1 }, { TOKEN_IDENTIFIER, "b", 1, 6 } }, 2 },
+        /* Comment delimiters do not overlap: the star of the opening pair
+         * cannot also start the closing pair. */
+        { "x/*/ */y", { { TOKEN_IDENTIFIER, "x", 1, 1 }, { TOKEN_IDENTIFIER, "y", 1, 8 } }, 2 },
+        { "/* */*/", { { TOKEN_STAR, "*", 1, 6 }, { TOKEN_SLASH, "/", 1, 7 } }, 2 }
+    };
+    for (size_t i = 0; i < sizeof cases / sizeof cases[0]; ++i)
+        sequence(cases[i].text, cases[i].tokens, cases[i].count);
+
+    const char* bad[] = {
+        ".5_", "01.", "01.x", "._", "1e2_d", "1_.5", "\"\"\x80", "@main1", "@main_",
+        "@mai", "@ma in", "/*/", "/* /* */", "!x"
+    };
+    for (size_t i = 0; i < sizeof bad / sizeof bad[0]; ++i)
+        expect_error(bad[i]);
+}
+
+static void layout_decisions(void)
+{
+    /* A leading tab is an error only on a line with a real token. */
+    const case_t tabs[] = {
+        { "\t// c\nx", { { TOKEN_IDENTIFIER, "x", 2, 1 } }, 1 },
+        { "\t/* c */\nx", { { TOKEN_IDENTIFIER, "x", 2, 1 } }, 1 },
+        { "a\n\t// c\nb", { { TOKEN_IDENTIFIER, "a", 1, 1 }, { TOKEN_NEWLINE, "\n", 1, 2 },
+                              { TOKEN_IDENTIFIER, "b", 3, 1 } }, 3 },
+        { "x\n\t/* c\n*/\ny", { { TOKEN_IDENTIFIER, "x", 1, 1 }, { TOKEN_NEWLINE, "\n", 1, 2 },
+                                  { TOKEN_IDENTIFIER, "y", 4, 1 } }, 3 },
+        { "/* c */\tx", { { TOKEN_IDENTIFIER, "x", 1, 9 } }, 1 }
+    };
+    for (size_t i = 0; i < sizeof tabs / sizeof tabs[0]; ++i)
+        sequence(tabs[i].text, tabs[i].tokens, tabs[i].count);
+    const expected_t paren[] = {
+        { TOKEN_IDENTIFIER, "f", 1, 1 }, { TOKEN_LPAREN, "(", 1, 2 },
+        { TOKEN_IDENTIFIER, "x", 3, 3 }, { TOKEN_RPAREN, ")", 3, 4 }
+    };
+    sequence("f(\n\t// c\n  x)", paren, sizeof paren / sizeof paren[0]);
+
+    /* After a multiline block comment, // is the expected line end itself. */
+    const case_t tails[] = {
+        { "a /*\n*/ // c\nb", { { TOKEN_IDENTIFIER, "a", 1, 1 }, { TOKEN_NEWLINE, "\n", 1, 5 },
+                                  { TOKEN_IDENTIFIER, "b", 3, 1 } }, 3 },
+        { "a /*\n*/ // c", { { TOKEN_IDENTIFIER, "a", 1, 1 }, { TOKEN_NEWLINE, "\n", 1, 5 },
+                               { TOKEN_EOF, NULL, 2, 8 } }, 3 },
+        { "a /*\n*/ /* x */ // c\nb", { { TOKEN_IDENTIFIER, "a", 1, 1 },
+                                          { TOKEN_NEWLINE, "\n", 1, 5 },
+                                          { TOKEN_IDENTIFIER, "b", 3, 1 } }, 3 },
+        { "a /*\n*///\nb", { { TOKEN_IDENTIFIER, "a", 1, 1 }, { TOKEN_NEWLINE, "\n", 1, 5 },
+                               { TOKEN_IDENTIFIER, "b", 3, 1 } }, 3 }
+    };
+    for (size_t i = 0; i < sizeof tails / sizeof tails[0]; ++i)
+        sequence(tails[i].text, tails[i].tokens, tails[i].count);
+    const expected_t paren_tail[] = {
+        { TOKEN_IDENTIFIER, "f", 1, 1 }, { TOKEN_LPAREN, "(", 1, 2 },
+        { TOKEN_IDENTIFIER, "y", 3, 3 }, { TOKEN_RPAREN, ")", 3, 4 }
+    };
+    sequence("f( /*\n*/ // c\n  y)", paren_tail, sizeof paren_tail / sizeof paren_tail[0]);
+
+    /* Comments accept any byte; only string and token content is ASCII. */
+    const case_t bytes[] = {
+        { "// \xc4\x8d\nx", { { TOKEN_IDENTIFIER, "x", 2, 1 } }, 1 },
+        { "a // \x80", { { TOKEN_IDENTIFIER, "a", 1, 1 }, { TOKEN_NEWLINE, "\n", 1, 7 } }, 2 },
+        { "/* \x80 */ x", { { TOKEN_IDENTIFIER, "x", 1, 9 } }, 1 }
+    };
+    for (size_t i = 0; i < sizeof bytes / sizeof bytes[0]; ++i)
+        sequence(bytes[i].text, bytes[i].tokens, bytes[i].count);
+
+    const char* bad[] = {
+        "\t/* c */ x", "\t/* c\n*/ x", "a /*\n*/ / b", "a /*\n*/ /", "f(\n\t/* c */ x)",
+        "f(\n// c\n\tx)"
+    };
+    for (size_t i = 0; i < sizeof bad / sizeof bad[0]; ++i)
+        expect_error(bad[i]);
+}
+
 #ifdef LEXER_TEST_ALLOC_FAILURES
 static void allocation_failures(void)
 {
@@ -722,9 +912,12 @@ int main(void)
     operator_boundaries();
     identifier_boundaries();
     comment_layout();
+    multiline_comment_tail_layout();
+    automaton_boundaries();
+    layout_decisions();
 #ifdef LEXER_TEST_ALLOC_FAILURES
     allocation_failures();
 #endif
-    puts("Lexer: all 17 test groups passed.");
+    puts("Lexer: all 20 test groups passed.");
     return 0;
 }
