@@ -1,5 +1,6 @@
 #include "semantic.h"
 #include "comp_error.h"
+#include "dynamic_array.h"
 #include "symtable.h"
 
 typedef struct {
@@ -90,6 +91,83 @@ static st_result_t insert_builtin_functions(symtable_t* symtable)
     return ST_OK;
 }
 
+static error_code_t collect_function_signatures(sema_ctx_t* semantic_ctx)
+{
+    // Validate params
+    if (semantic_ctx == NULL || semantic_ctx->program == NULL)
+        return ERR_INTERNAL;
+
+    // Helper variables
+    symtable_t* symtable = semantic_ctx->symbol_table;
+    symbol_t* func_sym;
+    error_code_t err_code;
+
+    // Get function list handle
+    ast_node_t* program = semantic_ctx->program;
+    dyn_arr_t* function_list = &program->program.func_list;
+
+    // Loop over every function in the program
+    for (size_t func_i = 0; func_i < function_list->count; func_i++) {
+        ast_node_t* func_node = dyn_arr_get(function_list, func_i);
+        if (func_node == NULL)
+            return ERR_INTERNAL;
+
+        ast_func_def_t* func_def = &func_node->func_def;
+
+        // Insert the function into the symbol table
+        err_code = convert_st_error_code(
+            symtable_insert_func(symtable, func_def->name, &func_sym));
+        if (err_code != ERR_OK)
+            return err_code;
+
+        // Fill the symbol (symtable value = ast node value)
+        func_sym->decl = func_node;
+        func_sym->is_main = func_def->is_main;
+        func_sym->type = func_def->return_type;
+        func_sym->ret_inferred = (func_def->return_type == NULL);
+
+        // Function params
+        dyn_arr_t* ast_params = &func_def->params;
+        ast_param_t* ast_param;
+
+        // Go over every param in the AST, get it and add it to the symtable
+        for (size_t param_i = 0; param_i < ast_params->count; param_i++) {
+            ast_param = dyn_arr_get(ast_params, param_i);
+            if (ast_param == NULL)
+                return ERR_INTERNAL;
+
+            err_code = convert_st_error_code(
+                symtable_func_add_param(func_sym, ast_param->name, ast_param->type));
+            if (err_code != ERR_OK)
+                return err_code;
+        }
+
+        // Check for @main
+        if (func_def->is_main == true) {
+            // There is already a main function
+            if (semantic_ctx->main_func != NULL)
+                return ERR_SEM_REDEF;
+
+            // This is the first main function
+            semantic_ctx->main_func = func_node;
+
+            // Main function cant have params
+            if (ast_params->count > 0)
+                return ERR_SEM_CALL;
+
+            // @main must return Unit
+            if (func_def->return_type != NULL && func_def->return_type->kind != T_UNIT)
+                return ERR_SEM_TYPE;
+        }
+    }
+
+    // No @main exists
+    if (semantic_ctx->main_func == NULL)
+        return ERR_SEM_UNDEF;
+
+    return ERR_OK;
+}
+
 error_code_t semantic_analyze(ast_node_t* program)
 {
     // Check input param validity
@@ -97,12 +175,11 @@ error_code_t semantic_analyze(ast_node_t* program)
         return ERR_INTERNAL;
 
     // Context struct for
-    sema_ctx_t semantic_ctx = {.program = program};
+    sema_ctx_t semantic_ctx = { .program = program };
 
     // -----------------------------------------------------------
     //  PASS 0: insert builtin functions to symtable->global
     // -----------------------------------------------------------
-
     semantic_ctx.symbol_table = symtable_new();
     if (semantic_ctx.symbol_table == NULL)
         return ERR_INTERNAL;
@@ -116,10 +193,20 @@ error_code_t semantic_analyze(ast_node_t* program)
         return err_code;
     }
 
+    // -----------------------------------------------------------
+    //  PASS 1: insert user functions & check @main semantics
+    // -----------------------------------------------------------
+    err_code = collect_function_signatures(&semantic_ctx);
+    if (err_code != ERR_OK) {
+        symtable_free(semantic_ctx.symbol_table);
+        return err_code;
+    }
 
     // -----------------------------------------------------------
-    //  PASS 1:
+    //  PASS 2
     // -----------------------------------------------------------
+
+    symtable_free(semantic_ctx.symbol_table);
 
     return ERR_OK;
 }
