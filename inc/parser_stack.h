@@ -28,12 +28,6 @@ typedef struct{
 }tstack_t;
 
 /**
- * @brief Handles stack errors by printing an error message to stderr
- *        and setting the global stack error flag.
- */
-static int stack_err(void);
-
-/**
  * @brief Initializes the precedence stack by setting the top pointer to NULL.
  * 
  * @param s Pointer to the stack instance to be initialized.
@@ -47,7 +41,7 @@ static void stack_init(tstack_t *s);
  * @param d Data element (token/symbol) to be pushed onto the stack.
  * @return true if allocation and push succeeded, false otherwise.
  */
-static void push(tstack_t *s, tdata_t d);
+static bool push(tstack_t *s, tdata_t d);
 
 /**
  * @brief Removes the top element from the stack and frees its memory.
