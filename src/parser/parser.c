@@ -296,11 +296,25 @@ int parse_expression(lexer_t *lexer, ast_node_t **out_node) {
                         }
                         else if (input.type == TOKEN_STRING) {
                             leaf_node->kind = AST_STRING_LIT;
-                            leaf_node->string_lit.value = input.lexeme;
-                        }
+
+							if(input.lexeme == NULL)
+								input.lexeme = "";
+							
+							leaf_node->string_lit.value = malloc (strlen(input.lexeme) + 1);			// +1= '\0'
+							
+                        	if(leaf_node->string_lit.value != NULL)
+									strcpy (leaf_node->string_lit.value, input.lexeme);
+						}
                         else if (input.type == TOKEN_IDENTIFIER) {
                             leaf_node->kind = AST_VAR_REF;
-                            leaf_node->var_ref.name = input.lexeme;
+
+							if(input.lexeme == NULL)
+								input.lexeme = "";
+							
+							leaf_node->var_ref.name = malloc(strlen(input.lexeme) + 1);
+						
+							if (leaf_node->var_ref.name != NULL) 
+							    strcpy(leaf_node->var_ref.name, input.lexeme);
                         }
                     }
                 }
