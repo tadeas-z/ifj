@@ -32,7 +32,7 @@ static int get_precedence_index(token_type_t t);
  * @return true If a rule was successfully reduced and pushed back to the stack.
  * @return false If no matching grammar rule was found or stack error occurred.
  */
-static bool reduce_rules(tstack_t *stack);
+static int reduce_rules(tstack_t *stack);
 
 /**
  * @brief Safely fetches the next token from the lexer stream.
