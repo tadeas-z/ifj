@@ -23,12 +23,18 @@ typedef struct {
 static error_code_t check_function(sema_ctx_t* semantic_ctx, ast_node_t* ast_func_def);
 static error_code_t check_block(sema_ctx_t* semantic_ctx, ast_node_t* ast_block);
 static error_code_t check_statement(sema_ctx_t* semantic_ctx, ast_node_t* ast_statement);
-// static error_code_t check_expression(sema_ctx_t* semantic_ctx, ast_node_t* ast_expression);
+static error_code_t check_expression(sema_ctx_t* semantic_ctx, ast_node_t* ast_expression);
 // static error_code_t check_call(sema_ctx_t* semantic_ctx, ast_node_t* ast_call);
 
-// ----------------------------------------
+static error_code_t check_var_def(sema_ctx_t *semantic_ctx, ast_node_t* ast_statement);
+static error_code_t check_assign(sema_ctx_t *semantic_ctx, ast_node_t* ast_statement);
+static error_code_t check_return(sema_ctx_t *semantic_ctx, ast_node_t* ast_statement);
+static error_code_t check_if(sema_ctx_t *semantic_ctx, ast_node_t* ast_statement);
+static error_code_t check_while(sema_ctx_t *semantic_ctx, ast_node_t* ast_statement);
+
+// ========================================
 //  Helpers
-// ----------------------------------------
+// ========================================
 
 /**
  *  @brief Helper used to convert between error codes
@@ -81,9 +87,53 @@ static symbol_t* lookup_var_in_function(sema_ctx_t* semantic_ctx, const char* na
     return var_symbol;
 }
 
-// ----------------------------------------
+// returns the last statement of a AST_BLOCK
+static ast_node_t* last_statement(ast_node_t* body) {
+    if (body == NULL)
+        return NULL;
+
+    dyn_arr_t *block_statements = &body->block.statements;
+
+    if (block_statements->count > 0)
+        return dyn_arr_get(block_statements, block_statements->count - 1);
+
+    return NULL;
+}
+
+// True when the last statemen of a block is return, else false
+static bool block_ends_with_return(ast_node_t* block) {
+    ast_node_t* last_stmt = last_statement(block);
+    if (last_stmt == NULL)
+        return false;
+
+    if (last_stmt->kind == AST_RETURN)
+        return true;
+
+    if (last_stmt->kind == AST_IF)
+        return block_ends_with_return(last_stmt->if_stmt.then_block) &&
+        block_ends_with_return(last_stmt->if_stmt.else_block);
+
+    return false;
+}
+
+static bool block_ends_with_unit(ast_node_t* block) {
+    ast_node_t* last_stmt = last_statement(block);
+
+    // Empty block -> Unit
+    if (last_stmt == NULL)
+        return true;
+
+    if (last_stmt->kind == AST_IF)
+        return block_ends_with_unit(last_stmt->if_stmt.then_block) &&
+        block_ends_with_unit(last_stmt->if_stmt.else_block);
+
+    // Otherwise last_stmp->type is Unit
+    return last_stmt->type->kind == T_UNIT;
+}
+
+// ========================================
 //  PASS 0 (builtin functions) & PASS 1 (insert functions into symtable)
-// ----------------------------------------
+// ========================================
 
 /**
  * @brief Inserts all the builtin functions into the symbol table
@@ -107,6 +157,7 @@ static error_code_t insert_builtin_functions(symtable_t* symtable)
         { "subStr", TYPE_STRING, 3, { TYPE_STRING, TYPE_INT, TYPE_INT }, { "value", "start", "end" } },
         { "ord", TYPE_INT, 2, { TYPE_STRING, TYPE_INT }, { "value", "index" } },
         { "chr", TYPE_STRING, 1, { TYPE_INT }, { "code" } },
+        {"readBoolean", TYPE_BOOL, 0, {0}, {NULL}}
     };
 
     const size_t builtin_cnt = sizeof(BUILTINS) / sizeof(BUILTINS[0]);
@@ -207,9 +258,9 @@ static error_code_t collect_function_signatures(sema_ctx_t* semantic_ctx)
     return ERR_OK;
 }
 
-// ----------------------------------------
+// ========================================
 //  PASS 2 - type and other rules checks
-// ----------------------------------------
+// ========================================
 
 /**
  * @brief Loops over every function in program->func_list
@@ -302,15 +353,34 @@ static error_code_t check_function(sema_ctx_t* semantic_ctx, ast_node_t* ast_fun
     // Check the function body
     TRY(check_block(semantic_ctx, ast_func_def_data->body));
 
+    // Section 2.3 (rule 3)
+    // check_statement always sets an if to unit, here we check whats inside each branch
+    ast_node_t* last_stmt = last_statement(ast_func_def_data->body);
+    if (last_stmt != NULL) {
+        if (last_stmt->kind == AST_IF) {
+
+            // If function return type is explicitly Unit it doesnt matter what each branch returns
+            // because it is discarded and the function returns Unit
+            if (!func_sym->ret_inferred && ast_func_def_data->return_type->kind == T_UNIT)
+                ;
+
+            // Each path ends with return and
+            // check_return already checked if each branches return type is compatible with the functions return type
+            else if (block_ends_with_return(ast_func_def_data->body))
+                ast_func_def_data->body->type = ast_func_def_data->return_type;
+
+            else if (func_sym->ret_inferred && block_ends_with_unit(ast_func_def_data->body))
+                ast_func_def_data->body->type = TYPE_UNIT;
+            else
+                return ERR_SEM_TYPE;
+        }
+    }
+
     // Set the inferred return type - can be set because check_body set the return type of the body
     if (func_sym->ret_inferred == true) { // ret_inferred is set by the parser in pass 1 when the return type of the function is NULL
         ast_func_def_data->return_type = ast_func_def_data->body->type;
         func_sym->type = ast_func_def_data->body->type;
     }
-
-    // Functions cant return booleans
-    if (ast_func_def_data->return_type->kind == T_BOOL)
-        return ERR_SEM_TYPE;
 
     // TODO explicit type -> return rules
 
@@ -346,20 +416,76 @@ static error_code_t check_block(sema_ctx_t* semantic_ctx, ast_node_t* ast_block)
         TRY(check_statement(semantic_ctx, statement));
     }
 
-    // Set the type of the block
-    if (block_statements->count > 0) {
-        // Get the last statement and set the return type of the block to its return type
-        ast_node_t* statement = dyn_arr_get(block_statements, block_statements->count - 1);
-        ast_block->type = statement->type;
-
-    } else { // Empty - return type is Unit
+    // Get the last statement and set the return type of the block to the type of the last statement
+    ast_node_t *last_stmt = last_statement(block_statements);
+    if (last_stmt == NULL)
         ast_block->type = TYPE_UNIT;
-    }
+    else
+        ast_block->type = last_stmt->type;
+
 
     // Pop the scope - the block is already analyzed
     TRY_ST(symtable_pop_scope(semantic_ctx->symbol_table));
 
     return ERR_OK;
+}
+
+// ========================================
+//  Statements
+// ========================================
+
+static error_code_t check_statement(sema_ctx_t* semantic_ctx, ast_node_t* ast_statement)
+{
+    if (semantic_ctx == NULL || ast_statement == NULL)
+        return ERR_INTERNAL;
+
+    switch (ast_statement->kind) {
+    case AST_VAR_DEF:
+        TRY(check_var_def(semantic_ctx, ast_statement));
+        ast_statement->type = TYPE_UNIT;        // What is the type if this stmt is the last
+        break;
+
+    case AST_ASSIGN:
+        TRY(check_assign(semantic_ctx, ast_statement));
+        ast_statement->type = TYPE_UNIT;
+        break;
+
+    case AST_RETURN:
+        TRY(check_return(semantic_ctx, ast_statement));
+        ast_statement->type = semantic_ctx->current_func->func_def.return_type;
+        break;
+
+    case AST_IF:
+        TRY(check_if(semantic_ctx, ast_statement));
+        ast_statement->type = TYPE_UNIT;
+        break;
+
+    case AST_WHILE:
+        TRY(check_while(semantic_ctx, ast_statement));
+        ast_statement->type = TYPE_UNIT;
+        break;
+
+    case AST_EXPR_STMT:
+        TRY(check_expression(semantic_ctx, ast_statement->expr_stmt.expr));
+        ast_statement->type = ast_statement->expr_stmt.expr->type;
+        break;
+
+    default:
+        return ERR_INTERNAL;
+    }
+
+    return ERR_OK;
+}
+
+static error_code_t check_var_def(sema_ctx_t *semantic_ctx, ast_node_t* ast_statement) {
+    ast_var_def_t *ast_var_def = &ast_statement->var_def;
+
+    // val x = x + 1
+    // check_expression looks up an x that already exists and uses its symbol, then we return and insert the new x into the symtable
+    // if we were to insert the new x first, then call check_expression the lookup there would find the new x
+    // For correct shadowing we use the first option
+    TRY(check_expression(semantic_ctx ,ast_var_def->init)); // ast_var_def->init->type is now known
+
 }
 
 // ----------------------------------------
