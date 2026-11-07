@@ -200,7 +200,7 @@ static int reduce_rules (tstack_t *stack){
 				break;
 				case TOKEN_GREATER: bin_node->binary.op = AST_OP_GT;
 				break;
-				case TOKEN_GREATER_EQUAL: bin_node->binary.op = AST_OP_GTE;
+				case TOKEN_GREATER_EQUAL: bin_node->binary.op = AST_OP_GE;
 				break;
 				
                 default:
