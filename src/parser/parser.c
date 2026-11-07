@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <stdbool.h>
 #include <stdlib.h>
+#include <string.h>
 
 #include "parser.h"
 #include "parser_stack.h"
@@ -12,25 +13,23 @@ bool stack_err_flag = false;
 #define R_ERR ' ' 	
 
 //stack function definition
-static int stack_err (void){
-	fprintf(stderr, "! WOARNING ! -> The program done some illegal operation. \n");
-	stack_err_flag = true;
-    return 2;
-}
 
 static void stack_init (tstack_t *s){
 	s->top = NULL;
 }
 
-static void push (tstack_t *s, tdata_t d) {
+static bool push (tstack_t *s, tdata_t d) {
 	tselem_t *temp = (tselem_t * ) malloc(sizeof(tselem_t));
-	if(temp != NULL){
+	if(temp == NULL){
+		stack_err_flag = true;
+		return false;
+	}
+	else{
 		temp->data = d;
 		temp->next = s->top;
 		s->top = temp;
+		return true;
 	}
-	else
-		stack_err();
 }
 
 static void pop (tstack_t *s){
@@ -46,7 +45,7 @@ static tdata_t top (tstack_t *s) {
 	if(s->top != NULL)
 		return (s->top->data);
 	else{
-		stack_err();
+		stack_err_flag = true;
 		tdata_t stack_is_empity = {SYMBOL_TERMINAL, 0, false, NULL};
 		return stack_is_empity;
 	}
@@ -128,7 +127,7 @@ static int get_precedence_index (token_type_t t){
 		return -1;
 }
 
-static bool reduce_rules (tstack_t *stack){
+static int reduce_rules (tstack_t *stack){
     tdata_t control[5];
     int count_control = 0;
     while (stack->top != NULL){
@@ -137,23 +136,25 @@ static bool reduce_rules (tstack_t *stack){
 
 		if (temp.shift_mark){
             temp.shift_mark = false;
-			push (stack, temp);
+			if(!(push (stack, temp)))
+				return 99;
 			break; 
 		}
 		
         control[count_control++] = temp;
         if(count_control > 3)
-            return false;    	  
+            return 2;    	  
 						  //_______________________________|shift_|________
     }                     //|symbol_type        |token_type|mark  |ast_node|
     tdata_t non_terminal = {SYMBOL_NON_TERMINAL, TOKEN_EOF, false, NULL};
     if (count_control == 0)
-        return false;
+        return 2;
     //rule E -> id 
     if(count_control == 1 && control[0].symbol_type == SYMBOL_TERMINAL){
             non_terminal.ast_node = control[0].ast_node;
-            push(stack, non_terminal);
-            return true;
+            if (!(push(stack, non_terminal))) 
+				return 99;
+			return 0;
     }
     if (count_control == 3){
         //pravidlo E -> ( E )
@@ -162,8 +163,9 @@ static bool reduce_rules (tstack_t *stack){
 			control[0].token_type == TOKEN_RPAREN){
 			
             non_terminal.ast_node = control[1].ast_node;
-            push(stack, non_terminal);
-            return true;
+            if (!(push(stack, non_terminal))) 
+				return 99;
+            return 0;
         }  
 		
         //pravidlo E -> E a E, a={+,-,*,/}
@@ -172,8 +174,9 @@ static bool reduce_rules (tstack_t *stack){
 			control[0].symbol_type == SYMBOL_NON_TERMINAL){
 			
             ast_node_t *bin_node = (ast_node_t *) malloc(sizeof(ast_node_t));
-            if(bin_node == NULL)
-                return false;
+            if(bin_node == NULL){
+                return 99;
+			}
             bin_node->kind = AST_BINARY;
             bin_node->binary.left = control[2].ast_node;
             bin_node->binary.right = control[0].ast_node;
@@ -202,14 +205,15 @@ static bool reduce_rules (tstack_t *stack){
 				
                 default:
                     free(bin_node);
-                    return false;
+                    return 2;
             }
             non_terminal.ast_node = bin_node;
-            push(stack, non_terminal);
-            return true;
+            if (!(push(stack, non_terminal))) 
+				return 99;
+            return 0;
         }
     }
-    return false;
+    return 2;
 }
 
 // AI-generated using: Gemini
@@ -221,10 +225,9 @@ static bool reduce_rules (tstack_t *stack){
 // More details on: ifj-private/src/parser/parser_skeleton_notes.txt
 
 static token_t get_next_token (lexer_t *lexer){
-    token_t token;
-    lexer_status_t status = lexer_next (lexer, &token);
-    if (status != LEXER_OK || status != LEXER_ERROR || status != EOF)
-        return token;
+    token_t token = {0};
+    lexer_next (lexer, &token);
+    return token;
 }
 
 int parse_expression(lexer_t *lexer, ast_node_t **out_node) {
@@ -232,7 +235,8 @@ int parse_expression(lexer_t *lexer, ast_node_t **out_node) {
     stack_init(&stack);
 
     tdata_t dollar = {SYMBOL_TERMINAL, TOKEN_EOF, false, NULL};
-    push(&stack, dollar);
+    if (!(push(&stack, dollar))) 
+		return 99;
     bool end_parsing = false;
     token_t input = get_next_token(lexer);
 
@@ -253,14 +257,18 @@ int parse_expression(lexer_t *lexer, ast_node_t **out_node) {
         switch (rel){
             case '=': {
                 tdata_t data = {SYMBOL_TERMINAL, input.type, false, NULL};
-                push (&stack, data);
+                if (!(push(&stack, data))){ 
+					stack_free(&stack);
+					return 99;
+				}
                 input = get_next_token (lexer);
             }
             break;
             case '>': {
-                if(reduce_rules(&stack) == false){
+				int r_rules = reduce_rules(&stack); 
+                if(r_rules != 0){
                     stack_free (&stack);
-                    return 2;
+                    return r_rules;
                 }
                 tselem_t *first_elem = stack.top;
                 
@@ -270,8 +278,10 @@ int parse_expression(lexer_t *lexer, ast_node_t **out_node) {
                     first_elem->next->data.token_type == TOKEN_EOF &&
                     col == index_dollar)
                 {
-                    if(out_node != NULL)
+                    if(out_node != NULL){
                         *out_node = first_elem->data.ast_node;
+                        first_elem->data.ast_node = NULL; 
+                    }
                     end_parsing = true;
                 }
             }
@@ -285,38 +295,49 @@ int parse_expression(lexer_t *lexer, ast_node_t **out_node) {
                     input.type == TOKEN_STRING || input.type == TOKEN_IDENTIFIER)
                 {
                     leaf_node = (ast_node_t *) malloc(sizeof(ast_node_t));
-                    if(leaf_node != NULL){    
-                        if (input.type == TOKEN_INTEGER) {
-                            leaf_node->kind = AST_INT_LIT;
-                            leaf_node->int_lit.value = atoll(input.lexeme ? input.lexeme : "0");
-                        } 
-                        else if (input.type == TOKEN_DOUBLE) {
-                            leaf_node->kind = AST_DOUBLE_LIT;
-                            leaf_node->double_lit.value = atof(input.lexeme ? input.lexeme : "0.0");
-                        }
-                        else if (input.type == TOKEN_STRING) {
-                            leaf_node->kind = AST_STRING_LIT;
+					if(leaf_node == NULL){
+						stack_free(&stack);
+						return 99;
+					}
 
-							if(input.lexeme == NULL)
-								input.lexeme = "";
-							
-							leaf_node->string_lit.value = malloc (strlen(input.lexeme) + 1);			// +1= '\0'
-							
-                        	if(leaf_node->string_lit.value != NULL)
-									strcpy (leaf_node->string_lit.value, input.lexeme);
-						}
-                        else if (input.type == TOKEN_IDENTIFIER) {
-                            leaf_node->kind = AST_VAR_REF;
+					if (input.type == TOKEN_INTEGER) {
+						leaf_node->kind = AST_INT_LIT;
+						leaf_node->int_lit.value = atoll(input.lexeme ? input.lexeme : "0");
+					} 
+					else if (input.type == TOKEN_DOUBLE) {
+						leaf_node->kind = AST_DOUBLE_LIT;
+						leaf_node->double_lit.value = atof(input.lexeme ? input.lexeme : "0.0");
+					}
+					else if (input.type == TOKEN_STRING) {
+						leaf_node->kind = AST_STRING_LIT;
 
-							if(input.lexeme == NULL)
-								input.lexeme = "";
-							
-							leaf_node->var_ref.name = malloc(strlen(input.lexeme) + 1);
+						if(input.lexeme == NULL)
+							input.lexeme = "";
 						
-							if (leaf_node->var_ref.name != NULL) 
-							    strcpy(leaf_node->var_ref.name, input.lexeme);
-                        }
-                    }
+						leaf_node->string_lit.value = malloc (strlen(input.lexeme) + 1);			// +1= '\0'
+						if(leaf_node->string_lit.value == NULL){
+							free(leaf_node);
+							stack_free(&stack);
+							return 99;
+						}
+		
+						strcpy (leaf_node->string_lit.value, input.lexeme);
+					}
+					else if (input.type == TOKEN_IDENTIFIER) {
+						leaf_node->kind = AST_VAR_REF;
+
+						if(input.lexeme == NULL)
+							input.lexeme = "";
+						
+						leaf_node->var_ref.name = malloc(strlen(input.lexeme) + 1);
+						if (leaf_node->var_ref.name == NULL){
+							free(leaf_node);
+							stack_free(&stack);
+							return 99;
+						}
+						
+						strcpy(leaf_node->var_ref.name, input.lexeme);
+					}
                 }
         
             tdata_t data = {
@@ -325,7 +346,12 @@ int parse_expression(lexer_t *lexer, ast_node_t **out_node) {
                     .shift_mark = false,
                     .ast_node = leaf_node
                 };
-            push(&stack, data);
+            if (!push(&stack, data)) {
+                    if (leaf_node != NULL) 
+						ast_free(leaf_node);
+                    stack_free(&stack);
+                    return 99;
+            }
             input = get_next_token(lexer);
             
             break;
