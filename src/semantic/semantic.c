@@ -32,6 +32,9 @@ static error_code_t check_return(sema_ctx_t* semantic_ctx, ast_node_t* ast_state
 static error_code_t check_if(sema_ctx_t* semantic_ctx, ast_node_t* ast_statement);
 static error_code_t check_while(sema_ctx_t* semantic_ctx, ast_node_t* ast_statement);
 
+static error_code_t check_unary(sema_ctx_t* semantic_ctx, ast_node_t* ast_expression);
+static error_code_t check_binary(sema_ctx_t* semantic_ctx, ast_node_t* ast_expression);
+
 // ========================================
 //  Helpers
 // ========================================
@@ -160,6 +163,29 @@ static error_code_t coerce(ast_node_t** slot, type_t* target, error_code_t misma
         (*slot) = ast_convert_node;
     }
 
+    return ERR_OK;
+}
+
+static bool is_numeric(type_t* ast_operand_type)
+{
+    if (ast_operand_type == NULL)
+        return false;
+
+    if (ast_operand_type->kind == T_INT || ast_operand_type->kind == T_DOUBLE)
+        return true;
+
+    return false;
+}
+
+static error_code_t unify_numeric(ast_node_t* ast_binary)
+{
+    type_t* left_type = ast_binary->binary.left->type;
+    type_t* right_type = ast_binary->binary.right->type;
+
+    if (left_type->kind == T_DOUBLE || right_type->kind == T_DOUBLE) {
+        TRY(coerce(&ast_binary->binary.left, TYPE_DOUBLE, ERR_SEM_TYPE));
+        TRY(coerce(&ast_binary->binary.right, TYPE_DOUBLE, ERR_SEM_TYPE));
+    }
     return ERR_OK;
 }
 
@@ -576,7 +602,8 @@ static error_code_t check_var_def(sema_ctx_t* semantic_ctx, ast_node_t* ast_stat
  *  assignment to a constant variable (val) -> ERR_SEM_UNSIGNED,
  *  check if the type of left and right side of the assign match (maybe convert),
  */
-static error_code_t check_assign(sema_ctx_t* semantic_ctx, ast_node_t* ast_statement) {
+static error_code_t check_assign(sema_ctx_t* semantic_ctx, ast_node_t* ast_statement)
+{
     symbol_t* var_sym = lookup_var_in_function(semantic_ctx, ast_statement->assign.name);
 
     // Variable doesnt exist (could also be ERR_SEM_ASSIGN)
@@ -605,7 +632,8 @@ static error_code_t check_assign(sema_ctx_t* semantic_ctx, ast_node_t* ast_state
  *  Type of the condition must be T_BOOL
  *  calls check_block on the body of the cycle
  */
-static error_code_t check_while(sema_ctx_t* semantic_ctx, ast_node_t* ast_statement) {
+static error_code_t check_while(sema_ctx_t* semantic_ctx, ast_node_t* ast_statement)
+{
     // Check the condition + cond must be bool
     TRY(check_expression(semantic_ctx, ast_statement->while_stmt.cond));
     if (ast_statement->while_stmt.cond->type->kind != T_BOOL)
@@ -623,7 +651,8 @@ static error_code_t check_while(sema_ctx_t* semantic_ctx, ast_node_t* ast_statem
  *  Type of the condition must be T_BOOL
  *  Calls check_block on the body of every branch
  */
-static error_code_t check_if(sema_ctx_t* semantic_ctx, ast_node_t* ast_statement) {
+static error_code_t check_if(sema_ctx_t* semantic_ctx, ast_node_t* ast_statement)
+{
     // Check the condition + cond must be bool
     TRY(check_expression(semantic_ctx, ast_statement->if_stmt.cond));
     if (ast_statement->if_stmt.cond->type->kind != T_BOOL)
@@ -648,8 +677,9 @@ static error_code_t check_if(sema_ctx_t* semantic_ctx, ast_node_t* ast_statement
  *  When there is no return value and function return type is T_UNIT thats fine, if its not T_UNIT
  *  There is nothing to return but the function needs something returned -> ERR_SEM_OTHER (10)
  */
-static error_code_t check_return(sema_ctx_t* semantic_ctx, ast_node_t* ast_statement) {
-    ast_return_t *ast_return_stmt = &ast_statement->return_stmt;
+static error_code_t check_return(sema_ctx_t* semantic_ctx, ast_node_t* ast_statement)
+{
+    ast_return_t* ast_return_stmt = &ast_statement->return_stmt;
     ast_func_def_t* ast_func_def = &semantic_ctx->current_func->func_def;
 
     // If body contains return the function MUST have an explicit return type
@@ -666,19 +696,19 @@ static error_code_t check_return(sema_ctx_t* semantic_ctx, ast_node_t* ast_state
 
         // Now we know the type of the return value
         if (ast_func_def->return_type->kind == T_UNIT)
-            ;       // Return value is discarded when function returns Unit
+            ; // Return value is discarded when function returns Unit
         else
             // Check if the return type and function return type is compatible and maybe do a conversion
             TRY(coerce(&ast_return_stmt->value, ast_func_def->return_type, ERR_SEM_TYPE));
 
-    // There is no return value
+        // There is no return value
     } else {
         // Unit function discards the return value anyways
         if (ast_func_def->return_type->kind == T_UNIT)
             ;
         // The function has a (non Unit) return type but we are not returning anything
         else
-            return ERR_SEM_OTHER;       // Could also be ERR_SEM_TYPE (6)
+            return ERR_SEM_OTHER; // Could also be ERR_SEM_TYPE (6)
     }
 
     return ERR_OK;
@@ -690,45 +720,48 @@ static error_code_t check_return(sema_ctx_t* semantic_ctx, ast_node_t* ast_state
 
 // Expression switch
 
-static error_code_t check_expression(sema_ctx_t* semantic_ctx, ast_node_t* ast_expression) {
+static error_code_t check_expression(sema_ctx_t* semantic_ctx, ast_node_t* ast_expression)
+{
     switch (ast_expression->kind) {
-        case AST_INT_LIT:
-            ast_expression->type = TYPE_INT;
-            break;
+    case AST_INT_LIT:
+        ast_expression->type = TYPE_INT;
+        break;
 
-        case AST_DOUBLE_LIT:
-            ast_expression->type = TYPE_DOUBLE;
-            break;
+    case AST_DOUBLE_LIT:
+        ast_expression->type = TYPE_DOUBLE;
+        break;
 
-        case AST_STRING_LIT:
-            ast_expression->type = TYPE_STRING;
-            break;
+    case AST_STRING_LIT:
+        ast_expression->type = TYPE_STRING;
+        break;
 
-        case AST_UNIT_LIT:
-            ast_expression->type = TYPE_UNIT;
-            break;
+    case AST_UNIT_LIT:
+        ast_expression->type = TYPE_UNIT;
+        break;
 
-        case AST_VAR_REF: {
-            symbol_t* var_sym = lookup_var_in_function(semantic_ctx, ast_expression->var_ref.name);
-            if (var_sym == NULL)
-                return ERR_SEM_UNDEF;
-            ast_expression->type = var_sym->type;
-            ast_expression->var_ref.id = var_sym->id;
-            break;
-        }
+    case AST_VAR_REF: {
+        symbol_t* var_sym = lookup_var_in_function(semantic_ctx, ast_expression->var_ref.name);
+        if (var_sym == NULL)
+            return ERR_SEM_UNDEF;
+        ast_expression->type = var_sym->type;
+        ast_expression->var_ref.id = var_sym->id;
+        break;
+    }
 
-        // TODO add the rest of expression types
-        case AST_UNARY:
-            return ERR_INTERNAL;
+    // TODO add the rest of expression types
+    case AST_UNARY:
+        TRY(check_unary(semantic_ctx, ast_expression));
+        break;
 
-        case AST_BINARY:
-            return ERR_INTERNAL;
+    case AST_BINARY:
+        TRY(check_binary(semantic_ctx, ast_expression));
+        break;
 
-        case AST_CALL:
-            return ERR_INTERNAL;
+    case AST_CALL:
+        return ERR_INTERNAL;
 
-        default:
-            return ERR_INTERNAL;
+    default:
+        return ERR_INTERNAL;
     }
     return ERR_OK;
 }
@@ -737,7 +770,105 @@ static error_code_t check_expression(sema_ctx_t* semantic_ctx, ast_node_t* ast_e
 //  Specific expressions
 // ----------------------------------------
 
+static error_code_t check_unary(sema_ctx_t* semantic_ctx, ast_node_t* ast_expression)
+{
+    TRY(check_expression(semantic_ctx, ast_expression->unary.operand));
+    // Now we know ast_expression ast_expression->unary.operand->type
 
+    switch (ast_expression->unary.op) {
+    case AST_OP_NEG:
+        if (!is_numeric(ast_expression->unary.operand->type))
+            return ERR_SEM_TYPE;
+        break;
+
+    default:
+        return ERR_INTERNAL;
+    }
+
+    ast_expression->type = ast_expression->unary.operand->type;
+    return ERR_OK;
+}
+
+static error_code_t check_binary(sema_ctx_t* semantic_ctx, ast_node_t* ast_expression)
+{
+    // Checks both children, save their types
+    TRY(check_expression(semantic_ctx, ast_expression->binary.left));
+    TRY(check_expression(semantic_ctx, ast_expression->binary.right));
+    type_t* left_type = ast_expression->binary.left->type;
+    type_t* right_type = ast_expression->binary.right->type;
+
+    type_t* result = NULL;
+
+    switch (ast_expression->binary.op) {
+    // Arithmetic operators
+    case AST_OP_ADD:
+        // Concatenation
+        if (left_type->kind == T_STRING && right_type->kind == T_STRING) {
+            result = TYPE_STRING;
+            break;
+        }
+
+        // fallthrough
+    case AST_OP_SUB:
+    case AST_OP_MUL:
+    case AST_OP_DIV:
+        // These apply for + - * /
+        // If at least one side is not numeric -> ERR_SEM_TYPE
+        if (!is_numeric(left_type) || !is_numeric(right_type))
+            return ERR_SEM_TYPE;
+
+        // Both sides are T_INT -> expression result is T_INT
+        if (left_type->kind == T_INT && right_type->kind == T_INT)
+            result = TYPE_INT;
+
+        // At least one side is T_DOUBLE -> convert both sides to T_DOUBLE & check
+        // Result expression type is also T_DOUBLE
+        else {
+            TRY(unify_numeric(ast_expression));
+            result = TYPE_DOUBLE;
+        }
+        break;
+
+    // Relational operators
+    case AST_OP_LT:
+    case AST_OP_LE:
+    case AST_OP_GT:
+    case AST_OP_GE:
+        // Both sides must be string or both sides must be numerical, else - ERROR
+        if (!(left_type->kind = T_STRING && right_type->kind == T_STRING) && !(is_numeric(left_type) && is_numeric(right_type)))
+            return ERR_SEM_TYPE;
+
+        // Both sides are strings - OK
+        // Both sides are numbers - OK
+        // Both INT - OK, At least one DOUBLE -> convert
+        TRY(unify_numeric(ast_expression));
+
+        // Relational operators always return T_BOOL
+        result = TYPE_BOOL;
+        break;
+
+    // Equality
+    case AST_OP_EQ:
+    case AST_OP_NE:
+        // Both sides must be numerric or both sides must match type, otherwise -> ERROR
+        if (!((is_numeric(left_type) && is_numeric(right_type)) || (left_type->kind == right_type->kind)))
+            return ERR_SEM_TYPE;
+
+        // Both are numeric -> might need conversion - OK
+        // Both INT - OK, Atlest one DOUBLE -> convert
+        // Both types match - OK
+        TRY(unify_numeric(ast_expression));
+
+        result = TYPE_BOOL;
+        break;
+
+    default:
+        return ERR_INTERNAL;
+    }
+
+    ast_expression->type = result;
+    return ERR_OK;
+}
 
 // ========================================
 //  Top level semantics function
