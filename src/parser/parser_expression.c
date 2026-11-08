@@ -1,3 +1,7 @@
+// Implementation of the IFJ26 imperative language compiler
+// parser_expression.c
+// Author(s): Dusan Popovic (xpopovd00)
+
 #include <stdio.h>
 #include <stdbool.h>
 #include <stdlib.h>
@@ -70,8 +74,8 @@ static void stack_free(tstack_t *s){
             tselem_t *next = temp->next;
             if(temp->data.ast_node != NULL)
                 ast_free (temp->data.ast_node);
-            temp->next = next;
             free(temp);
+			temp = next;
         }
         s->top = NULL;
     }
@@ -127,33 +131,66 @@ static int get_precedence_index (token_type_t t){
 		return -1;
 }
 
+static bool is_operand (token_type_t token) {
+	if(token == TOKEN_IDENTIFIER || token == TOKEN_INTEGER ||
+		token == TOKEN_DOUBLE || token == TOKEN_STRING){
+			return true;
+	}
+	return false;
+}
+
+static void free_control (tdata_t* control, int count){
+	for(int i = 0; i < count; i++){
+		if (control[i].ast_node != NULL){
+			ast_free(control[i].ast_node);
+			control[i].ast_node = NULL;
+		}
+	}	
+}
+
 static int reduce_rules (tstack_t *stack){
     tdata_t control[5];
     int count_control = 0;
+	bool mark_found = false;
+	
     while (stack->top != NULL){
         tdata_t temp = top(stack);
         pop(stack);
 
 		if (temp.shift_mark){
             temp.shift_mark = false;
-			if(!(push (stack, temp)))
+			if(!(push (stack, temp))){
+				if(temp.ast_node != NULL)
+					ast_free(temp.ast_node);
+				free_control (control, count_control);
 				return 99;
+			}
+			mark_found = true;
 			break; 
 		}
 		
         control[count_control++] = temp;
-        if(count_control > 3)
-            return 2;    	  
+        if(count_control > 3){
+            free_control (control, count_control);
+			return 2;    	  
+		}
 						  //_______________________________|shift_|________
     }                     //|symbol_type        |token_type|mark  |ast_node|
     tdata_t non_terminal = {SYMBOL_NON_TERMINAL, TOKEN_EOF, false, NULL};
-    if (count_control == 0)
-        return 2;
+    if (!(mark_found) || count_control == 0){
+        free_control (control, count_control);
+		return 2;
+	}
+	
     //rule E -> id 
-    if(count_control == 1 && control[0].symbol_type == SYMBOL_TERMINAL){
+    if(count_control == 1 && control[0].symbol_type == SYMBOL_TERMINAL && 
+		is_operand (control[0].token_type)){
+		
             non_terminal.ast_node = control[0].ast_node;
-            if (!(push(stack, non_terminal))) 
+            if (!(push(stack, non_terminal))){
+				free_control (control, count_control);
 				return 99;
+			}
 			return 0;
     }
     if (count_control == 3){
@@ -163,8 +200,10 @@ static int reduce_rules (tstack_t *stack){
 			control[0].token_type == TOKEN_RPAREN){
 			
             non_terminal.ast_node = control[1].ast_node;
-            if (!(push(stack, non_terminal))) 
+            if (!(push(stack, non_terminal))){ 
+				free_control (control, count_control);
 				return 99;
+			}
             return 0;
         }  
 		
@@ -173,8 +212,9 @@ static int reduce_rules (tstack_t *stack){
 			control[1].symbol_type == SYMBOL_TERMINAL && 
 			control[0].symbol_type == SYMBOL_NON_TERMINAL){
 			
-            ast_node_t *bin_node = (ast_node_t *) malloc(sizeof(ast_node_t));
+            ast_node_t *bin_node = (ast_node_t *) calloc(1, sizeof(ast_node_t));
             if(bin_node == NULL){
+				free_control (control, count_control);
                 return 99;
 			}
             bin_node->kind = AST_BINARY;
@@ -205,14 +245,18 @@ static int reduce_rules (tstack_t *stack){
 				
                 default:
                     free(bin_node);
+					free_control (control, count_control);
                     return 2;
             }
             non_terminal.ast_node = bin_node;
-            if (!(push(stack, non_terminal))) 
+            if (!(push(stack, non_terminal))){ 
+				ast_free (bin_node);
 				return 99;
+			}
             return 0;
         }
     }
+	free_control (control, count_control);
     return 2;
 }
 
@@ -222,7 +266,7 @@ static int reduce_rules (tstack_t *stack){
 //           parser using shift-reduce algorithm, precedence matrix, stack operations,
 //           and AST node creation for literals and variables."
 // Scope: parse_expression(modified by xpopovd00), get_next_token(modified by xpopovd00)
-// More details on: ifj-private/src/parser/parser_skeleton_notes.txt
+// More details on: ifj/src/parser/parser_skeleton_notes.txt
 
 static token_t get_next_token (lexer_t *lexer){
     token_t token = {0};
