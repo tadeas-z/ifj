@@ -1,3 +1,14 @@
+// Implementation of the IFJ26 imperative language compiler
+// semantic.c
+// Author(s): Adam Zatloukal (xzatloa01)
+
+// call semantic_analyze to perform smenatics analysis.
+// Pass 0 adds every builtin function into the symbol table,
+// Pass 1 goes through every function and adds it into the symbol table.
+// Pass2 goes through the body of each function and performs analysis -
+// different rule checks, type checks, type conversions, type compatibility,
+// type inferrence + adds useful information into the ast for codegen.
+
 #include "semantic.h"
 #include "comp_error.h"
 #include "dynamic_array.h"
