@@ -835,7 +835,7 @@ static error_code_t check_binary(sema_ctx_t* semantic_ctx, ast_node_t* ast_expre
     case AST_OP_GT:
     case AST_OP_GE:
         // Both sides must be string or both sides must be numerical, else - ERROR
-        if (!(left_type->kind = T_STRING && right_type->kind == T_STRING) && !(is_numeric(left_type) && is_numeric(right_type)))
+        if (!(left_type->kind == T_STRING && right_type->kind == T_STRING) && !(is_numeric(left_type) && is_numeric(right_type)))
             return ERR_SEM_TYPE;
 
         // Both sides are strings - OK
