@@ -467,6 +467,12 @@ static error_code_t check_block(sema_ctx_t* semantic_ctx, ast_node_t* ast_block)
 //  Statements
 // ========================================
 
+// Statement switch
+
+/**
+ * @paragraph Calls check_* function based on statement->type and sets the type of the statement
+ *  in case it is the last statement in a block and it is needed as a return value (type)
+ */
 static error_code_t check_statement(sema_ctx_t* semantic_ctx, ast_node_t* ast_statement)
 {
     if (semantic_ctx == NULL || ast_statement == NULL)
@@ -510,6 +516,17 @@ static error_code_t check_statement(sema_ctx_t* semantic_ctx, ast_node_t* ast_st
     return ERR_OK;
 }
 
+// ----------------------------------------
+//  Specific statements
+// ----------------------------------------
+
+/**
+ * @paragraph Does the following checks:
+ *  checks the return type of the init expression,
+ *  when var has NO specified type tries to set the type to the type of the init expression,
+ * @paragraph Fills info into the ast (id, adds the var as a local to the current function)
+ *  Also inserts the var into the symbol table
+ */
 static error_code_t check_var_def(sema_ctx_t* semantic_ctx, ast_node_t* ast_statement)
 {
     // Helper variables
@@ -553,6 +570,12 @@ static error_code_t check_var_def(sema_ctx_t* semantic_ctx, ast_node_t* ast_stat
     return ERR_OK;
 }
 
+/**
+ * @paragraph Does the following checks:
+ *  assignment to a variable that doest exist -> ERR_SEM_UNDEF,
+ *  assignment to a constant variable (val) -> ERR_SEM_UNSIGNED,
+ *  check if the type of left and right side of the assign match (maybe convert),
+ */
 static error_code_t check_assign(sema_ctx_t* semantic_ctx, ast_node_t* ast_statement) {
     symbol_t* var_sym = lookup_var_in_function(semantic_ctx, ast_statement->assign.name);
 
@@ -577,6 +600,11 @@ static error_code_t check_assign(sema_ctx_t* semantic_ctx, ast_node_t* ast_state
     return ERR_OK;
 }
 
+/**
+ * @paragraph Does the following checks:
+ *  Type of the condition must be T_BOOL
+ *  calls check_block on the body of the cycle
+ */
 static error_code_t check_while(sema_ctx_t* semantic_ctx, ast_node_t* ast_statement) {
     // Check the condition + cond must be bool
     TRY(check_expression(semantic_ctx, ast_statement->while_stmt.cond));
@@ -590,6 +618,11 @@ static error_code_t check_while(sema_ctx_t* semantic_ctx, ast_node_t* ast_statem
     return ERR_OK;
 }
 
+/**
+ * @paragraph Does the following checks:
+ *  Type of the condition must be T_BOOL
+ *  Calls check_block on the body of every branch
+ */
 static error_code_t check_if(sema_ctx_t* semantic_ctx, ast_node_t* ast_statement) {
     // Check the condition + cond must be bool
     TRY(check_expression(semantic_ctx, ast_statement->if_stmt.cond));
@@ -606,6 +639,15 @@ static error_code_t check_if(sema_ctx_t* semantic_ctx, ast_node_t* ast_statement
     return ERR_OK;
 }
 
+/**
+ * @paragraph Does the following checks:
+ *  If there is a return statement (there is because we got into this function) the function
+ *  MUST have an explicit reutrn type,
+ *  When return contains a return value check if the type of tha value is compatible with the
+ *  functions return type - if function return type is T_UNIT we dont check (it is discarded),
+ *  When there is no return value and function return type is T_UNIT thats fine, if its not T_UNIT
+ *  There is nothing to return but the function needs something returned -> ERR_SEM_OTHER (10)
+ */
 static error_code_t check_return(sema_ctx_t* semantic_ctx, ast_node_t* ast_statement) {
     ast_return_t *ast_return_stmt = &ast_statement->return_stmt;
     ast_func_def_t* ast_func_def = &semantic_ctx->current_func->func_def;
@@ -641,6 +683,12 @@ static error_code_t check_return(sema_ctx_t* semantic_ctx, ast_node_t* ast_state
 
     return ERR_OK;
 }
+
+// ========================================
+//  Expressions
+// ========================================
+
+// Expression switch
 
 static error_code_t check_expression(sema_ctx_t* semantic_ctx, ast_node_t* ast_expression) {
     switch (ast_expression->kind) {
@@ -686,8 +734,14 @@ static error_code_t check_expression(sema_ctx_t* semantic_ctx, ast_node_t* ast_e
 }
 
 // ----------------------------------------
-//  Top level semantics function
+//  Specific expressions
 // ----------------------------------------
+
+
+
+// ========================================
+//  Top level semantics function
+// ========================================
 
 error_code_t semantic_analyze(ast_node_t* program)
 {
