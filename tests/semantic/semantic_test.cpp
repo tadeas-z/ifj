@@ -14,8 +14,10 @@
 //          input and allocation failures (99))
 // Scope: the whole file
 //
-// Note: until pass 2 exists the function bodies are not checked, so every
-// function here gets a trivial body "()" and only the declarations matter.
+// Note: these tests are about the declarations only. Every function gets a
+// trivial body that pass 2 accepts: a literal of its written return type
+// (0, 0.0, "") or "()" when the type is Unit or not written.
+// Pass 2 itself is tested in semantic_pass2_test.cpp.
 
 extern "C" {
 #include "ast.h"
@@ -74,7 +76,24 @@ protected:
         ast_free(program);
     }
 
-    // def <name>(<params>): <ret> = ()     ret == nullptr -> return type not written
+    // A literal of the given type, so the body matches the written return type
+    static ast_node_t* literal_of(type_t* type)
+    {
+        if (type == nullptr)
+            return ast_new_unit_lit(2, 3);
+        switch (type->kind) {
+        case T_INT:
+            return ast_new_int_lit(0, 2, 3);
+        case T_DOUBLE:
+            return ast_new_double_lit(0.0, 2, 3);
+        case T_STRING:
+            return ast_new_string_lit("", 2, 3);
+        default:
+            return ast_new_unit_lit(2, 3);
+        }
+    }
+
+    // def <name>(<params>): <ret> = <literal of ret>     ret == nullptr -> return type not written
     ast_node_t* add_func(const char* name, bool is_main, type_t* ret, const param_list_t& params = {})
     {
         ast_node_t* fn = ast_new_func_def(name, is_main, 1, 1);
@@ -85,7 +104,7 @@ protected:
 
         ast_node_t* body = ast_new_block(2, 3);
         EXPECT_NE(body, nullptr);
-        EXPECT_TRUE(dyn_arr_append(&body->block.statements, ast_new_expr_stmt(ast_new_unit_lit(2, 3), 2, 3)));
+        EXPECT_TRUE(dyn_arr_append(&body->block.statements, ast_new_expr_stmt(literal_of(ret), 2, 3)));
         fn->func_def.body = body;
 
         EXPECT_TRUE(dyn_arr_append(&program->program.func_list, fn));
