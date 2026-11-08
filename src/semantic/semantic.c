@@ -26,11 +26,11 @@ static error_code_t check_statement(sema_ctx_t* semantic_ctx, ast_node_t* ast_st
 static error_code_t check_expression(sema_ctx_t* semantic_ctx, ast_node_t* ast_expression);
 // static error_code_t check_call(sema_ctx_t* semantic_ctx, ast_node_t* ast_call);
 
-static error_code_t check_var_def(sema_ctx_t *semantic_ctx, ast_node_t* ast_statement);
-static error_code_t check_assign(sema_ctx_t *semantic_ctx, ast_node_t* ast_statement);
-static error_code_t check_return(sema_ctx_t *semantic_ctx, ast_node_t* ast_statement);
-static error_code_t check_if(sema_ctx_t *semantic_ctx, ast_node_t* ast_statement);
-static error_code_t check_while(sema_ctx_t *semantic_ctx, ast_node_t* ast_statement);
+static error_code_t check_var_def(sema_ctx_t* semantic_ctx, ast_node_t* ast_statement);
+static error_code_t check_assign(sema_ctx_t* semantic_ctx, ast_node_t* ast_statement);
+static error_code_t check_return(sema_ctx_t* semantic_ctx, ast_node_t* ast_statement);
+static error_code_t check_if(sema_ctx_t* semantic_ctx, ast_node_t* ast_statement);
+static error_code_t check_while(sema_ctx_t* semantic_ctx, ast_node_t* ast_statement);
 
 // ========================================
 //  Helpers
@@ -88,11 +88,12 @@ static symbol_t* lookup_var_in_function(sema_ctx_t* semantic_ctx, const char* na
 }
 
 // returns the last statement of a AST_BLOCK
-static ast_node_t* last_statement(ast_node_t* body) {
+static ast_node_t* last_statement(ast_node_t* body)
+{
     if (body == NULL)
         return NULL;
 
-    dyn_arr_t *block_statements = &body->block.statements;
+    dyn_arr_t* block_statements = &body->block.statements;
 
     if (block_statements->count > 0)
         return dyn_arr_get(block_statements, block_statements->count - 1);
@@ -101,7 +102,8 @@ static ast_node_t* last_statement(ast_node_t* body) {
 }
 
 // True when the last statemen of a block is return, else false
-static bool block_ends_with_return(ast_node_t* block) {
+static bool block_ends_with_return(ast_node_t* block)
+{
     ast_node_t* last_stmt = last_statement(block);
     if (last_stmt == NULL)
         return false;
@@ -110,13 +112,13 @@ static bool block_ends_with_return(ast_node_t* block) {
         return true;
 
     if (last_stmt->kind == AST_IF)
-        return block_ends_with_return(last_stmt->if_stmt.then_block) &&
-        block_ends_with_return(last_stmt->if_stmt.else_block);
+        return block_ends_with_return(last_stmt->if_stmt.then_block) && block_ends_with_return(last_stmt->if_stmt.else_block);
 
     return false;
 }
 
-static bool block_ends_with_unit(ast_node_t* block) {
+static bool block_ends_with_unit(ast_node_t* block)
+{
     ast_node_t* last_stmt = last_statement(block);
 
     // Empty block -> Unit
@@ -124,11 +126,41 @@ static bool block_ends_with_unit(ast_node_t* block) {
         return true;
 
     if (last_stmt->kind == AST_IF)
-        return block_ends_with_unit(last_stmt->if_stmt.then_block) &&
-        block_ends_with_unit(last_stmt->if_stmt.else_block);
+        return block_ends_with_unit(last_stmt->if_stmt.then_block) && block_ends_with_unit(last_stmt->if_stmt.else_block);
 
     // Otherwise last_stmp->type is Unit
     return last_stmt->type->kind == T_UNIT;
+}
+
+/**
+ * @brief Checks type compatibility + Implicit conversion: Int -> Double
+ * @param slot *slot is the ptr to the expression node itslef (type is already checked)
+ * @param target type thats expected at this place
+ * @param mismatch_err what to return if types dont fit
+ */
+static error_code_t coerce(ast_node_t** slot, type_t* target, error_code_t mismatch_err)
+{
+    // Get the source type (type of the expression)
+    type_t* source = (*slot)->type;
+    if (source == NULL) // If its NULL semantics forgot to set a type -> ERR_INTERNAL
+        return ERR_INTERNAL;
+
+    // If the 2 types dont fit return mismatch
+    if (!type_compatible(target, source))
+        return mismatch_err;
+
+    // Convert Int -> Double
+    if (source->kind == T_INT && target->kind == T_DOUBLE) {
+        ast_node_t* ast_convert_node = ast_new_convert(*slot); // CONVERT --> INT_LIT 0 (copies the pointer into .operand)
+        if (ast_convert_node == NULL)
+            return ERR_INTERNAL;
+
+        // Make the pointer that pointed to the expression node point to the CONVERSION node
+        // var_def->init --> CONVERT --> INT_LIT 0
+        (*slot) = ast_convert_node;
+    }
+
+    return ERR_OK;
 }
 
 // ========================================
@@ -157,7 +189,7 @@ static error_code_t insert_builtin_functions(symtable_t* symtable)
         { "subStr", TYPE_STRING, 3, { TYPE_STRING, TYPE_INT, TYPE_INT }, { "value", "start", "end" } },
         { "ord", TYPE_INT, 2, { TYPE_STRING, TYPE_INT }, { "value", "index" } },
         { "chr", TYPE_STRING, 1, { TYPE_INT }, { "code" } },
-        {"readBoolean", TYPE_BOOL, 0, {0}, {NULL}}
+        { "readBoolean", TYPE_BOOL, 0, { 0 }, { NULL } }
     };
 
     const size_t builtin_cnt = sizeof(BUILTINS) / sizeof(BUILTINS[0]);
@@ -369,6 +401,8 @@ static error_code_t check_function(sema_ctx_t* semantic_ctx, ast_node_t* ast_fun
             else if (block_ends_with_return(ast_func_def_data->body))
                 ast_func_def_data->body->type = ast_func_def_data->return_type;
 
+            // If function return type was not specified and every path in the if reutrns Unit
+            // infer the type as Unit
             else if (func_sym->ret_inferred && block_ends_with_unit(ast_func_def_data->body))
                 ast_func_def_data->body->type = TYPE_UNIT;
             else
@@ -417,12 +451,11 @@ static error_code_t check_block(sema_ctx_t* semantic_ctx, ast_node_t* ast_block)
     }
 
     // Get the last statement and set the return type of the block to the type of the last statement
-    ast_node_t *last_stmt = last_statement(block_statements);
+    ast_node_t* last_stmt = last_statement(ast_block);
     if (last_stmt == NULL)
         ast_block->type = TYPE_UNIT;
     else
         ast_block->type = last_stmt->type;
-
 
     // Pop the scope - the block is already analyzed
     TRY_ST(symtable_pop_scope(semantic_ctx->symbol_table));
@@ -442,7 +475,7 @@ static error_code_t check_statement(sema_ctx_t* semantic_ctx, ast_node_t* ast_st
     switch (ast_statement->kind) {
     case AST_VAR_DEF:
         TRY(check_var_def(semantic_ctx, ast_statement));
-        ast_statement->type = TYPE_UNIT;        // What is the type if this stmt is the last
+        ast_statement->type = TYPE_UNIT; // What is the type if this stmt is the last
         break;
 
     case AST_ASSIGN:
@@ -477,15 +510,179 @@ static error_code_t check_statement(sema_ctx_t* semantic_ctx, ast_node_t* ast_st
     return ERR_OK;
 }
 
-static error_code_t check_var_def(sema_ctx_t *semantic_ctx, ast_node_t* ast_statement) {
-    ast_var_def_t *ast_var_def = &ast_statement->var_def;
+static error_code_t check_var_def(sema_ctx_t* semantic_ctx, ast_node_t* ast_statement)
+{
+    // Helper variables
+    ast_var_def_t* ast_var_def = &ast_statement->var_def;
+    symtable_t* symbol_table = semantic_ctx->symbol_table;
+
+    // Check the initilizer
 
     // val x = x + 1
     // check_expression looks up an x that already exists and uses its symbol, then we return and insert the new x into the symtable
     // if we were to insert the new x first, then call check_expression the lookup there would find the new x
     // For correct shadowing we use the first option
-    TRY(check_expression(semantic_ctx ,ast_var_def->init)); // ast_var_def->init->type is now known
+    TRY(check_expression(semantic_ctx, ast_var_def->init)); // ast_var_def->init->type is now known
 
+    // Determine variables type
+    type_t* var_type;
+
+    if (ast_var_def->declared_type != NULL) {
+        // Var type was specified
+        TRY(coerce(&ast_var_def->init, ast_var_def->declared_type, ERR_SEM_TYPE)); // Convert init expr to double if needed
+        var_type = ast_var_def->declared_type;
+    } else {
+        // Type is inferred
+        var_type = ast_var_def->init->type;
+    }
+
+    // Insert into current scope (symtable)
+    symbol_t* var_sym;
+    TRY_ST(symtable_insert_var(symbol_table, ast_var_def->name, var_type,
+        ast_var_def->is_const, &var_sym));
+
+    // Copy uniqe id from symtable to ast
+    ast_var_def->id = var_sym->id;
+
+    // Append the variable to the func_def.locals array
+    bool err_code = dyn_arr_append(&semantic_ctx->current_func->func_def.locals, ast_statement);
+    if (err_code == false)
+        return ERR_INTERNAL;
+
+    // Type of the statement is already set by check_stetement
+    return ERR_OK;
+}
+
+static error_code_t check_assign(sema_ctx_t* semantic_ctx, ast_node_t* ast_statement) {
+    symbol_t* var_sym = lookup_var_in_function(semantic_ctx, ast_statement->assign.name);
+
+    // Variable doesnt exist (could also be ERR_SEM_ASSIGN)
+    if (var_sym == NULL)
+        return ERR_SEM_UNDEF;
+
+    // You cannot assign to val - aslo covers trying to assign to func params
+    if (var_sym->is_const)
+        return ERR_SEM_ASSIGN;
+
+    // Check right side of assign
+    TRY(check_expression(semantic_ctx, ast_statement->assign.value));
+
+    // Now we know type of the right hand side -> check if it matches with the left side
+    // Type of var cannot change during runtime
+    TRY(coerce(&ast_statement->assign.value, var_sym->type, ERR_SEM_TYPE));
+
+    ast_statement->assign.id = var_sym->id;
+
+    // Statement type is set in check_statement to Unit
+    return ERR_OK;
+}
+
+static error_code_t check_while(sema_ctx_t* semantic_ctx, ast_node_t* ast_statement) {
+    // Check the condition + cond must be bool
+    TRY(check_expression(semantic_ctx, ast_statement->while_stmt.cond));
+    if (ast_statement->while_stmt.cond->type->kind != T_BOOL)
+        return ERR_SEM_TYPE;
+
+    // Check the body of the cycle
+    TRY(check_block(semantic_ctx, ast_statement->while_stmt.body));
+
+    // Type of this statement is Unit - set in check_statement
+    return ERR_OK;
+}
+
+static error_code_t check_if(sema_ctx_t* semantic_ctx, ast_node_t* ast_statement) {
+    // Check the condition + cond must be bool
+    TRY(check_expression(semantic_ctx, ast_statement->if_stmt.cond));
+    if (ast_statement->if_stmt.cond->type->kind != T_BOOL)
+        return ERR_SEM_TYPE;
+
+    // Check each the body of each branch
+    TRY(check_block(semantic_ctx, ast_statement->if_stmt.then_block));
+    // Boolthen -> else_block can be NULL
+    if (ast_statement->if_stmt.else_block != NULL)
+        TRY(check_block(semantic_ctx, ast_statement->if_stmt.else_block));
+
+    // Type of this statement is Unit - set in check_statement
+    return ERR_OK;
+}
+
+static error_code_t check_return(sema_ctx_t* semantic_ctx, ast_node_t* ast_statement) {
+    ast_return_t *ast_return_stmt = &ast_statement->return_stmt;
+    ast_func_def_t* ast_func_def = &semantic_ctx->current_func->func_def;
+
+    // If body contains return the function MUST have an explicit return type
+
+    // No return type written (ast_func_def->return_type is NULL while the
+    // func is being checked - it is set only at the end of check_function)
+    // We dont even need to lookup the symbol to check ret_inferred
+    if (ast_func_def->return_type == NULL)
+        return ERR_SEM_TYPE;
+
+    // We have a return value
+    if (ast_return_stmt->value != NULL) {
+        TRY(check_expression(semantic_ctx, ast_return_stmt->value));
+
+        // Now we know the type of the return value
+        if (ast_func_def->return_type->kind == T_UNIT)
+            ;       // Return value is discarded when function returns Unit
+        else
+            // Check if the return type and function return type is compatible and maybe do a conversion
+            TRY(coerce(&ast_return_stmt->value, ast_func_def->return_type, ERR_SEM_TYPE));
+
+    // There is no return value
+    } else {
+        // Unit function discards the return value anyways
+        if (ast_func_def->return_type->kind == T_UNIT)
+            ;
+        // The function has a (non Unit) return type but we are not returning anything
+        else
+            return ERR_SEM_OTHER;       // Could also be ERR_SEM_TYPE (6)
+    }
+
+    return ERR_OK;
+}
+
+static error_code_t check_expression(sema_ctx_t* semantic_ctx, ast_node_t* ast_expression) {
+    switch (ast_expression->kind) {
+        case AST_INT_LIT:
+            ast_expression->type = TYPE_INT;
+            break;
+
+        case AST_DOUBLE_LIT:
+            ast_expression->type = TYPE_DOUBLE;
+            break;
+
+        case AST_STRING_LIT:
+            ast_expression->type = TYPE_STRING;
+            break;
+
+        case AST_UNIT_LIT:
+            ast_expression->type = TYPE_UNIT;
+            break;
+
+        case AST_VAR_REF: {
+            symbol_t* var_sym = lookup_var_in_function(semantic_ctx, ast_expression->var_ref.name);
+            if (var_sym == NULL)
+                return ERR_SEM_UNDEF;
+            ast_expression->type = var_sym->type;
+            ast_expression->var_ref.id = var_sym->id;
+            break;
+        }
+
+        // TODO add the rest of expression types
+        case AST_UNARY:
+            return ERR_INTERNAL;
+
+        case AST_BINARY:
+            return ERR_INTERNAL;
+
+        case AST_CALL:
+            return ERR_INTERNAL;
+
+        default:
+            return ERR_INTERNAL;
+    }
+    return ERR_OK;
 }
 
 // ----------------------------------------
