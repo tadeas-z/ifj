@@ -24,7 +24,7 @@ static error_code_t check_function(sema_ctx_t* semantic_ctx, ast_node_t* ast_fun
 static error_code_t check_block(sema_ctx_t* semantic_ctx, ast_node_t* ast_block);
 static error_code_t check_statement(sema_ctx_t* semantic_ctx, ast_node_t* ast_statement);
 static error_code_t check_expression(sema_ctx_t* semantic_ctx, ast_node_t* ast_expression);
-// static error_code_t check_call(sema_ctx_t* semantic_ctx, ast_node_t* ast_call);
+static error_code_t check_call(sema_ctx_t* semantic_ctx, ast_node_t* ast_call);
 
 static error_code_t check_var_def(sema_ctx_t* semantic_ctx, ast_node_t* ast_statement);
 static error_code_t check_assign(sema_ctx_t* semantic_ctx, ast_node_t* ast_statement);
@@ -379,6 +379,16 @@ static error_code_t check_function(sema_ctx_t* semantic_ctx, ast_node_t* ast_fun
     // When THIS function is called from within ITS body - we know the type isnt known yet
     func_sym->sema_marker = SEMA_IN_PROGRESS;
 
+    // Used for call recursion detection
+    // When we enter a function, create a frame .caller poitns to the pervious frame
+    // and we make the context point to the new frame the result is: (diagram is when we are in fn3)
+    // |───[fn1 frame]◀────[fn2 frame]◀────[fn3 frame]
+    //                                          ▲
+    //                                          |
+    //                              [context]───
+    sema_frame_t frame = { .func_sym = func_sym, .caller = semantic_ctx->call_chain };
+    semantic_ctx->call_chain = &frame; // Push to the call chain
+
     // Save callers state and update context
     sema_ctx_t callers_state = {
         .current_func = semantic_ctx->current_func, // When called by check_function_bodies - NULL. When called by check_call - the func being checked
@@ -442,13 +452,31 @@ static error_code_t check_function(sema_ctx_t* semantic_ctx, ast_node_t* ast_fun
         func_sym->type = ast_func_def_data->body->type;
     }
 
-    // TODO explicit type -> return rules
+    // Return type is explicit
+    // skip when last_stmt is IF since that is already covered
+    if (!func_sym->ret_inferred && func_sym->type->kind != T_UNIT && (last_stmt == NULL || last_stmt->kind != AST_IF)) {
+        if (last_stmt != NULL && last_stmt->kind == AST_EXPR_STMT) {
+            TRY(coerce(&last_stmt->expr_stmt.expr, func_sym->type, ERR_SEM_TYPE));
+            last_stmt->type = func_sym->type;
+            ast_func_def_data->body->type = func_sym->type;
+
+        } else if (!type_compatible(func_sym->type, ast_func_def_data->body->type))
+            return ERR_SEM_TYPE;
+    }
 
     // @main has to return Unit
     if (ast_func_def_data->is_main && ast_func_def_data->return_type->kind != T_UNIT)
         return ERR_SEM_TYPE;
 
     // Cleanup
+
+    // For fn3:
+    // |───[fn1 frame]◀────[fn2 frame]◀────[fn3 frame] (destoyed when check_function returns)
+    //                          ▲
+    //                          |
+    //              [context]───
+    semantic_ctx->call_chain = frame.caller; // Pop from the call chain
+
     symtable_pop_scope(symbol_table);
     semantic_ctx->current_func = callers_state.current_func;
     semantic_ctx->base_depth = callers_state.base_depth;
@@ -758,7 +786,8 @@ static error_code_t check_expression(sema_ctx_t* semantic_ctx, ast_node_t* ast_e
         break;
 
     case AST_CALL:
-        return ERR_INTERNAL;
+        TRY(check_call(semantic_ctx, ast_expression));
+        break;
 
     default:
         return ERR_INTERNAL;
@@ -867,6 +896,62 @@ static error_code_t check_binary(sema_ctx_t* semantic_ctx, ast_node_t* ast_expre
     }
 
     ast_expression->type = result;
+    return ERR_OK;
+}
+
+// ========================================
+//  Function calls
+// ========================================
+
+static error_code_t check_call(sema_ctx_t* semantic_ctx, ast_node_t* ast_call)
+{
+    // Helper variables
+    symtable_t* symbol_table = semantic_ctx->symbol_table;
+    ast_call_t* ast_call_data = &ast_call->call;
+
+    // Find the function in the symbol table
+    symbol_t* func_sym = symtable_lookup_func(symbol_table, ast_call_data->name);
+    if (func_sym == NULL)
+        return ERR_SEM_UNDEF;
+
+    ast_call_data->is_builtin = func_sym->builtin;
+
+    // Lazy checks
+    if (func_sym->sema_marker == SEMA_UNCHECKED)
+        TRY(check_function(semantic_ctx, func_sym->decl));
+
+    // This means the funciton is recursive -> must have explicit return type
+    // Also covers indirect recursion
+    else if (func_sym->sema_marker == SEMA_IN_PROGRESS) {
+        // Currently we are in the innermost function (see call chain diagram in check_function)
+        for (sema_frame_t* frame = semantic_ctx->call_chain; frame != NULL; frame = frame->caller) {
+            if (frame->func_sym->ret_inferred)
+                return ERR_SEM_TYPE;
+
+            if (frame->func_sym == func_sym)
+                break;
+        }
+    }
+
+    // Arguments
+    // arg count must match the func signature
+    if ((size_t)func_sym->param_count != ast_call_data->args.count)
+        return ERR_SEM_CALL;
+
+    // Check each arg
+    for (size_t arg_i = 0; arg_i < (size_t)func_sym->param_count; arg_i++) {
+        ast_node_t* ast_arg = dyn_arr_get(&ast_call_data->args, arg_i); // !!! LOCAL COPY
+        type_t* expected_param_type = func_sym->param_types[arg_i];
+
+        TRY(check_expression(semantic_ctx, ast_arg));
+        // Now we know ast_arg->type
+        // check type mismatch between ast param and the func signature param type
+        TRY(coerce(&ast_arg, expected_param_type, ERR_SEM_CALL));
+        ast_call_data->args.items[arg_i] = ast_arg; // needed since ast_param is a copy of the pointer
+    }
+
+    // Calls return type is the same as the functions return type
+    ast_call->type = func_sym->type;
     return ERR_OK;
 }
 
