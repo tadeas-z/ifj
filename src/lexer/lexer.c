@@ -2,6 +2,11 @@
 // lexer.c
 // Author(s): Tadeáš Zonyga (xzonygt00)
 
+/* IFJ26 lexer. Each token kind has its own scanner
+ * that follows the lexer automaton diagram.
+ * Helper functions handle logical lines,
+ * indentation and comments. */
+
 #include "lexer.h"
 
 #include <errno.h>
@@ -479,8 +484,13 @@ static scan_result_t scan_number(lexer_t* lexer, buffer_t* buffer, token_type_t*
             next = NUM_FRACTION;
             break;
         }
-        if (!moved)
+        if (!moved) {
+            if (state != NUM_DOT && id_part(c)) {
+                invalid(lexer);
+                return SCAN_ERROR;
+            }
             return accept_number(lexer, buffer, state, type);
+        }
         state = next;
         if (!take(lexer, buffer))
             return SCAN_ERROR;
@@ -548,8 +558,11 @@ static scan_result_t scan_string(lexer_t* lexer, buffer_t* buffer)
                 next = RAW_END;
             break;
         case STR_END:
-        case RAW_END:
             moved = 0;
+            break;
+        case RAW_END:
+            moved = c == '"';
+            next = RAW_END;
             break;
         }
         if (!moved) {

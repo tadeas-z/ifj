@@ -2,17 +2,21 @@
 // lexer.h
 // Author(s): Tadeáš Zonyga (xzonygt00)
 
+/* Public interface of the IFJ26 lexer: lexer state,
+ * reading tokens one by one and error codes.
+ * The caller opens and closes the input file. */
+
 #ifndef IFJ_LEXER_H
 #define IFJ_LEXER_H
 
+#include "comp_error.h"
 #include "token.h"
 #include <stdio.h>
 
-typedef enum {
-    LEXER_OK = 0,
-    LEXER_ERROR = 1,
-    LEXER_INTERNAL_ERROR = 99
-} lexer_status_t;
+typedef error_code_t lexer_status_t;
+#define LEXER_OK ERR_OK
+#define LEXER_ERROR ERR_LEXICAL
+#define LEXER_INTERNAL_ERROR ERR_INTERNAL
 
 typedef struct {
     FILE* input; /* Borrowed, lexer never closes it. */

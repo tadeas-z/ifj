@@ -2,6 +2,11 @@
 // token.h
 // Author(s): Tadeáš Zonyga (xzonygt00)
 
+/* Token types and the token structure shared by
+ * the lexer and the parser. A token holds its type,
+ * its text, its position in the source and
+ * line/indentation information for the parser. */
+
 #ifndef IFJ_TOKEN_H
 #define IFJ_TOKEN_H
 

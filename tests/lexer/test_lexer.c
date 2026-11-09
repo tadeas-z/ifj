@@ -2,6 +2,8 @@
 // test_lexer.c
 // Author(s): Tadeáš Zonyga (xzonygt00)
 
+/* Regression tests for the IFJ26 lexer. */
+
 #include "lexer.h"
 
 #include <assert.h>
@@ -160,40 +162,43 @@ static void numbers(void)
     sequence("1.foo-2", adjacent, sizeof adjacent / sizeof adjacent[0]);
 }
 
+static void expect_error(const char* text);
+
 // AI-generated using: Claude Code
 //              model: Claude Opus 5.5
-// Prompt (summary): "Add regression tests for numeric token boundaries,
-// including 10abc\"y\", lexeme lengths and positions. Assess unsupported
-// numeric suffixes individually and preserve malformed-number checks."
-// Scope: number_boundaries(), numeric cases in errors() and test registration.
-/* A number ends after its longest valid literal; the next character is not
- * consumed and starts the next token. Unsupported forms (hex, L, f, d on an
- * integer) therefore split into tokens the parser rejects. */
+// Prompt (summary): "Rewrite the numeric boundary tests after the code
+//          review: a number glued to an identifier character is lexical
+//          error 1, a number followed by '.', an operator or a string still
+//          ends normally."
+// Scope: number_boundaries().
+/* Spec 1.1 and 6: unsupported bases and suffixes (hex, L, f, d on an
+ * integer) and any letter right after a number form one malformed lexeme. */
 static void number_boundaries(void)
 {
-    const expected_t regression[] = {
-        { TOKEN_INTEGER, "10", 1, 1 }, { TOKEN_IDENTIFIER, "abc", 1, 3 },
-        { TOKEN_STRING, "\"y\"", 1, 6 }, { TOKEN_EOF, NULL, 1, 9 }
+    const char* glued[] = {
+        "10abc\"y\"", "12abc", "0x12", "0x1F", "1L", "1.0f", "1.5F",
+        "1.0Dfoo", "1.0dd", "1d", "1e2x", "1_0.5_0dx", ".5abc", "1_0x", "x = 1abc"
     };
-    sequence("10abc\"y\"", regression, sizeof regression / sizeof regression[0]);
+    for (size_t i = 0; i < sizeof glued / sizeof glued[0]; ++i)
+        expect_error(glued[i]);
 
-    const struct {
-        const char* text;
-        expected_t first, second;
-    } split[] = {
-        { "12abc", { TOKEN_INTEGER, "12", 1, 1 }, { TOKEN_IDENTIFIER, "abc", 1, 3 } },
-        { "0x12", { TOKEN_INTEGER, "0", 1, 1 }, { TOKEN_IDENTIFIER, "x12", 1, 2 } },
-        { "1L", { TOKEN_INTEGER, "1", 1, 1 }, { TOKEN_IDENTIFIER, "L", 1, 2 } },
-        { "1.0f", { TOKEN_DOUBLE, "1.0", 1, 1 }, { TOKEN_IDENTIFIER, "f", 1, 4 } },
-        { "1.0Dfoo", { TOKEN_DOUBLE, "1.0D", 1, 1 }, { TOKEN_IDENTIFIER, "foo", 1, 5 } },
-        { "1d", { TOKEN_INTEGER, "1", 1, 1 }, { TOKEN_IDENTIFIER, "d", 1, 2 } },
-        { "1e2x", { TOKEN_DOUBLE, "1e2", 1, 1 }, { TOKEN_IDENTIFIER, "x", 1, 4 } },
-        { "1_0.5_0dx", { TOKEN_DOUBLE, "1_0.5_0d", 1, 1 }, { TOKEN_IDENTIFIER, "x", 1, 9 } }
+    const expected_t member[] = {
+        { TOKEN_INTEGER, "1", 1, 1 }, { TOKEN_DOT, ".", 1, 2 },
+        { TOKEN_IDENTIFIER, "toString", 1, 3 }
     };
-    for (size_t i = 0; i < sizeof split / sizeof split[0]; ++i) {
-        const expected_t expected[] = { split[i].first, split[i].second };
-        sequence(split[i].text, expected, 2);
-    }
+    sequence("1.toString", member, 3);
+    const expected_t field[] = {
+        { TOKEN_IDENTIFIER, "x", 1, 1 }, { TOKEN_DOT, ".", 1, 2 },
+        { TOKEN_IDENTIFIER, "y", 1, 3 }
+    };
+    sequence("x.y", field, 3);
+    const expected_t ends[] = {
+        { TOKEN_INTEGER, "10", 1, 1 }, { TOKEN_STRING, "\"y\"", 1, 3 },
+        { TOKEN_DOUBLE, "1e5", 1, 6 }, { TOKEN_RPAREN, ")", 1, 9 },
+        { TOKEN_INTEGER, "2", 1, 10 }, { TOKEN_PLUS, "+", 1, 11 },
+        { TOKEN_DOUBLE, ".5", 1, 12 }
+    };
+    sequence("10\"y\"1e5)2+.5", ends, 7);
 }
 
 static void errors(void)
@@ -767,12 +772,10 @@ static void automaton_boundaries(void)
         { "1.2.3", { { TOKEN_DOUBLE, "1.2", 1, 1 }, { TOKEN_DOUBLE, ".3", 1, 4 } }, 2 },
         { ".5d", { { TOKEN_DOUBLE, ".5d", 1, 1 } }, 1 },
         { "01e5", { { TOKEN_DOUBLE, "01e5", 1, 1 } }, 1 },
-        { "1.0dd", { { TOKEN_DOUBLE, "1.0d", 1, 1 }, { TOKEN_IDENTIFIER, "d", 1, 5 } }, 2 },
-        /* f23 needs a third quote for q16; f25 has no outgoing transition. */
+        /* f23 needs a third quote for q16; f25 loops on '"' (code review). */
         { "\"\"x", { { TOKEN_STRING, "\"\"", 1, 1 }, { TOKEN_IDENTIFIER, "x", 1, 3 } }, 2 },
         { "\"\"\"\"\"x\"\"\"", { { TOKEN_STRING, "\"\"\"\"\"x\"\"\"", 1, 1 } }, 1 },
-        { "\"\"\"\"\"\"\"\"", { { TOKEN_STRING, "\"\"\"\"\"\"", 1, 1 },
-                                  { TOKEN_STRING, "\"\"", 1, 7 } }, 2 },
+        { "\"\"\"\"\"\"\"\"", { { TOKEN_STRING, "\"\"\"\"\"\"\"\"", 1, 1 } }, 1 },
         { "\"a\rb\"", { { TOKEN_STRING, "\"a\rb\"", 1, 1 } }, 1 },
         { "@main(", { { TOKEN_MAIN, "@main", 1, 1 }, { TOKEN_LPAREN, "(", 1, 6 } }, 2 },
         /* f26 is TOKEN_SLASH unless / or * follows. */
@@ -893,6 +896,36 @@ static void allocation_failures(void)
 }
 #endif
 
+// AI-generated using: Claude Code
+//              model: Claude Opus 5.5
+// Prompt (summary): "Add regression tests for the raw string review fix:
+//          extra closing quotes are content and the last three close the
+//          literal; too few quotes stay an unterminated string."
+// Scope: raw_string_quotes().
+/* Lexemes keep the original spelling, so the value is the text without the
+ * first three and the last three quotes. */
+static void raw_string_quotes(void)
+{
+    const char* valid[] = {
+        "\"\"\"say \"hi\"\"\"\"", /* value: say "hi" */
+        "\"\"\"\"\"\"\"\"", /* value: "" */
+        "\"\"\"x\"\"\"\"\"\"\"", /* value: x"""" */
+        "\"\"\"\"\"\"" /* value: empty */
+    };
+    for (size_t i = 0; i < sizeof valid / sizeof valid[0]; ++i) {
+        const expected_t expected[] = { { TOKEN_STRING, valid[i], 1, 1 } };
+        sequence(valid[i], expected, 1);
+    }
+    const expected_t followed[] = {
+        { TOKEN_STRING, "\"\"\"a\"\"\"\"", 1, 1 }, { TOKEN_IDENTIFIER, "b", 1, 10 },
+        { TOKEN_STRING, "\"c\"", 1, 12 }
+    };
+    sequence("\"\"\"a\"\"\"\" b \"c\"", followed, 3);
+    const char* bad[] = { "\"\"\"\"\"", "\"\"\"say \"hi\"\"" };
+    for (size_t i = 0; i < sizeof bad / sizeof bad[0]; ++i)
+        expect_error(bad[i]);
+}
+
 int main(void)
 {
     basic_program();
@@ -915,9 +948,10 @@ int main(void)
     multiline_comment_tail_layout();
     automaton_boundaries();
     layout_decisions();
+    raw_string_quotes();
 #ifdef LEXER_TEST_ALLOC_FAILURES
     allocation_failures();
 #endif
-    puts("Lexer: all 20 test groups passed.");
+    puts("Lexer: all 21 test groups passed.");
     return 0;
 }
