@@ -94,7 +94,7 @@ typedef struct
 // └──────────────────────────────┘     VAR_DEF WHILE EXPR_STMT
 typedef struct
 {
-    dyn_arr_t statements; // (P) statements of the block in source order
+    dyn_arr_t statements; // (P) statements of the block in source order (item is ast_node_t)
 } ast_block_t;
 
 typedef struct
@@ -174,7 +174,7 @@ typedef struct
 typedef struct
 {
     char* name; // (P) the called functions identifier
-    dyn_arr_t args; // (P) argument expressions in order
+    dyn_arr_t args; // (P) argument expressions in order (ast_node_t*)
     bool is_builtin; // (S) print, readInt, ...
 } ast_call_t;
 

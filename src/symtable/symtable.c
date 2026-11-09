@@ -41,16 +41,18 @@ struct symtable {
         .type = (t),              \
         .is_const = (c) })
 
-#define SYMBOL_INIT_FUNC(st)   \
-    ((symbol_t) {              \
-        .id = (st)->next_id++, \
-        .kind = (SYM_FUNC),    \
-        .type = NULL,          \
-        .is_const = true,      \
-        .ret_inferred = false, \
-        .param_count = 0,      \
-        .param_types = NULL,   \
-        .param_names = NULL })
+#define SYMBOL_INIT_FUNC(st)        \
+    ((symbol_t) {                   \
+        .id = (st)->next_id++,      \
+        .kind = (SYM_FUNC),         \
+        .type = NULL,               \
+        .is_const = true,           \
+        .ret_inferred = false,      \
+        .param_count = 0,           \
+        .param_types = NULL,        \
+        .param_names = NULL,        \
+        .sema_marker = SEMA_UNCHECKED,   \
+        .decl = NULL })
 
 #define CHECK_MEM_ERR(ptr)   \
     do {                     \

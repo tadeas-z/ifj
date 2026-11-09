@@ -488,6 +488,13 @@ static const char* KIND_NAMES[] = {
 };
 static const char* BINARY_OP_NAMES[] = { "+", "-", "*", "/", "<", "<=", ">", ">=", "==", "!=" };
 
+// AI-generated using: Claude Code
+//              model: Claude Opus 5.5
+// Prompt: "update the ast print function" (so that it also shows the fields
+//          filled by the semantic analyzer: types, ids, is_builtin, inferred
+//          return type, function params and locals count)
+// Scope: type_name, print_id, print_header, print_children and the new print_node
+
 static void print_node(const ast_node_t* node, FILE* out, int depth);
 
 static void print_list(const dyn_arr_t* list, FILE* out, int depth)
@@ -496,7 +503,153 @@ static void print_list(const dyn_arr_t* list, FILE* out, int depth)
         print_node(dyn_arr_get(list, i), out, depth);
 }
 
-// Prints one node per line: indentation, kind, its own data, [line:column], then its children
+// Readable name of a type, "?" when it is not known (yet)
+static const char* type_name(const type_t* type)
+{
+    if (type == NULL)
+        return "?";
+
+    switch (type->kind) {
+    case T_INT:
+        return "Int";
+    case T_DOUBLE:
+        return "Double";
+    case T_STRING:
+        return "String";
+    case T_UNIT:
+        return "Unit";
+    case T_BOOL:
+        return "Boolean";
+    case T_ANY:
+        return "Any";
+    case T_UNION:
+        return "Union";
+    case T_LIST:
+        return "List";
+    case T_FUNC:
+        return "Func";
+    case T_CLASS:
+        return "Class";
+    }
+    return "?";
+}
+
+// Variable id assigned by semantics (-1 = not resolved yet, printed as nothing)
+static void print_id(int id, FILE* out)
+{
+    if (id >= 0)
+        fprintf(out, " #%d", id);
+}
+
+// Kind specific data of the node (without position and children)
+static void print_header(const ast_node_t* node, FILE* out)
+{
+    switch (node->kind) {
+    case AST_FUNC_DEF: {
+        const ast_func_def_t* fd = &node->func_def;
+        fprintf(out, " %s%s(", fd->is_main ? "@main " : "", fd->name);
+        for (size_t i = 0; i < fd->params.count; i++) {
+            const ast_param_t* param = dyn_arr_get(&fd->params, i);
+            fprintf(out, "%s%s", i > 0 ? ", " : "", param->name);
+            print_id(param->id, out);
+            fprintf(out, ": %s", type_name(param->type));
+        }
+        fprintf(out, ") -> %s", type_name(fd->return_type));
+        if (fd->locals.count > 0)
+            fprintf(out, " locals=%zu", fd->locals.count);
+        break;
+    }
+    case AST_VAR_DEF:
+        fprintf(out, " %s %s", node->var_def.is_const ? "val" : "var", node->var_def.name);
+        print_id(node->var_def.id, out);
+        if (node->var_def.declared_type != NULL)
+            fprintf(out, " (declared %s)", type_name(node->var_def.declared_type));
+        break;
+    case AST_ASSIGN:
+        fprintf(out, " %s", node->assign.name);
+        print_id(node->assign.id, out);
+        break;
+    case AST_INT_LIT:
+        fprintf(out, " %lld", (long long)node->int_lit.value);
+        break;
+    case AST_DOUBLE_LIT:
+        fprintf(out, " %g", node->double_lit.value);
+        break;
+    case AST_STRING_LIT:
+        fprintf(out, " \"%s\"", node->string_lit.value);
+        break;
+    case AST_VAR_REF:
+        fprintf(out, " %s", node->var_ref.name);
+        print_id(node->var_ref.id, out);
+        break;
+    case AST_UNARY:
+        fprintf(out, " -");
+        break;
+    case AST_BINARY:
+        fprintf(out, " %s", BINARY_OP_NAMES[node->binary.op]);
+        break;
+    case AST_CALL:
+        fprintf(out, " %s%s", node->call.name, node->call.is_builtin ? " builtin" : "");
+        break;
+    default:
+        break;
+    }
+}
+
+static void print_children(const ast_node_t* node, FILE* out, int depth)
+{
+    switch (node->kind) {
+    case AST_PROGRAM:
+        print_list(&node->program.func_list, out, depth);
+        break;
+    case AST_FUNC_DEF:
+        print_node(node->func_def.body, out, depth);
+        break;
+    case AST_BLOCK:
+        print_list(&node->block.statements, out, depth);
+        break;
+    case AST_VAR_DEF:
+        print_node(node->var_def.init, out, depth);
+        break;
+    case AST_ASSIGN:
+        print_node(node->assign.value, out, depth);
+        break;
+    case AST_RETURN:
+        if (node->return_stmt.value != NULL)
+            print_node(node->return_stmt.value, out, depth);
+        break;
+    case AST_IF:
+        print_node(node->if_stmt.cond, out, depth);
+        print_node(node->if_stmt.then_block, out, depth);
+        print_node(node->if_stmt.else_block, out, depth);
+        break;
+    case AST_WHILE:
+        print_node(node->while_stmt.cond, out, depth);
+        print_node(node->while_stmt.body, out, depth);
+        break;
+    case AST_EXPR_STMT:
+        print_node(node->expr_stmt.expr, out, depth);
+        break;
+    case AST_UNARY:
+        print_node(node->unary.operand, out, depth);
+        break;
+    case AST_BINARY:
+        print_node(node->binary.left, out, depth);
+        print_node(node->binary.right, out, depth);
+        break;
+    case AST_CALL:
+        print_list(&node->call.args, out, depth);
+        break;
+    case AST_CONVERT:
+        print_node(node->convert.operand, out, depth);
+        break;
+    default: // literals and variable references have no children
+        break;
+    }
+}
+
+// Prints one node per line: indentation, kind, its own data, ": Type" once semantics
+// filled it, [line:column], then its children one level deeper
 static void print_node(const ast_node_t* node, FILE* out, int depth)
 {
     fprintf(out, "%*s", depth * 2, "");
@@ -504,82 +657,14 @@ static void print_node(const ast_node_t* node, FILE* out, int depth)
         fprintf(out, "(null)\n");
         return;
     }
-    fprintf(out, "%s ", KIND_NAMES[node->kind]);
 
-    switch (node->kind) {
-    case AST_PROGRAM:
-        fprintf(out, "[%zu:%zu]\n", node->line, node->column);
-        print_list(&node->program.func_list, out, depth + 1);
-        break;
-    case AST_FUNC_DEF:
-        fprintf(out, "%s%s [%zu:%zu]\n", node->func_def.is_main ? "@main " : "", node->func_def.name, node->line, node->column);
-        print_node(node->func_def.body, out, depth + 1);
-        break;
-    case AST_BLOCK:
-        fprintf(out, "[%zu:%zu]\n", node->line, node->column);
-        print_list(&node->block.statements, out, depth + 1);
-        break;
-    case AST_VAR_DEF:
-        fprintf(out, "%s %s [%zu:%zu]\n", node->var_def.is_const ? "val" : "var", node->var_def.name, node->line, node->column);
-        print_node(node->var_def.init, out, depth + 1);
-        break;
-    case AST_ASSIGN:
-        fprintf(out, "%s [%zu:%zu]\n", node->assign.name, node->line, node->column);
-        print_node(node->assign.value, out, depth + 1);
-        break;
-    case AST_RETURN:
-        fprintf(out, "[%zu:%zu]\n", node->line, node->column);
-        if (node->return_stmt.value != NULL)
-            print_node(node->return_stmt.value, out, depth + 1);
-        break;
-    case AST_IF:
-        fprintf(out, "[%zu:%zu]\n", node->line, node->column);
-        print_node(node->if_stmt.cond, out, depth + 1);
-        print_node(node->if_stmt.then_block, out, depth + 1);
-        print_node(node->if_stmt.else_block, out, depth + 1);
-        break;
-    case AST_WHILE:
-        fprintf(out, "[%zu:%zu]\n", node->line, node->column);
-        print_node(node->while_stmt.cond, out, depth + 1);
-        print_node(node->while_stmt.body, out, depth + 1);
-        break;
-    case AST_EXPR_STMT:
-        fprintf(out, "[%zu:%zu]\n", node->line, node->column);
-        print_node(node->expr_stmt.expr, out, depth + 1);
-        break;
-    case AST_INT_LIT:
-        fprintf(out, "%lld [%zu:%zu]\n", (long long)node->int_lit.value, node->line, node->column);
-        break;
-    case AST_DOUBLE_LIT:
-        fprintf(out, "%g [%zu:%zu]\n", node->double_lit.value, node->line, node->column);
-        break;
-    case AST_STRING_LIT:
-        fprintf(out, "\"%s\" [%zu:%zu]\n", node->string_lit.value, node->line, node->column);
-        break;
-    case AST_UNIT_LIT:
-        fprintf(out, "[%zu:%zu]\n", node->line, node->column);
-        break;
-    case AST_VAR_REF:
-        fprintf(out, "%s [%zu:%zu]\n", node->var_ref.name, node->line, node->column);
-        break;
-    case AST_UNARY:
-        fprintf(out, "- [%zu:%zu]\n", node->line, node->column);
-        print_node(node->unary.operand, out, depth + 1);
-        break;
-    case AST_BINARY:
-        fprintf(out, "%s [%zu:%zu]\n", BINARY_OP_NAMES[node->binary.op], node->line, node->column);
-        print_node(node->binary.left, out, depth + 1);
-        print_node(node->binary.right, out, depth + 1);
-        break;
-    case AST_CALL:
-        fprintf(out, "%s [%zu:%zu]\n", node->call.name, node->line, node->column);
-        print_list(&node->call.args, out, depth + 1);
-        break;
-    case AST_CONVERT:
-        fprintf(out, "[%zu:%zu]\n", node->line, node->column);
-        print_node(node->convert.operand, out, depth + 1);
-        break;
-    }
+    fprintf(out, "%s", KIND_NAMES[node->kind]);
+    print_header(node, out);
+    if (node->type != NULL)
+        fprintf(out, " : %s", type_name(node->type));
+    fprintf(out, " [%zu:%zu]\n", node->line, node->column);
+
+    print_children(node, out, depth + 1);
 }
 
 void ast_print(const ast_node_t* node, FILE* out)

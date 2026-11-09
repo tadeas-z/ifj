@@ -8,6 +8,8 @@
 #include <stdbool.h>
 #include "types.h"
 
+struct ast_node;
+
 typedef enum {
     SYM_VAR,
     SYM_FUNC
@@ -19,6 +21,12 @@ typedef enum {
     ST_NOMEM,
     ST_INVALID
 } st_result_t;
+
+typedef enum {
+    SEMA_UNCHECKED,
+    SEMA_IN_PROGRESS,
+    SEMA_DONE
+} marker_t;
 
 typedef struct
 {
@@ -33,6 +41,8 @@ typedef struct
     int param_count;
     type_t** param_types; // Dynamic array of param types
     char** param_names; // Dynamic array of param names
+    marker_t sema_marker;
+    struct ast_node* decl;         // Declaration of a function - used & set by semantics
 } symbol_t;
 
 // implementation is private
