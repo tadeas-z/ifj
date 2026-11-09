@@ -35,6 +35,7 @@ bool  dyn_arr_init(dyn_arr_t* ptr);
  * @param item pointer to the element you want to append
  * @return false on invalid params, memory allocation failure
  *          else true
+ * @note the thing that ptr points to MUST live on the heap
  */
 bool  dyn_arr_append(dyn_arr_t* ptr, void* item);
 

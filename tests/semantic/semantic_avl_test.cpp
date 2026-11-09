@@ -34,6 +34,7 @@ extern "C" {
 #include "semantic_builders.hpp"
 
 #include <algorithm>
+#include <cstdio>
 #include <map>
 #include <string>
 #include <tuple>
@@ -732,6 +733,25 @@ INSTANTIATE_TEST_SUITE_P(Variants, SemanticAvlValidVariantTest,
     [](const ::testing::TestParamInfo<std::tuple<avl_valid_case_t, avl_order_t>>& info) {
         return std::string(std::get<0>(info.param).name) + "_" + order_name(std::get<1>(info.param));
     });
+
+// Prints the AST of the valid program before and after semantic analysis.
+// DISABLED_ -> not run by make test, only on request:
+//   ./build/tests/semantic_avl_test --gtest_also_run_disabled_tests --gtest_filter='*PrintAst*'
+TEST_F(SemanticAvlTest, DISABLED_PrintAstBeforeAndAfter)
+{
+    avl = build_avl(VALID);
+
+    std::printf("===== AVL program: AST before semantic analysis =====\n");
+    ast_print(avl.program, stdout);
+
+    error_code_t err = semantic_analyze(avl.program);
+
+    std::printf("\n===== AVL program: AST after semantic analysis (result %d) =====\n", static_cast<int>(err));
+    ast_print(avl.program, stdout);
+    std::fflush(stdout);
+
+    EXPECT_EQ(err, ERR_OK);
+}
 
 // P_MAX_INFERRED really infers Int
 TEST_F(SemanticAvlTest, InferredMaxIsInt)
