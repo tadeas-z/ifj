@@ -10,6 +10,7 @@
 #include "error.h"      //compiler exit
 #include "parser_expression.h"
 #include "symtable.h"
+#include "types.h"
 
 int parser_program ();
 
