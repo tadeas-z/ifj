@@ -1,10 +1,10 @@
-
 #include "parser.h"
 
 typedef struct {
   lexer_t *lexer;
   token_t input_token;
   symtable_t *symtable;
+  size_t current_indent;
 }parser_t;
 
 static int get_next_token(parser_t *parser){
@@ -20,6 +20,10 @@ static bool is_expected (parser_t *parser, token_type_t token){
   else
     return false;
 }
+
+
+static int parser_block (parser_t *parser, ast_node_t **out_node);
+static int parser_statement (parser_t *parser, ast_node_t **out_node);
 /*
 ---------------------------------------------------------------------------------
 |  Chacking syntax of var declaration                                           |
@@ -97,7 +101,7 @@ static int parser_assignment_or_fun_assignment (parser_t *parser, ast_node_t **o
       return ERR_SYNTAX; 
     return ERR_OK;
   }
-      //temp = fun() ;
+    //temp = fun() ;
   else if(is_expected(parser, TOKEN_LPAREN)){
     get_next_token(parser); 
 
@@ -128,15 +132,114 @@ static int parser_assignment_or_fun_assignment (parser_t *parser, ast_node_t **o
   }
   return ERR_SYNTAX;
 }
-
-static int if_statement (parser_t parser, ast_node_t **out_node){
+/*
+---------------------------------------------------------------------------------
+|  Check syntax of IF condition                                                  |
+|  (for example:   if <expr> then                                                |
+|                      <stmts>                                                   |
+|                    else                                                        |
+|                      <stmts>                                                   |
+---------------------------------------------------------------------------------
+*/
+static int if_statement (parser_t *parser, ast_node_t **out_node){
   if(is_expected(parser, TOKEN_IF)){
     get_next_token(parser);
 
-    int err = expect(parser, TOKEN_LPAREN);
+    ast_node_t *cond_expr = NULL;                                          //condition expression
+    int expr_result = parser_expression (parser->lexer, &cond_expr);
+    if(expr_result != ERR_OK)
+      return expr_result;
+
+    get_next_token(parser);
+    
+    if(!(is_expected(parser, TOKEN_THEN)))
+      return ERR_SYNTAX;
+
+    get_next_token(parser);
+    //if_block
+    ast_node_t *if_block = NULL;
+    int err = parser_block(parser, &if_block); 
     if (err != ERR_OK) 
       return err;
     
-  }
+    //skip new line between if_end_block and else_condition
+    while (is_expected(parser, TOKEN_NEWLINE)) {
+        get_next_token(parser);
+    }
     
+    //else_condition
+    if (!(is_expected(parser, TOKEN_ELSE))) 
+        return ERR_SYNTAX;
+    
+    get_next_token(parser);
+    //else_block
+    ast_node_t *else_block = NULL;
+    err = parser_block(parser, &else_block);
+    return err;
+  }   
+  return ERR_SYNTAX;
+}
+
+/*
+---------------------------------------------------------------------------------
+|  Helper function for parsing indented block syntax                            |
+---------------------------------------------------------------------------------
+*/
+static int parser_block(ll_parser_t *parser, ast_node_t **out_node) {
+    (void)out_node;
+
+    while (check(parser, TOKEN_NEWLINE)) {
+        int err = advance(parser);
+        if (err != ERR_OK) return err;
+    }
+
+    // 2. Prvi token u bloku MORA da počinje na novom redu (starts_line == 1)
+    if (!parser->input_token.starts_line) {
+        return ERR_SYNTAX; // Blok mora početi na novom redu (Greška 2)[cite: 5, 26]
+    }
+
+    size_t parent_indent = parser->current_indent;
+    size_t block_indent = parser->input_token.indentation;
+
+    // Indention of new block must be bigger then indention of parent block
+    if (block_indent <= parent_indent) {
+        return ERR_SYNTAX; 
+    }
+
+    size_t old_indent = parser->current_indent;
+    parser->current_indent = block_indent;
+
+    if (symtable_push_scope(parser->symtable) != ST_OK) {
+        return ERR_INTERNAL;
+    }
+
+    while (!check(parser, TOKEN_EOF)) {
+        if (match(parser, TOKEN_NEWLINE)) {
+            continue;
+        }
+
+        if (parser->input_token.starts_line) {
+            // If indent of smaller then block, that means end of block
+            if (parser->input_token.indentation < block_indent) {
+                break; 
+            }
+
+            if (parser->input_token.indentation != block_indent) {
+                symtable_pop_scope(parser->symtable);
+                return ERR_SYNTAX; 
+            }
+        }
+
+        int err = parser_statement(parser, out_node);
+        if (err != ERR_OK) {
+            symtable_pop_scope(parser->symtable);
+            return err;
+        }
+    }
+
+    //end of domen and return old indent
+    symtable_pop_scope(parser->symtable);
+    parser->current_indent = old_indent;
+
+    return ERR_OK;
 }
