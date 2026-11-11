@@ -354,14 +354,14 @@ static scan_result_t scan_operator(lexer_t* lexer, buffer_t* buffer, token_type_
 
 typedef enum {
     NUM_INT, /* f18: Int */
-    NUM_INT_SEP, /* q7: '_' in Int, digit required */
+    NUM_INT_SEP, /* q7: '_'s in Int, digit required */
     NUM_POINT, /* q8: '.' after Int, digit required */
     NUM_FRACTION, /* f19: Double with fraction */
-    NUM_FRACTION_SEP, /* q9: '_' in fraction, digit required */
+    NUM_FRACTION_SEP, /* q9: '_'s in fraction, digit required */
     NUM_EXP, /* q10: e/E, sign or digit required */
     NUM_EXP_SIGN, /* q11: exponent sign, digit required */
     NUM_EXPONENT, /* f20: Double with exponent */
-    NUM_EXPONENT_SEP, /* q12: '_' in exponent, digit required */
+    NUM_EXPONENT_SEP, /* q12: '_'s in exponent, digit required */
     NUM_SUFFIX, /* f21: Double with d/D suffix */
     NUM_DOT /* f22: TOKEN_DOT, or the start of .5 */
 } number_state_t;
@@ -403,6 +403,13 @@ static scan_result_t accept_number(lexer_t* lexer, const buffer_t* buffer,
     }
 }
 
+// AI-generated using: Claude Code
+//              model: Claude Opus 5.5
+// Prompt (summary): "Allow several underscores between digits (1__000) as
+//          confirmed on the forum: the separator states q7, q9 and q12 loop
+//          on '_' and still require a digit after the last one."
+// Scope: cases NUM_INT_SEP, NUM_FRACTION_SEP, NUM_EXPONENT_SEP in scan_number.
+
 static scan_result_t scan_number(lexer_t* lexer, buffer_t* buffer, token_type_t* type)
 {
     /* s -0..9-> f18, s -'.'-> f22 */
@@ -426,9 +433,11 @@ static scan_result_t scan_number(lexer_t* lexer, buffer_t* buffer, token_type_t*
             else
                 moved = 0;
             break;
-        case NUM_INT_SEP:
-            moved = digit(c);
-            next = NUM_INT;
+        case NUM_INT_SEP: /* digit continues, further '_' stays here */
+            if (digit(c))
+                next = NUM_INT;
+            else if (c != '_')
+                moved = 0;
             break;
         case NUM_POINT:
             moved = digit(c);
@@ -446,9 +455,11 @@ static scan_result_t scan_number(lexer_t* lexer, buffer_t* buffer, token_type_t*
             else
                 moved = 0;
             break;
-        case NUM_FRACTION_SEP:
-            moved = digit(c);
-            next = NUM_FRACTION;
+        case NUM_FRACTION_SEP: /* digit continues, further '_' stays here */
+            if (digit(c))
+                next = NUM_FRACTION;
+            else if (c != '_')
+                moved = 0;
             break;
         case NUM_EXP:
             if (c == '+' || c == '-')
@@ -472,9 +483,11 @@ static scan_result_t scan_number(lexer_t* lexer, buffer_t* buffer, token_type_t*
             else
                 moved = 0;
             break;
-        case NUM_EXPONENT_SEP:
-            moved = digit(c);
-            next = NUM_EXPONENT;
+        case NUM_EXPONENT_SEP: /* digit continues, further '_' stays here */
+            if (digit(c))
+                next = NUM_EXPONENT;
+            else if (c != '_')
+                moved = 0;
             break;
         case NUM_SUFFIX:
             moved = 0;

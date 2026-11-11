@@ -138,13 +138,21 @@ static void words(void)
     }
 }
 
+// AI-generated using: Claude Code
+//              model: Claude Opus 5.5
+// Prompt (summary): "Update the number tests for repeated underscores:
+//          1__000 and similar are valid, a trailing run of '_' or a run
+//          before e/d/an identifier character is lexical error 1."
+// Scope: integers/doubles arrays in numbers(), bad array in errors().
+
 static void numbers(void)
 {
-    const char* integers[] = { "0", "00", "0_0", "42", "1_000_000", "2147483648" };
+    const char* integers[] = { "0", "00", "0_0", "0__0", "42", "1_000_000", "1__000", "1___0",
+        "2147483648" };
     const char* doubles[] = {
         ".5", "0.5", "01.5", "1.0d", "1.0D", "1e2", "1E-2", "1e+2D",
         "1_000.2_5e1_0d", ".5e-2", "0e0", "1.7976931348623157e308",
-        "1e-310", "0e-9999"
+        "1e-310", "0e-9999", "1.2__5", "1e1__0", "1__0.5__0e1__0d"
     };
     for (size_t i = 0; i < sizeof integers / sizeof integers[0]; ++i) {
         const expected_t expected[] = { { TOKEN_INTEGER, integers[i], 1, 1 } };
@@ -204,7 +212,8 @@ static void number_boundaries(void)
 static void errors(void)
 {
     const char* bad[] = {
-        "_", "01", "0_1", "1_", "1__0", "1e", "1e+", "1e_2", "1e2_",
+        "_", "01", "0_1", "0__1", "1_", "1__", "1__x", "1e", "1e+", "1e_2", "1e2_",
+        "1e2__", "1.0__", "1.0__d",
         "1.0_", "1ex", "1e+x", "1_x", "1.5_d", "01abc", "00_1", "1e2_x",
         "@", "@ main", "@other", "@mainly", "!", "&", "|", "%", "{", "}",
         "`name`", "\x80",
@@ -763,10 +772,8 @@ static void automaton_boundaries(void)
     const case_t cases[] = {
         /* f18 enters q8 only with a digit lookahead (footnote 3). */
         { "1.", { { TOKEN_INTEGER, "1", 1, 1 }, { TOKEN_DOT, ".", 1, 2 } }, 2 },
-        { "1._5", { { TOKEN_INTEGER, "1", 1, 1 }, { TOKEN_DOT, ".", 1, 2 },
-                      { TOKEN_IDENTIFIER, "_5", 1, 3 } }, 3 },
-        { "1.e5", { { TOKEN_INTEGER, "1", 1, 1 }, { TOKEN_DOT, ".", 1, 2 },
-                      { TOKEN_IDENTIFIER, "e5", 1, 3 } }, 3 },
+        { "1._5", { { TOKEN_INTEGER, "1", 1, 1 }, { TOKEN_DOT, ".", 1, 2 }, { TOKEN_IDENTIFIER, "_5", 1, 3 } }, 3 },
+        { "1.e5", { { TOKEN_INTEGER, "1", 1, 1 }, { TOKEN_DOT, ".", 1, 2 }, { TOKEN_IDENTIFIER, "e5", 1, 3 } }, 3 },
         { "._5", { { TOKEN_DOT, ".", 1, 1 }, { TOKEN_IDENTIFIER, "_5", 1, 2 } }, 2 },
         /* f19 has no '.' transition; f22 -0..9-> f19 starts the next Double. */
         { "1.2.3", { { TOKEN_DOUBLE, "1.2", 1, 1 }, { TOKEN_DOUBLE, ".3", 1, 4 } }, 2 },
@@ -779,8 +786,7 @@ static void automaton_boundaries(void)
         { "\"a\rb\"", { { TOKEN_STRING, "\"a\rb\"", 1, 1 } }, 1 },
         { "@main(", { { TOKEN_MAIN, "@main", 1, 1 }, { TOKEN_LPAREN, "(", 1, 6 } }, 2 },
         /* f26 is TOKEN_SLASH unless / or * follows. */
-        { "a/b", { { TOKEN_IDENTIFIER, "a", 1, 1 }, { TOKEN_SLASH, "/", 1, 2 },
-                     { TOKEN_IDENTIFIER, "b", 1, 3 } }, 3 },
+        { "a/b", { { TOKEN_IDENTIFIER, "a", 1, 1 }, { TOKEN_SLASH, "/", 1, 2 }, { TOKEN_IDENTIFIER, "b", 1, 3 } }, 3 },
         { "/ /", { { TOKEN_SLASH, "/", 1, 1 }, { TOKEN_SLASH, "/", 1, 3 } }, 2 },
         { "a/**/b", { { TOKEN_IDENTIFIER, "a", 1, 1 }, { TOKEN_IDENTIFIER, "b", 1, 6 } }, 2 },
         /* Comment delimiters do not overlap: the star of the opening pair
@@ -805,10 +811,8 @@ static void layout_decisions(void)
     const case_t tabs[] = {
         { "\t// c\nx", { { TOKEN_IDENTIFIER, "x", 2, 1 } }, 1 },
         { "\t/* c */\nx", { { TOKEN_IDENTIFIER, "x", 2, 1 } }, 1 },
-        { "a\n\t// c\nb", { { TOKEN_IDENTIFIER, "a", 1, 1 }, { TOKEN_NEWLINE, "\n", 1, 2 },
-                              { TOKEN_IDENTIFIER, "b", 3, 1 } }, 3 },
-        { "x\n\t/* c\n*/\ny", { { TOKEN_IDENTIFIER, "x", 1, 1 }, { TOKEN_NEWLINE, "\n", 1, 2 },
-                                  { TOKEN_IDENTIFIER, "y", 4, 1 } }, 3 },
+        { "a\n\t// c\nb", { { TOKEN_IDENTIFIER, "a", 1, 1 }, { TOKEN_NEWLINE, "\n", 1, 2 }, { TOKEN_IDENTIFIER, "b", 3, 1 } }, 3 },
+        { "x\n\t/* c\n*/\ny", { { TOKEN_IDENTIFIER, "x", 1, 1 }, { TOKEN_NEWLINE, "\n", 1, 2 }, { TOKEN_IDENTIFIER, "y", 4, 1 } }, 3 },
         { "/* c */\tx", { { TOKEN_IDENTIFIER, "x", 1, 9 } }, 1 }
     };
     for (size_t i = 0; i < sizeof tabs / sizeof tabs[0]; ++i)
@@ -821,15 +825,10 @@ static void layout_decisions(void)
 
     /* After a multiline block comment, // is the expected line end itself. */
     const case_t tails[] = {
-        { "a /*\n*/ // c\nb", { { TOKEN_IDENTIFIER, "a", 1, 1 }, { TOKEN_NEWLINE, "\n", 1, 5 },
-                                  { TOKEN_IDENTIFIER, "b", 3, 1 } }, 3 },
-        { "a /*\n*/ // c", { { TOKEN_IDENTIFIER, "a", 1, 1 }, { TOKEN_NEWLINE, "\n", 1, 5 },
-                               { TOKEN_EOF, NULL, 2, 8 } }, 3 },
-        { "a /*\n*/ /* x */ // c\nb", { { TOKEN_IDENTIFIER, "a", 1, 1 },
-                                          { TOKEN_NEWLINE, "\n", 1, 5 },
-                                          { TOKEN_IDENTIFIER, "b", 3, 1 } }, 3 },
-        { "a /*\n*///\nb", { { TOKEN_IDENTIFIER, "a", 1, 1 }, { TOKEN_NEWLINE, "\n", 1, 5 },
-                               { TOKEN_IDENTIFIER, "b", 3, 1 } }, 3 }
+        { "a /*\n*/ // c\nb", { { TOKEN_IDENTIFIER, "a", 1, 1 }, { TOKEN_NEWLINE, "\n", 1, 5 }, { TOKEN_IDENTIFIER, "b", 3, 1 } }, 3 },
+        { "a /*\n*/ // c", { { TOKEN_IDENTIFIER, "a", 1, 1 }, { TOKEN_NEWLINE, "\n", 1, 5 }, { TOKEN_EOF, NULL, 2, 8 } }, 3 },
+        { "a /*\n*/ /* x */ // c\nb", { { TOKEN_IDENTIFIER, "a", 1, 1 }, { TOKEN_NEWLINE, "\n", 1, 5 }, { TOKEN_IDENTIFIER, "b", 3, 1 } }, 3 },
+        { "a /*\n*///\nb", { { TOKEN_IDENTIFIER, "a", 1, 1 }, { TOKEN_NEWLINE, "\n", 1, 5 }, { TOKEN_IDENTIFIER, "b", 3, 1 } }, 3 }
     };
     for (size_t i = 0; i < sizeof tails / sizeof tails[0]; ++i)
         sequence(tails[i].text, tails[i].tokens, tails[i].count);
