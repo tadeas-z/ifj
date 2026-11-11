@@ -20,6 +20,8 @@ typedef struct {
     size_t length, capacity;
 } buffer_t;
 
+/* Character classes: digit is 0-9, letter is a-z or A-Z, id_start is a letter
+ * or '_', id_part is id_start or a digit. */
 static int digit(int c) { return c >= '0' && c <= '9'; }
 static int letter(int c)
 {
@@ -50,6 +52,8 @@ lexer_status_t lexer_init(lexer_t* lexer, FILE* input)
     return lexer->status;
 }
 
+/* Shifts lookahead into current, reads a new lookahead and updates line/column
+ * (LF starts a new line at column 1); does nothing at EOF. */
 static void advance(lexer_t* lexer)
 {
     if (lexer->current == EOF)
@@ -66,6 +70,8 @@ static void advance(lexer_t* lexer)
         lexer->status = ERR_INTERNAL;
 }
 
+/* Appends current to the buffer and advances; returns 1 on success, 0 on
+ * allocation or input error (status is then ERR_INTERNAL). */
 static int take(lexer_t* lexer, buffer_t* buffer)
 {
     if (buffer->length + 1 >= buffer->capacity) {
@@ -88,6 +94,8 @@ static int take(lexer_t* lexer, buffer_t* buffer)
     return lexer->status == ERR_OK;
 }
 
+/* Sets ERR_LEXICAL and returns the status; an earlier error (e.g. ERR_INTERNAL)
+ * is kept because it is the first and more fundamental failure. */
 static lexer_status_t invalid(lexer_t* lexer)
 {
     if (lexer->status == ERR_OK)
@@ -95,6 +103,8 @@ static lexer_status_t invalid(lexer_t* lexer)
     return lexer->status;
 }
 
+/* Maps a complete name to its keyword or reserved-word token type, otherwise
+ * returns TOKEN_IDENTIFIER. */
 static token_type_t keyword(const char* text)
 {
     static const struct {
@@ -187,6 +197,8 @@ typedef enum {
     ID_NAME /* f1: identifier or keyword */
 } id_state_t;
 
+/* Diagram 1: scans an identifier or keyword (states q1 and f1); returns
+ * SCAN_TOKEN, or SCAN_ERROR for a lone '_'. */
 static scan_result_t scan_identifier(lexer_t* lexer, buffer_t* buffer, token_type_t* type)
 {
     /* s -'_'-> q1, s -a..z+A..Z-> f1 */
@@ -223,6 +235,8 @@ typedef enum {
     MAIN_DONE /* f2: "@main" */
 } main_state_t;
 
+/* Scans the literal "@main" through states q2-q5 to the accepting f2; returns
+ * SCAN_TOKEN (TOKEN_MAIN), or SCAN_ERROR on a mismatch or a trailing name char. */
 static scan_result_t scan_main(lexer_t* lexer, buffer_t* buffer, token_type_t* type)
 {
     main_state_t state = MAIN_AT; /* s -'@'-> q2 */
@@ -273,6 +287,8 @@ typedef enum {
     OP_BANG /* q6: a lone "!" is an error */
 } operator_state_t;
 
+/* Diagram 2: scans an operator or delimiter, including the optional '=' of
+ * ==, <=, >=, != (states f3-f17, q6); returns SCAN_TOKEN or SCAN_ERROR. */
 static scan_result_t scan_operator(lexer_t* lexer, buffer_t* buffer, token_type_t* type)
 {
     operator_state_t state = OP_SINGLE;
@@ -377,6 +393,9 @@ static int integer_valid(const buffer_t* buffer)
     return 1;
 }
 
+/* Handles the end of a number in the given state: sets the token type
+ * (Int, Double or dot), validates Int (footnote 1) and Double range
+ * (footnote 2); returns SCAN_TOKEN, or SCAN_ERROR in a non-accepting state. */
 static scan_result_t accept_number(lexer_t* lexer, const buffer_t* buffer,
     number_state_t state, token_type_t* type)
 {
@@ -527,6 +546,8 @@ typedef enum {
 /* Sigma of the string section is ASCII 0..127; EOF is not in Sigma. */
 static int ascii(int c) { return c >= 0 && c <= 127; }
 
+/* Diagram 4: scans an ordinary or triple-quoted string (states q13-q18,
+ * f23-f25); returns SCAN_TOKEN, or SCAN_ERROR for an unterminated string. */
 static scan_result_t scan_string(lexer_t* lexer, buffer_t* buffer)
 {
     string_state_t state = STR_OPEN; /* s -'"'-> q13 */
@@ -698,11 +719,14 @@ static scan_result_t scan_token(lexer_t* lexer, buffer_t* buffer, token_type_t* 
     }
 }
 
+/* Returns 1 for space, tab, CR, form feed and vertical tab (all except LF). */
 static int horizontal_space(int c)
 {
     return c == ' ' || c == '\t' || c == '\r' || c == '\f' || c == '\v';
 }
 
+/* Resets the per-line state: line-start flag, indentation count, leading-tab
+ * flag and prefix_complete. */
 static void begin_physical_line(lexer_t* lexer)
 {
     lexer->at_line_start = 1;
@@ -711,6 +735,9 @@ static void begin_physical_line(lexer_t* lexer)
     lexer->prefix_complete = 0;
 }
 
+/* Fills output with a TOKEN_NEWLINE ("\n") at the given position with the
+ * current logical indentation, when a logical line ends; returns 1, or -1 on
+ * allocation failure. */
 static int newline_token(lexer_t* lexer, token_t* output, size_t line, size_t column)
 {
     output->line = line;
