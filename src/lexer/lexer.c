@@ -39,14 +39,14 @@ void token_dispose(token_t* token)
 lexer_status_t lexer_init(lexer_t* lexer, FILE* input)
 {
     if (!lexer)
-        return LEXER_INTERNAL_ERROR;
+        return ERR_INTERNAL;
     *lexer = (lexer_t) { .input = input, .line = 1, .column = 1, .at_line_start = 1 };
     if (!input)
-        return lexer->status = LEXER_INTERNAL_ERROR;
+        return lexer->status = ERR_INTERNAL;
     lexer->current = fgetc(input);
     lexer->lookahead = fgetc(input);
     if (ferror(input))
-        lexer->status = LEXER_INTERNAL_ERROR;
+        lexer->status = ERR_INTERNAL;
     return lexer->status;
 }
 
@@ -63,7 +63,7 @@ static void advance(lexer_t* lexer)
     lexer->current = lexer->lookahead;
     lexer->lookahead = fgetc(lexer->input);
     if (ferror(lexer->input))
-        lexer->status = LEXER_INTERNAL_ERROR;
+        lexer->status = ERR_INTERNAL;
 }
 
 static int take(lexer_t* lexer, buffer_t* buffer)
@@ -71,12 +71,12 @@ static int take(lexer_t* lexer, buffer_t* buffer)
     if (buffer->length + 1 >= buffer->capacity) {
         size_t capacity = buffer->capacity ? buffer->capacity * 2 : 32;
         if (buffer->capacity > SIZE_MAX / 2) {
-            lexer->status = LEXER_INTERNAL_ERROR;
+            lexer->status = ERR_INTERNAL;
             return 0;
         }
         char* data = realloc(buffer->data, capacity);
         if (!data) {
-            lexer->status = LEXER_INTERNAL_ERROR;
+            lexer->status = ERR_INTERNAL;
             return 0;
         }
         buffer->data = data;
@@ -85,13 +85,13 @@ static int take(lexer_t* lexer, buffer_t* buffer)
     buffer->data[buffer->length++] = (char)lexer->current;
     buffer->data[buffer->length] = '\0';
     advance(lexer);
-    return lexer->status == LEXER_OK;
+    return lexer->status == ERR_OK;
 }
 
 static lexer_status_t invalid(lexer_t* lexer)
 {
-    if (lexer->status == LEXER_OK)
-        lexer->status = LEXER_ERROR;
+    if (lexer->status == ERR_OK)
+        lexer->status = ERR_LEXICAL;
     return lexer->status;
 }
 
@@ -125,7 +125,7 @@ static void double_in_range(lexer_t* lexer, const buffer_t* buffer)
 {
     char* normalized = malloc(buffer->length + 1);
     if (!normalized) {
-        lexer->status = LEXER_INTERNAL_ERROR;
+        lexer->status = ERR_INTERNAL;
         return;
     }
     size_t length = 0;
@@ -175,7 +175,7 @@ typedef struct {
 
 /* Every scanner follows the diagram's termination rule: when no transition
  * applies, an accepting state f returns its token and leaves current for the
- * next call, a non-accepting state q is LEXER_ERROR. Transitions consume
+ * next call, a non-accepting state q is ERR_LEXICAL. Transitions consume
  * current through take(). EOF is never an ASCII character, so it never
  * matches a transition.
  */
@@ -396,7 +396,7 @@ static scan_result_t accept_number(lexer_t* lexer, const buffer_t* buffer,
     case NUM_SUFFIX:
         *type = TOKEN_DOUBLE;
         double_in_range(lexer, buffer);
-        return lexer->status == LEXER_OK ? SCAN_TOKEN : SCAN_ERROR;
+        return lexer->status == ERR_OK ? SCAN_TOKEN : SCAN_ERROR;
     default: /* q7..q12 are not accepting */
         invalid(lexer);
         return SCAN_ERROR;
@@ -597,7 +597,7 @@ static scan_result_t scan_string(lexer_t* lexer, buffer_t* buffer)
  */
 static void line_comment_body(lexer_t* lexer)
 {
-    while (lexer->status == LEXER_OK && lexer->current != '\n' && lexer->current != EOF)
+    while (lexer->status == ERR_OK && lexer->current != '\n' && lexer->current != EOF)
         advance(lexer);
 }
 
@@ -608,7 +608,7 @@ static void line_comment_body(lexer_t* lexer)
 static void block_comment_body(lexer_t* lexer, comment_t* comment)
 {
     size_t depth = 1;
-    while (lexer->status == LEXER_OK) {
+    while (lexer->status == ERR_OK) {
         if (lexer->current == EOF) {
             invalid(lexer);
             return;
@@ -620,7 +620,7 @@ static void block_comment_body(lexer_t* lexer, comment_t* comment)
         }
         if (lexer->current == '/' && lexer->lookahead == '*') {
             if (depth == SIZE_MAX) {
-                lexer->status = LEXER_INTERNAL_ERROR;
+                lexer->status = ERR_INTERNAL;
                 return;
             }
             ++depth; /* p2 -slash-star-> p2 / ++depth */
@@ -649,11 +649,11 @@ static scan_result_t scan_slash(lexer_t* lexer, buffer_t* buffer, token_type_t* 
     case '/': /* f26 -'/'-> p1 */
         advance(lexer);
         line_comment_body(lexer);
-        return lexer->status == LEXER_OK ? SCAN_LINE_COMMENT : SCAN_ERROR;
+        return lexer->status == ERR_OK ? SCAN_LINE_COMMENT : SCAN_ERROR;
     case '*': /* f26 -'*' / depth = 1-> p2 */
         advance(lexer);
         block_comment_body(lexer, comment);
-        return lexer->status == LEXER_OK ? SCAN_BLOCK_COMMENT : SCAN_ERROR;
+        return lexer->status == ERR_OK ? SCAN_BLOCK_COMMENT : SCAN_ERROR;
     default:
         *type = TOKEN_SLASH;
         return SCAN_TOKEN;
@@ -661,7 +661,7 @@ static scan_result_t scan_slash(lexer_t* lexer, buffer_t* buffer, token_type_t* 
 }
 
 /* s: the first character selects the section of the automaton. Characters
- * without a transition from s are LEXER_ERROR.
+ * without a transition from s are ERR_LEXICAL.
  */
 static scan_result_t scan_token(lexer_t* lexer, buffer_t* buffer, token_type_t* type,
     comment_t* comment)
@@ -718,7 +718,7 @@ static int newline_token(lexer_t* lexer, token_t* output, size_t line, size_t co
     output->indentation = lexer->logical_indentation;
     output->lexeme = malloc(2);
     if (output->lexeme == NULL) {
-        lexer->status = LEXER_INTERNAL_ERROR;
+        lexer->status = ERR_INTERNAL;
         return -1;
     }
     memcpy(output->lexeme, "\n", 2);
@@ -739,7 +739,7 @@ static int newline_token(lexer_t* lexer, token_t* output, size_t line, size_t co
 /* Spaces before the first token of a physical line count as indentation. */
 static void skip_horizontal_space(lexer_t* lexer)
 {
-    while (lexer->status == LEXER_OK && horizontal_space(lexer->current)) {
+    while (lexer->status == ERR_OK && horizontal_space(lexer->current)) {
         if (lexer->at_line_start && !lexer->prefix_complete) {
             if (lexer->current == ' ')
                 ++lexer->physical_indentation;
@@ -753,7 +753,7 @@ static void skip_horizontal_space(lexer_t* lexer)
 /* After a physical line break: 1 emits a logical newline, 0 continues. */
 static int logical_line_end(lexer_t* lexer, token_t* output, size_t line, size_t column)
 {
-    if (lexer->status != LEXER_OK)
+    if (lexer->status != ERR_OK)
         return -1;
     if (lexer->paren_depth == 0 && lexer->logical_has_tokens)
         return newline_token(lexer, output, line, column);
@@ -775,7 +775,7 @@ static int multiline_comment_tail(lexer_t* lexer, token_t* output)
 {
     for (;;) {
         skip_horizontal_space(lexer);
-        if (lexer->status != LEXER_OK)
+        if (lexer->status != ERR_OK)
             return -1;
         if (lexer->current != '/' || lexer->lookahead != '*')
             break;
@@ -785,7 +785,7 @@ static int multiline_comment_tail(lexer_t* lexer, token_t* output)
         advance(lexer);
         advance(lexer);
         block_comment_body(lexer, &ignored);
-        if (lexer->status != LEXER_OK)
+        if (lexer->status != ERR_OK)
             return -1;
     }
     // AI-generated using: Claude Code
@@ -798,7 +798,7 @@ static int multiline_comment_tail(lexer_t* lexer, token_t* output)
         advance(lexer);
         advance(lexer);
         line_comment_body(lexer);
-        if (lexer->status != LEXER_OK)
+        if (lexer->status != ERR_OK)
             return -1;
     }
     if (lexer->current != '\n' && lexer->current != EOF) {
@@ -826,7 +826,7 @@ static int multiline_comment_tail(lexer_t* lexer, token_t* output)
 static int skip_layout(lexer_t* lexer, token_t* output)
 {
     int result;
-    while (lexer->status == LEXER_OK) {
+    while (lexer->status == ERR_OK) {
         if (horizontal_space(lexer->current)) {
             skip_horizontal_space(lexer);
             continue;
@@ -868,7 +868,7 @@ static lexer_status_t accept_token(lexer_t* lexer, token_t* output, buffer_t* bu
     if (type == TOKEN_LPAREN) {
         if (lexer->paren_depth == SIZE_MAX) {
             free(buffer->data);
-            return lexer->status = LEXER_INTERNAL_ERROR;
+            return lexer->status = ERR_INTERNAL;
         }
         ++lexer->paren_depth;
     } else if (type == TOKEN_RPAREN && lexer->paren_depth != 0) {
@@ -883,22 +883,22 @@ static lexer_status_t accept_token(lexer_t* lexer, token_t* output, buffer_t* bu
     output->type = type;
     output->lexeme = buffer->data;
     output->length = buffer->length;
-    return LEXER_OK;
+    return ERR_OK;
 }
 
 lexer_status_t lexer_next(lexer_t* lexer, token_t* output)
 {
     if (!output)
-        return LEXER_INTERNAL_ERROR;
+        return ERR_INTERNAL;
     *output = (token_t) { 0 };
     if (!lexer)
-        return LEXER_INTERNAL_ERROR;
+        return ERR_INTERNAL;
     output->line = lexer->line;
     output->column = lexer->column;
-    if (lexer->status != LEXER_OK)
+    if (lexer->status != ERR_OK)
         return lexer->status;
     if (!lexer->input)
-        return lexer->status = LEXER_INTERNAL_ERROR;
+        return lexer->status = ERR_INTERNAL;
 
     for (;;) {
         if (skip_layout(lexer, output) != 0)
@@ -906,7 +906,7 @@ lexer_status_t lexer_next(lexer_t* lexer, token_t* output)
         output->line = lexer->line;
         output->column = lexer->column;
         if (lexer->current == EOF)
-            return LEXER_OK; /* EOF in s */
+            return ERR_OK; /* EOF in s */
         lexer->prefix_complete = 1;
 
         buffer_t buffer = { 0 };

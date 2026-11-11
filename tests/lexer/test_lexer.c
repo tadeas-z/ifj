@@ -51,9 +51,9 @@ static void sequence(const char* text, const expected_t* expected, size_t count)
     FILE* input = source(text);
     lexer_t lexer;
     token_t token = { 0 };
-    assert(lexer_init(&lexer, input) == LEXER_OK);
+    assert(lexer_init(&lexer, input) == ERR_OK);
     for (size_t i = 0; i < count; ++i) {
-        assert(lexer_next(&lexer, &token) == LEXER_OK);
+        assert(lexer_next(&lexer, &token) == ERR_OK);
         assert(token.type == expected[i].type);
         assert(token.line == expected[i].line);
         assert(token.column == expected[i].column);
@@ -68,10 +68,10 @@ static void sequence(const char* text, const expected_t* expected, size_t count)
         token_dispose(&token);
         token_dispose(&token);
     }
-    assert(lexer_next(&lexer, &token) == LEXER_OK);
+    assert(lexer_next(&lexer, &token) == ERR_OK);
     assert(token.type == TOKEN_EOF);
     size_t line = token.line, column = token.column;
-    assert(lexer_next(&lexer, &token) == LEXER_OK);
+    assert(lexer_next(&lexer, &token) == ERR_OK);
     assert(token.type == TOKEN_EOF && token.line == line && token.column == column);
     token_dispose(&token);
     fclose(input);
@@ -223,26 +223,26 @@ static void errors(void)
         FILE* input = source(bad[i]);
         lexer_t lexer;
         token_t token = { 0 };
-        assert(lexer_init(&lexer, input) == LEXER_OK);
+        assert(lexer_init(&lexer, input) == ERR_OK);
         lexer_status_t status;
         do {
             status = lexer_next(&lexer, &token);
-            if (status == LEXER_OK)
+            if (status == ERR_OK)
                 assert(token.type != TOKEN_EOF);
             token_dispose(&token);
-        } while (status == LEXER_OK);
-        assert(status == LEXER_ERROR);
-        assert(lexer_next(&lexer, &token) == LEXER_ERROR);
+        } while (status == ERR_OK);
+        assert(status == ERR_LEXICAL);
+        assert(lexer_next(&lexer, &token) == ERR_LEXICAL);
         assert(token.lexeme == NULL);
         fclose(input);
     }
     lexer_t lexer;
     token_t token = { 0 };
-    assert(lexer_init(NULL, NULL) == LEXER_INTERNAL_ERROR);
-    assert(lexer_init(&lexer, NULL) == LEXER_INTERNAL_ERROR);
-    assert(lexer_next(&lexer, &token) == LEXER_INTERNAL_ERROR);
-    assert(lexer_next(NULL, &token) == LEXER_INTERNAL_ERROR);
-    assert(lexer_next(NULL, NULL) == LEXER_INTERNAL_ERROR);
+    assert(lexer_init(NULL, NULL) == ERR_INTERNAL);
+    assert(lexer_init(&lexer, NULL) == ERR_INTERNAL);
+    assert(lexer_next(&lexer, &token) == ERR_INTERNAL);
+    assert(lexer_next(NULL, &token) == ERR_INTERNAL);
+    assert(lexer_next(NULL, NULL) == ERR_INTERNAL);
 }
 
 static void positions_and_ownership(void)
@@ -258,9 +258,9 @@ static void positions_and_ownership(void)
     FILE* input = source("first second");
     lexer_t lexer;
     token_t first, second;
-    assert(lexer_init(&lexer, input) == LEXER_OK);
-    assert(lexer_next(&lexer, &first) == LEXER_OK);
-    assert(lexer_next(&lexer, &second) == LEXER_OK);
+    assert(lexer_init(&lexer, input) == ERR_OK);
+    assert(lexer_next(&lexer, &first) == ERR_OK);
+    assert(lexer_next(&lexer, &second) == ERR_OK);
     assert(strcmp(first.lexeme, "first") == 0);
     assert(strcmp(second.lexeme, "second") == 0);
     token_dispose(&second);
@@ -362,20 +362,20 @@ static void expect_error(const char* text)
     FILE* input = source(text);
     lexer_t lexer;
     token_t token = { 0 };
-    assert(lexer_init(&lexer, input) == LEXER_OK);
+    assert(lexer_init(&lexer, input) == ERR_OK);
     lexer_status_t status;
     size_t count = 0;
     do {
         status = lexer_next(&lexer, &token);
-        if (status == LEXER_OK && token.type == TOKEN_EOF) {
+        if (status == ERR_OK && token.type == TOKEN_EOF) {
             fprintf(stderr, "Expected lexical error for: %s\n", text);
             assert(0);
         }
         token_dispose(&token);
         assert(++count <= strlen(text) + 2);
-    } while (status == LEXER_OK);
-    assert(status == LEXER_ERROR);
-    assert(lexer_next(&lexer, &token) == LEXER_ERROR);
+    } while (status == ERR_OK);
+    assert(status == ERR_LEXICAL);
+    assert(lexer_next(&lexer, &token) == ERR_LEXICAL);
     assert(token.lexeme == NULL);
     fclose(input);
 }
@@ -433,9 +433,9 @@ static void indentation_metadata(void)
     FILE* input = source(text);
     lexer_t lexer;
     token_t token = { 0 };
-    assert(lexer_init(&lexer, input) == LEXER_OK);
+    assert(lexer_init(&lexer, input) == ERR_OK);
     for (size_t i = 0; i < sizeof types / sizeof types[0]; ++i) {
-        assert(lexer_next(&lexer, &token) == LEXER_OK);
+        assert(lexer_next(&lexer, &token) == ERR_OK);
         assert(token.type == types[i]);
         assert(token.indentation == indentation[i]);
         assert(token.starts_line == starts[i]);
@@ -463,9 +463,9 @@ static void full_program(void)
     FILE* input = source(text);
     lexer_t lexer;
     token_t token = { 0 };
-    assert(lexer_init(&lexer, input) == LEXER_OK);
+    assert(lexer_init(&lexer, input) == ERR_OK);
     for (size_t i = 0; i < sizeof expected / sizeof expected[0]; ++i) {
-        assert(lexer_next(&lexer, &token) == LEXER_OK);
+        assert(lexer_next(&lexer, &token) == ERR_OK);
         assert(token.type == expected[i]);
         token_dispose(&token);
     }
@@ -478,22 +478,22 @@ static void independent_lexers(void)
     FILE* b = source("x\n  y");
     lexer_t first, second;
     token_t left = { 0 }, right = { 0 };
-    assert(lexer_init(&first, a) == LEXER_OK);
-    assert(lexer_init(&second, b) == LEXER_OK);
-    assert(lexer_next(&first, &left) == LEXER_OK);
+    assert(lexer_init(&first, a) == ERR_OK);
+    assert(lexer_init(&second, b) == ERR_OK);
+    assert(lexer_next(&first, &left) == ERR_OK);
     token_dispose(&left);
-    assert(lexer_next(&first, &left) == LEXER_OK);
+    assert(lexer_next(&first, &left) == ERR_OK);
     assert(left.type == TOKEN_LPAREN);
     token_dispose(&left);
-    assert(lexer_next(&second, &right) == LEXER_OK);
+    assert(lexer_next(&second, &right) == ERR_OK);
     assert(right.starts_line);
     token_dispose(&right);
-    assert(lexer_next(&first, &left) == LEXER_OK);
+    assert(lexer_next(&first, &left) == ERR_OK);
     assert(left.type == TOKEN_STRING && !left.starts_line);
-    assert(lexer_next(&second, &right) == LEXER_OK);
+    assert(lexer_next(&second, &right) == ERR_OK);
     assert(right.type == TOKEN_NEWLINE);
     token_dispose(&right);
-    assert(lexer_next(&second, &right) == LEXER_OK);
+    assert(lexer_next(&second, &right) == ERR_OK);
     assert(right.indentation == 2 && right.starts_line);
     token_dispose(&right);
     assert(strcmp(left.lexeme, "\"value\"") == 0);
@@ -657,9 +657,9 @@ static void comment_layout(void)
     FILE* input = source(text);
     lexer_t lexer;
     token_t token = { 0 };
-    assert(lexer_init(&lexer, input) == LEXER_OK);
+    assert(lexer_init(&lexer, input) == ERR_OK);
     for (size_t i = 0; i < count; ++i) {
-        assert(lexer_next(&lexer, &token) == LEXER_OK);
+        assert(lexer_next(&lexer, &token) == ERR_OK);
         assert(token.indentation == indentation[i]);
         assert(token.starts_line == starts[i]);
         token_dispose(&token);
@@ -733,9 +733,9 @@ static void multiline_comment_tail_layout(void)
     FILE* input = source(text);
     lexer_t lexer;
     token_t token = { 0 };
-    assert(lexer_init(&lexer, input) == LEXER_OK);
+    assert(lexer_init(&lexer, input) == ERR_OK);
     for (size_t i = 0; i < count; ++i) {
-        assert(lexer_next(&lexer, &token) == LEXER_OK);
+        assert(lexer_next(&lexer, &token) == ERR_OK);
         assert(token.indentation == indentation[i]);
         assert(token.starts_line == starts[i]);
         token_dispose(&token);
@@ -867,25 +867,25 @@ static void allocation_failures(void)
         FILE* input = source(text);
         lexer_t lexer;
         token_t token = { 0 };
-        assert(lexer_init(&lexer, input) == LEXER_OK);
+        assert(lexer_init(&lexer, input) == ERR_OK);
         allocation_calls = 0;
         fail_allocation = fail;
         lexer_status_t status;
         do {
             status = lexer_next(&lexer, &token);
-            int end = status != LEXER_OK || token.type == TOKEN_EOF;
+            int end = status != ERR_OK || token.type == TOKEN_EOF;
             token_dispose(&token);
             if (end)
                 break;
         } while (1);
         fail_allocation = 0;
-        if (status == LEXER_OK) {
+        if (status == ERR_OK) {
             assert(allocation_calls < fail);
             fclose(input);
             break;
         }
-        assert(status == LEXER_INTERNAL_ERROR);
-        assert(lexer_next(&lexer, &token) == LEXER_INTERNAL_ERROR);
+        assert(status == ERR_INTERNAL);
+        assert(lexer_next(&lexer, &token) == ERR_INTERNAL);
         assert(token.lexeme == NULL);
         ++failures;
         fclose(input);

@@ -14,9 +14,6 @@
 #include <stdio.h>
 
 typedef error_code_t lexer_status_t;
-#define LEXER_OK ERR_OK
-#define LEXER_ERROR ERR_LEXICAL
-#define LEXER_INTERNAL_ERROR ERR_INTERNAL
 
 typedef struct {
     FILE* input; /* Borrowed, lexer never closes it. */
