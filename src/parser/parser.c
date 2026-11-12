@@ -24,12 +24,14 @@ static bool is_expected (parser_t *parser, token_type_t token){
 
 static int parser_block (parser_t *parser, ast_node_t **out_node);
 static int parser_statement (parser_t *parser, ast_node_t **out_node);
+
 /*
 ---------------------------------------------------------------------------------
-|  Chacking syntax of var declaration                                           |
-|  (for example:  var temp: Int = [0 - 9]*)                                     |
+|  Chacking syntax of VAR/VAL declaration                                           |
+|  (for example:  var temp: Int = 10)                                     |
 ---------------------------------------------------------------------------------
 */
+
 static int parser_var_declaration (parser_t *parser, ast_node_t **out_node){
   bool is_const = is_expected(parser, TOKEN_VAL);
   get_next_token (parser);
@@ -41,13 +43,13 @@ static int parser_var_declaration (parser_t *parser, ast_node_t **out_node){
   get_next_token (parser);
 
   type_t *var_type;
-  if (is_expected(lexer->input_token.type, TOKEN_COLON)){
+  if (is_expected(parser, TOKEN_COLON)){
     get_next_token (parser);
-    if (is_expected(parser, TOKEN_INTEGER))
+    if (is_expected(parser, TOKEN_TYPE_INT))
       var_type = T_INT;
-    else if (is_expected(parser,TOKEN_DOUBLE))
+    else if (is_expected(parser,TOKEN_TYPE_DOUBLE))
       var_type = T_DOUBLE;
-    else if (is_expected(parser, TOKEN_STRING))
+    else if (is_expected(parser, TOKEN_TYPE_STRING))
       var_type = T_STRING;
     else
       return ERR_SYNTAX;
@@ -75,21 +77,22 @@ static int parser_var_declaration (parser_t *parser, ast_node_t **out_node){
     return ERR_SYNTAX;
   return ERR_OK;
 }
+
 /*
 ---------------------------------------------------------------------------------
 |  Assigning a value to a variable                                              |
-|  (for example:   temp = [0 - 9]* || '[a-z]*' || '[A-Z]*' || fun(a, b...)      |
+|  (for example:   temp = a + 5;  || fun(a, b);                                 |
 ---------------------------------------------------------------------------------
 */
 
-static int parser_assignment_or_fun_assignment (parser_t *parser, ast_node_t **out_node){
+static int parser_assignment_or_funcall_assignment (parser_t *parser, ast_node_t **out_node){
   char *var_name = parser->input_token.lexeme;
   get_next_token (parser);
 
+  // temp = <expr> ;
   if(is_expected (parser, TOKEN_ASSIGN)){
     get_next_token (parser);
     
-    // temp = expr ;
     ast_node_t *var_expression = NULL;
     int expr_result = parser_expression (parser->lexer, &var_expression);
     if (expr_result != ERR_OK)
@@ -101,7 +104,7 @@ static int parser_assignment_or_fun_assignment (parser_t *parser, ast_node_t **o
       return ERR_SYNTAX; 
     return ERR_OK;
   }
-    //temp = fun() ;
+    // func(<arg>) ;
   else if(is_expected(parser, TOKEN_LPAREN)){
     get_next_token(parser); 
 
@@ -132,16 +135,18 @@ static int parser_assignment_or_fun_assignment (parser_t *parser, ast_node_t **o
   }
   return ERR_SYNTAX;
 }
+
 /*
 ---------------------------------------------------------------------------------
-|  Check syntax of IF condition                                                  |
+|  Check syntax of IF conditional                                                |
 |  (for example:   if <expr> then                                                |
 |                      <stmts>                                                   |
-|                    else                                                        |
+|                  else                                                          |
 |                      <stmts>                                                   |
 ---------------------------------------------------------------------------------
 */
-static int if_statement (parser_t *parser, ast_node_t **out_node){
+
+static int parser_if_statement (parser_t *parser, ast_node_t **out_node){
   if(is_expected(parser, TOKEN_IF)){
     get_next_token(parser);
 
@@ -152,17 +157,21 @@ static int if_statement (parser_t *parser, ast_node_t **out_node){
 
     get_next_token(parser);
     
-    if(!(is_expected(parser, TOKEN_THEN)))
+    if(!(is_expected(parser, TOKEN_THEN))){
+      ast_free(cond_expr);
       return ERR_SYNTAX;
-
+    }
+    
     get_next_token(parser);
     //if_block
     ast_node_t *if_block = NULL;
-    int err = parser_block(parser, &if_block); 
-    if (err != ERR_OK) 
-      return err;
+    int block_syntax = parser_block(parser, &if_block); 
+    if (block_syntax != ERR_OK){ 
+      ast_free(cond_expr);
+      return block_syntax;
+    }
     
-    //skip new line between if_end_block and else_condition
+    //skip new line before else_condition
     while (is_expected(parser, TOKEN_NEWLINE)) {
         get_next_token(parser);
     }
@@ -174,9 +183,47 @@ static int if_statement (parser_t *parser, ast_node_t **out_node){
     get_next_token(parser);
     //else_block
     ast_node_t *else_block = NULL;
-    err = parser_block(parser, &else_block);
-    return err;
+    block_syntax = parser_block(parser, &else_block);
+    return block_syntax;
   }   
+  return ERR_SYNTAX;
+}
+
+/*
+---------------------------------------------------------------------------------
+|  Check syntax of WHILE loop                                                    |
+|  (for example:  while <expr> do                                                |
+|                      <stmts>                                                   |
+---------------------------------------------------------------------------------
+*/
+
+static int parser_while_statement (parser_t *parser, ast_node_t **out_node){
+  if(is_expected(parser, TOKEN_WHILE)){
+    
+    get_next_token(parser);
+
+    ast_node_t *cond_expr = NULL;
+    int expr_result = parser_expression (parser->lexer, &cond_expr);
+    if(expr_result != ERR_OK)
+      return expr_result;
+
+    get_next_token(parser);
+
+    if(!(is_expected(parser, TOKEN_DO))){
+      ast_free(cond_expr);
+      return ERR_SYNTAX;
+    }
+
+    get_next_token(parser);
+    //while_block
+    ast_node_t *while_block = NULL;
+    int block_syntax = parser_block(parser, &while_block); 
+    if (block_syntax != ERR_OK){ 
+      ast_free(cond_expr);
+      return block_syntax;
+    }
+    return ERR_OK;
+  }
   return ERR_SYNTAX;
 }
 
@@ -185,17 +232,19 @@ static int if_statement (parser_t *parser, ast_node_t **out_node){
 |  Helper function for parsing indented block syntax                            |
 ---------------------------------------------------------------------------------
 */
-static int parser_block(ll_parser_t *parser, ast_node_t **out_node) {
+
+static int parser_block(parser_t *parser, ast_node_t **out_node) {
     (void)out_node;
 
-    while (check(parser, TOKEN_NEWLINE)) {
-        int err = advance(parser);
-        if (err != ERR_OK) return err;
+    while (is_expected(parser, TOKEN_NEWLINE)) {
+        int block_syntax = get_next_token(parser);
+        if (block_syntax != ERR_OK) 
+          return block_syntax;
     }
 
-    // 2. Prvi token u bloku MORA da počinje na novom redu (starts_line == 1)
+    // Indention must starts on the new line
     if (!parser->input_token.starts_line) {
-        return ERR_SYNTAX; // Blok mora početi na novom redu (Greška 2)[cite: 5, 26]
+        return ERR_SYNTAX;
     }
 
     size_t parent_indent = parser->current_indent;
@@ -213,9 +262,10 @@ static int parser_block(ll_parser_t *parser, ast_node_t **out_node) {
         return ERR_INTERNAL;
     }
 
-    while (!check(parser, TOKEN_EOF)) {
-        if (match(parser, TOKEN_NEWLINE)) {
-            continue;
+    while (!is_expected(parser, TOKEN_EOF)) {
+        if (is_expected(parser, TOKEN_NEWLINE)) {
+          get_next_token(parser);
+          continue;
         }
 
         if (parser->input_token.starts_line) {
@@ -230,10 +280,10 @@ static int parser_block(ll_parser_t *parser, ast_node_t **out_node) {
             }
         }
 
-        int err = parser_statement(parser, out_node);
-        if (err != ERR_OK) {
+        int statement_syntax = parser_statement(parser, out_node);
+        if (statement_syntax != ERR_OK) {
             symtable_pop_scope(parser->symtable);
-            return err;
+            return statement_syntax;
         }
     }
 
@@ -243,3 +293,33 @@ static int parser_block(ll_parser_t *parser, ast_node_t **out_node) {
 
     return ERR_OK;
 }
+
+/*
+---------------------------------------------------------------------------------
+|  Statement (Router)                                                           |
+|  Routes execution to the appropriate rule based on the starting token         |
+---------------------------------------------------------------------------------
+*/
+
+static int parser_statement (parser_t *parser, ast_node_t **out_node){
+  
+  if(is_expected(parser, TOKEN_VAR) || is_expected(parser, TOKEN_VAL))
+    return parser_var_declaration (parser, out_node);
+    
+  else if(is_expected(parser, TOKEN_IDENTIFIER))
+    return parser_assignment_or_funcall_assignment (parser, out_node);
+
+  else if(is_expected(parser, TOKEN_IF))
+    return parser_if_statement (parser, out_node);
+
+  else if (is_expected(parser, TOKEN_WHILE)) 
+    return parser_while_statement(parser, out_node);
+
+  else if(is_expected(parser, TOKEN_SEMICOLON)){
+    get_next_token(parser);
+    return ERR_OK;
+  }
+  
+  return ERR_SYNTAX;
+}
+
