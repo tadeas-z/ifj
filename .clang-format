@@ -1,0 +1,9 @@
+# Implementation of the IFJ26 imperative language compiler
+# .clang-format
+# Author(s): Adam Zatloukal (xzatloa01)
+#
+# AI-generated using: Claude Code
+#              model: Claude Opus 5.5
+# Prompt: "Create a clang-format file based on the WebKit style"
+
+BasedOnStyle: WebKit
