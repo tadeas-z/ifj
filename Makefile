@@ -1,6 +1,6 @@
 # Implementation of the IFJ26 imperative language compiler
 # Makefile
-# Author(s): Tadeáš Zonyga (xzonygt00)
+# Author(s): Tadeáš Zonyga (xzonygt00), Marek Zachensky (xzachem00)
 
 CC = gcc
 CPPFLAGS = -Iinc
@@ -11,7 +11,7 @@ SOURCES = $(wildcard src/*.c src/*/*.c)
 OBJECTS = $(patsubst src/%.c,build/%.o,$(SOURCES))
 DEPS = $(OBJECTS:.o=.d)
 
-.PHONY: all clean
+.PHONY: all clean check build-check
 all: $(TARGET)
 
 $(TARGET): $(OBJECTS)
@@ -31,5 +31,13 @@ ifeq ($(OS),Windows_NT)
 else
 	rm -rf build
 endif
+
+CHECK_FILES = $(shell find src inc tests -name '*.[ch]')
+
+check:
+	clang-format --dry-run --Werror $(CHECK_FILES)
+	cppcheck --error-exitcode=1 -Iinc $(CHECK_FILES)
+
+build-check: check all
 
 -include $(DEPS)
