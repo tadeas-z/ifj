@@ -24,11 +24,12 @@ static bool is_expected (parser_t *parser, token_type_t token){
 
 static int parser_block (parser_t *parser, ast_node_t **out_node);
 static int parser_statement (parser_t *parser, ast_node_t **out_node);
+static int parser_return_statement(parser_t *parser, ast_node_t **out_node);
 
 /*
 ---------------------------------------------------------------------------------
 |  Chacking syntax of VAR/VAL declaration                                           |
-|  (for example:  var temp: Int = 10)                                     |
+|  (syntax:  var temp: Int = <value>) ;                                    |
 ---------------------------------------------------------------------------------
 */
 
@@ -81,11 +82,11 @@ static int parser_var_declaration (parser_t *parser, ast_node_t **out_node){
 /*
 ---------------------------------------------------------------------------------
 |  Assigning a value to a variable                                              |
-|  (for example:   temp = a + 5;  || fun(a, b);                                 |
+|  (syntax:   temp = <expr>;  || fun(<arg>);                                 |
 ---------------------------------------------------------------------------------
 */
 
-static int parser_assignment_or_funcall_assignment (parser_t *parser, ast_node_t **out_node){
+static int parser_assignment_or_funcall (parser_t *parser, ast_node_t **out_node){
   char *var_name = parser->input_token.lexeme;
   get_next_token (parser);
 
@@ -139,7 +140,7 @@ static int parser_assignment_or_funcall_assignment (parser_t *parser, ast_node_t
 /*
 ---------------------------------------------------------------------------------
 |  Check syntax of IF conditional                                                |
-|  (for example:   if <expr> then                                                |
+|  (syntax:   if <expr> then                                                |
 |                      <stmts>                                                   |
 |                  else                                                          |
 |                      <stmts>                                                   |
@@ -192,7 +193,7 @@ static int parser_if_statement (parser_t *parser, ast_node_t **out_node){
 /*
 ---------------------------------------------------------------------------------
 |  Check syntax of WHILE loop                                                    |
-|  (for example:  while <expr> do                                                |
+|  (syntax:  while <expr> do                                                |
 |                      <stmts>                                                   |
 ---------------------------------------------------------------------------------
 */
@@ -223,6 +224,107 @@ static int parser_while_statement (parser_t *parser, ast_node_t **out_node){
       return block_syntax;
     }
     return ERR_OK;
+  }
+  return ERR_SYNTAX;
+}
+
+/*
+---------------------------------------------------------------------------------
+|  Function Declaration Syntax Analysis                                         |
+|  Syntax: def id (param_list) [: type] = <expr_or_block>                       |
+---------------------------------------------------------------------------------
+*/
+static int parser_func_declaration (parser_t *parser, ast_node_t **out_node){
+  if(!(is_expected(parser, TOKEN_DEF))){
+    get_next_toke(parser);
+
+    if(!(is_expected(parser, TOKEN_IDENTIFIER)))
+      return ERR_SYNTAX;
+
+    char *func_name = parser->input_token.lexeme;
+
+    symbol_t *func_sym = NULL;
+    if(symtable_insert_func(parser->symtable, func_name, &func_sym) != ST_OK)
+      return ERR_INTERNAL;
+
+    get_next_token(parser);
+
+    if(!(is_expected(parser, TOKEN_LPAREN)))
+      return ERR_SYNTAX;
+
+    while(!(is_expected(parser, TOKEN_RPAREN))){
+      if(!(is_expected(parser, TOKEN_IDENTIFIER)))
+        return ERR_SYNTAX;
+
+      char *param_name = parser->input_token.lexeme;
+      
+      get_next_token(parser);
+
+      if(!(is_expected(parser, TOKEN_COLON)))
+        return ERR_SYNTAX;
+
+      type_t *param_type;
+      if(is_expected(parser, TOKEN_TYPE_INT))
+        param_type = T_INT;
+      else if(is_expected(parser, TOKEN_TYPE_DOUBLE))
+        param_type = T_DOUBLE;
+      else if(is_expeceted(parser, TOKEN_TYPE_STRING))
+        param_type = T_STRING;
+      else
+        return ERR_SYNTAX;
+
+      symbol_t *func_sym = NULL;
+      if(symtable_func_add_param(func_sym, param_name, param_type) != ST_OK)
+        return ERR_INTERNAL;
+
+      get_next_token(parser);
+
+      if(is_expeceted(parser, TOKEN_COMMA))
+        get_next_token(parser);
+      else
+        break;
+    }
+    
+    if(!(is_expected(parser, TOKEN_RPAREN)))
+      return ERR_SYNTAX;
+
+    get_next_token(parser);
+
+    if(is_expected(parser, TOKEN_COLON)){
+      get_next_token(parser);
+      if(is_expeceted(parser, TOKEN_TYPE_INT))
+        func_sym->type = T_INT;
+      else if(is_expected(parser, TOKEN_TYPE_DOUBLE))
+        func_sym->type = T_DOUBLE;
+      else if(is_expected(parser, TOKEN_TYPE_STRING))
+        func_sym->type = T_STRING;
+      else if(is_expected(parser, TOKEN_TYPE_UNIT))
+        func_sym->type = T_DOUBLE;
+      else
+        return ERR_SYNTAX;
+      get_next_token(parser);
+    }
+
+    if(!(is_expected(parser, TOKEN_ASSIGN)))
+      return ERR_SYNTAX;
+
+    get_next_token(parser);
+
+    // multi-line block
+    if(is_expected(parser, TOKEN_NEWLINE)){
+      ast_node_t *body_block = NULL;
+      return parser_block(parser, &body_block);
+    }
+      
+    // single-line block  
+    else{
+      ast_node_t *body_expr = NULL;
+      int expr_result = parser_expression(parser->lexer, &body_expr);
+      if(expr_result != ERR_OK)  
+        return expr_result;
+      get_next_token(parser);
+      return ERR_OK;
+    }
   }
   return ERR_SYNTAX;
 }
@@ -307,7 +409,7 @@ static int parser_statement (parser_t *parser, ast_node_t **out_node){
     return parser_var_declaration (parser, out_node);
     
   else if(is_expected(parser, TOKEN_IDENTIFIER))
-    return parser_assignment_or_funcall_assignment (parser, out_node);
+    return parser_assignment_or_funcall (parser, out_node);
 
   else if(is_expected(parser, TOKEN_IF))
     return parser_if_statement (parser, out_node);
@@ -319,7 +421,32 @@ static int parser_statement (parser_t *parser, ast_node_t **out_node){
     get_next_token(parser);
     return ERR_OK;
   }
+
+  else if(is_expected(parser, TOKEN_RETURN))
+    return parser_return(parser, out_node);
   
+  return ERR_SYNTAX;
+}
+
+/*
+---------------------------------------------------------------------------------
+|  Return                                                                        |
+|  Syntax: return <expr> ;                                                       |
+---------------------------------------------------------------------------------
+*/
+
+static int parser_return(parser_t *parser, ast_node_t **out_node){
+  get_next_token(parser);
+
+  ast_node_t *return_expr = NULL;
+  int expr_result = parser_expression(parser->lexer, &return_expr);
+  if(expr_result != ERR_OK)
+    return expr_result;
+
+  get_next_token(parser);
+
+  if (is_expected(parser, TOKEN_SEMICOLON)) 
+        return ERR_OK;
   return ERR_SYNTAX;
 }
 
