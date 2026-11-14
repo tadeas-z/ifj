@@ -1,4 +1,9 @@
+// Implementation of the IFJ26 imperative language compiler
+// parser.c
+// Author(s): Dušan Popović (xpopovd00)
+
 #include "parser.h"
+#include <string.h>
 
 typedef struct {
   lexer_t *lexer;
@@ -8,7 +13,7 @@ typedef struct {
 }parser_t;
 
 static int get_next_token(parser_t *parser){
-  lexer_status_t status = lexer_next(parser->lexer, &parser->input_token);
+  lexer_status_t status = lexer_next(parser->lexer, &parser->input_token);        //lexer_status_t is same like error_code_t
   if(status == ERR_LEXICAL)
     return ERR_LEXICAL;
   return ERR_OK;
@@ -24,12 +29,13 @@ static bool is_expected (parser_t *parser, token_type_t token){
 
 static int parser_block (parser_t *parser, ast_node_t **out_node);
 static int parser_statement (parser_t *parser, ast_node_t **out_node);
-static int parser_return_statement(parser_t *parser, ast_node_t **out_node);
+static int parser_return(parser_t *parser, ast_node_t **out_node);
+static int statement_end(parser_t *parser);
 
 /*
 ---------------------------------------------------------------------------------
 |  Chacking syntax of VAR/VAL declaration                                           |
-|  (syntax:  var temp: Int = <value>) ;                                    |
+|  (syntax:  var/val temp: Int = <value>) ;                                    |
 ---------------------------------------------------------------------------------
 */
 
@@ -43,7 +49,7 @@ static int parser_var_declaration (parser_t *parser, ast_node_t **out_node){
   char *var_name = parser->input_token.lexeme;
   get_next_token (parser);
 
-  type_t *var_type;
+  type_t *var_type = T_ANY;
   if (is_expected(parser, TOKEN_COLON)){
     get_next_token (parser);
     if (is_expected(parser, TOKEN_TYPE_INT))
@@ -52,6 +58,8 @@ static int parser_var_declaration (parser_t *parser, ast_node_t **out_node){
       var_type = T_DOUBLE;
     else if (is_expected(parser, TOKEN_TYPE_STRING))
       var_type = T_STRING;
+    else if (is_expected(parser, TOKEN_TYPE_UNIT))
+      var_type = T_UNIT;
     else
       return ERR_SYNTAX;
     get_next_token(parser);
@@ -62,11 +70,10 @@ static int parser_var_declaration (parser_t *parser, ast_node_t **out_node){
   if(st_result == ST_NOMEM)
     return ERR_INTERNAL;
 
-  if(is_expected(parser, TOKEN_ASSIGN)){
-    get_next_token(parser);  
-  }
-  else
+  if(!(is_expected(parser, TOKEN_ASSIGN)))  
     return ERR_SYNTAX;
+
+  get_next_token(parser);
 
   ast_node_t *new_expression = NULL;
   int expr_result = parser_expression (parser->lexer, &new_expression);
@@ -74,9 +81,8 @@ static int parser_var_declaration (parser_t *parser, ast_node_t **out_node){
     return expr_result;
 
   get_next_token (parser);
-  if(!(is_expected(parser, TOKEN_SEMICOLON)))
-    return ERR_SYNTAX;
-  return ERR_OK;
+  
+  return expect_statement_end(parser);
 }
 
 /*
@@ -101,9 +107,7 @@ static int parser_assignment_or_funcall (parser_t *parser, ast_node_t **out_node
 
     get_next_token (parser);
     
-    if (!is_expected(parser, TOKEN_SEMICOLON))
-      return ERR_SYNTAX; 
-    return ERR_OK;
+    return expect_statement_end(parser);
   }
     // func(<arg>) ;
   else if(is_expected(parser, TOKEN_LPAREN)){
@@ -120,6 +124,13 @@ static int parser_assignment_or_funcall (parser_t *parser, ast_node_t **out_node
   
         if(is_expected(parser, TOKEN_COMMA)){
           get_next_token(parser);
+
+          while (is_expected(parser, TOKEN_NEWLINE)) 
+            get_next_token(parser);
+
+          if (is_expected(parser, TOKEN_RPAREN))
+            break;
+          
           continue;
         }
         break;
@@ -130,9 +141,8 @@ static int parser_assignment_or_funcall (parser_t *parser, ast_node_t **out_node
         return ERR_SYNTAX;
 
     get_next_token (parser);
-    if (!is_expected(parser, TOKEN_SEMICOLON)) 
-        return ERR_SYNTAX;
-    return ERR_OK;
+    
+    return expect_statement_end(parser);
   }
   return ERR_SYNTAX;
 }
@@ -140,7 +150,7 @@ static int parser_assignment_or_funcall (parser_t *parser, ast_node_t **out_node
 /*
 ---------------------------------------------------------------------------------
 |  Check syntax of IF conditional                                                |
-|  (syntax:   if <expr> then                                                |
+|  (syntax:   if <expr> then                                                     |
 |                      <stmts>                                                   |
 |                  else                                                          |
 |                      <stmts>                                                   |
@@ -172,19 +182,22 @@ static int parser_if_statement (parser_t *parser, ast_node_t **out_node){
       return block_syntax;
     }
     
-    //skip new line before else_condition
+    //skip new lines before else
     while (is_expected(parser, TOKEN_NEWLINE)) {
         get_next_token(parser);
     }
     
     //else_condition
-    if (!(is_expected(parser, TOKEN_ELSE))) 
-        return ERR_SYNTAX;
+    if (!(is_expected(parser, TOKEN_ELSE))){
+      ast_free(cond_expr);  
+      return ERR_SYNTAX;
+    }
     
     get_next_token(parser);
     //else_block
     ast_node_t *else_block = NULL;
     block_syntax = parser_block(parser, &else_block);
+    ast_free(cond_expr);
     return block_syntax;
   }   
   return ERR_SYNTAX;
@@ -219,11 +232,8 @@ static int parser_while_statement (parser_t *parser, ast_node_t **out_node){
     //while_block
     ast_node_t *while_block = NULL;
     int block_syntax = parser_block(parser, &while_block); 
-    if (block_syntax != ERR_OK){ 
-      ast_free(cond_expr);
-      return block_syntax;
-    }
-    return ERR_OK;
+    ast_free(cond_expr);
+    return block_syntax;
   }
   return ERR_SYNTAX;
 }
@@ -234,8 +244,8 @@ static int parser_while_statement (parser_t *parser, ast_node_t **out_node){
 |  Syntax: def id (param_list) [: type] = <expr_or_block>                       |
 ---------------------------------------------------------------------------------
 */
-static int parser_func_declaration (parser_t *parser, ast_node_t **out_node){
-  if(!(is_expected(parser, TOKEN_DEF))){
+static int parser_func_declaration (parser_t *parser, ast_node_t **out_node, bool is_main){
+  if(is_expected(parser, TOKEN_DEF)){
     get_next_toke(parser);
 
     if(!(is_expected(parser, TOKEN_IDENTIFIER)))
@@ -247,11 +257,14 @@ static int parser_func_declaration (parser_t *parser, ast_node_t **out_node){
     if(symtable_insert_func(parser->symtable, func_name, &func_sym) != ST_OK)
       return ERR_INTERNAL;
 
+    func_sym->is_main = is_main;
     get_next_token(parser);
 
     if(!(is_expected(parser, TOKEN_LPAREN)))
       return ERR_SYNTAX;
 
+    get_next_token(parser);
+    
     while(!(is_expected(parser, TOKEN_RPAREN))){
       if(!(is_expected(parser, TOKEN_IDENTIFIER)))
         return ERR_SYNTAX;
@@ -263,17 +276,18 @@ static int parser_func_declaration (parser_t *parser, ast_node_t **out_node){
       if(!(is_expected(parser, TOKEN_COLON)))
         return ERR_SYNTAX;
 
-      type_t *param_type;
+      type_t *param_type = T_ANY;
       if(is_expected(parser, TOKEN_TYPE_INT))
         param_type = T_INT;
       else if(is_expected(parser, TOKEN_TYPE_DOUBLE))
         param_type = T_DOUBLE;
       else if(is_expeceted(parser, TOKEN_TYPE_STRING))
         param_type = T_STRING;
+      else if(is_expected(parser, TOKEN_TYPE_UNIT))
+        param_type = T_UNIT;
       else
         return ERR_SYNTAX;
 
-      symbol_t *func_sym = NULL;
       if(symtable_func_add_param(func_sym, param_name, param_type) != ST_OK)
         return ERR_INTERNAL;
 
@@ -281,8 +295,14 @@ static int parser_func_declaration (parser_t *parser, ast_node_t **out_node){
 
       if(is_expeceted(parser, TOKEN_COMMA))
         get_next_token(parser);
-      else
-        break;
+        while (is_expected(parser, TOKEN_NEWLINE)) 
+          get_next_token(parser);
+        
+        if (is_expected(parser, TOKEN_RPAREN))
+          break;
+        continue;
+      }
+      break;
     }
     
     if(!(is_expected(parser, TOKEN_RPAREN)))
@@ -299,7 +319,7 @@ static int parser_func_declaration (parser_t *parser, ast_node_t **out_node){
       else if(is_expected(parser, TOKEN_TYPE_STRING))
         func_sym->type = T_STRING;
       else if(is_expected(parser, TOKEN_TYPE_UNIT))
-        func_sym->type = T_DOUBLE;
+        func_sym->type = T_UNIT;
       else
         return ERR_SYNTAX;
       get_next_token(parser);
@@ -310,21 +330,23 @@ static int parser_func_declaration (parser_t *parser, ast_node_t **out_node){
 
     get_next_token(parser);
 
+    int body_result;
     // multi-line block
     if(is_expected(parser, TOKEN_NEWLINE)){
       ast_node_t *body_block = NULL;
-      return parser_block(parser, &body_block);
+      body_result = parser_block(parser, &body_block);
     }
       
     // single-line block  
     else{
       ast_node_t *body_expr = NULL;
-      int expr_result = parser_expression(parser->lexer, &body_expr);
-      if(expr_result != ERR_OK)  
-        return expr_result;
-      get_next_token(parser);
-      return ERR_OK;
+      body_result = parser_expression(parser->lexer, &body_expr);
+      if(body_result == ERR_OK){
+        get_next_token(parser);
+        body_result = statement_end(parser);
+      }
     }
+    return body_result;
   }
   return ERR_SYNTAX;
 }
@@ -339,14 +361,14 @@ static int parser_block(parser_t *parser, ast_node_t **out_node) {
     (void)out_node;
 
     while (is_expected(parser, TOKEN_NEWLINE)) {
-        int block_syntax = get_next_token(parser);
-        if (block_syntax != ERR_OK) 
-          return block_syntax;
+      int block_syntax = get_next_token(parser);
+      if (block_syntax != ERR_OK) 
+        return block_syntax;
     }
 
     // Indention must starts on the new line
     if (!parser->input_token.starts_line) {
-        return ERR_SYNTAX;
+      return ERR_SYNTAX;
     }
 
     size_t parent_indent = parser->current_indent;
@@ -354,38 +376,37 @@ static int parser_block(parser_t *parser, ast_node_t **out_node) {
 
     // Indention of new block must be bigger then indention of parent block
     if (block_indent <= parent_indent) {
-        return ERR_SYNTAX; 
+      return ERR_SYNTAX; 
     }
 
     size_t old_indent = parser->current_indent;
     parser->current_indent = block_indent;
 
     if (symtable_push_scope(parser->symtable) != ST_OK) {
-        return ERR_INTERNAL;
+      return ERR_INTERNAL;
     }
 
     while (!is_expected(parser, TOKEN_EOF)) {
-        if (is_expected(parser, TOKEN_NEWLINE)) {
-          get_next_token(parser);
-          continue;
-        }
+      if (is_expected(parser, TOKEN_NEWLINE)) {
+        get_next_token(parser);
+        continue;
+      }
 
-        if (parser->input_token.starts_line) {
-            // If indent of smaller then block, that means end of block
-            if (parser->input_token.indentation < block_indent) {
-                break; 
-            }
-
-            if (parser->input_token.indentation != block_indent) {
-                symtable_pop_scope(parser->symtable);
-                return ERR_SYNTAX; 
-            }
+      if (parser->input_token.starts_line) {
+        // If indent of smaller then block, that means end of block
+        if (parser->input_token.indentation < block_indent) 
+          break; 
+  
+        if (parser->input_token.indentation != block_indent) {
+          symtable_pop_scope(parser->symtable);
+          return ERR_SYNTAX; 
         }
+      }
 
         int statement_syntax = parser_statement(parser, out_node);
         if (statement_syntax != ERR_OK) {
-            symtable_pop_scope(parser->symtable);
-            return statement_syntax;
+          symtable_pop_scope(parser->symtable);
+          return statement_syntax;
         }
     }
 
@@ -417,6 +438,9 @@ static int parser_statement (parser_t *parser, ast_node_t **out_node){
   else if (is_expected(parser, TOKEN_WHILE)) 
     return parser_while_statement(parser, out_node);
 
+  else if (is_expected(parser, TOKEN_RETURN))
+    return parser_return(parser, out_node);
+    
   else if(is_expected(parser, TOKEN_SEMICOLON)){
     get_next_token(parser);
     return ERR_OK;
@@ -438,6 +462,12 @@ static int parser_statement (parser_t *parser, ast_node_t **out_node){
 static int parser_return(parser_t *parser, ast_node_t **out_node){
   get_next_token(parser);
 
+   if (is_expected(parser, TOKEN_NEWLINE) || 
+       is_expected(parser, TOKEN_SEMICOLON) ||
+       is_expected(parser, TOKEN_EOF)) {
+    return statement_end(parser);
+  }
+  
   ast_node_t *return_expr = NULL;
   int expr_result = parser_expression(parser->lexer, &return_expr);
   if(expr_result != ERR_OK)
@@ -445,8 +475,96 @@ static int parser_return(parser_t *parser, ast_node_t **out_node){
 
   get_next_token(parser);
 
-  if (is_expected(parser, TOKEN_SEMICOLON)) 
-        return ERR_OK;
-  return ERR_SYNTAX;
+  return expect_statement_end(parser);
 }
 
+static int statement_end(parser_t *parser) {
+    if (is_expected(parser, TOKEN_SEMICOLON)) {
+      return get_next_token(parser);
+    }
+    if (is_expected(parser, TOKEN_NEWLINE) || is_expected(parser, TOKEN_EOF)) {
+      return ERR_OK;
+    }
+    return ERR_SYNTAX;
+}
+
+int parser_main(lexer_t *lexer, ast_node_t **out_ast){
+  parser_t parser;
+  parser.lexer = lexer;
+  parser.current_indent = 0;
+
+  parser.symtable = symtable_new ();
+  if(parser.symtable == NULL)
+    return ERR_INTERNAL;
+
+  if(get_next_token(&parser) != ERR_OK){
+    symtable_free(parser.symtable);
+    return ERR_LEXICAL;
+  }
+
+  // prolog: import ifj26.*
+  if(!(is_expected(&parser, TOKEN_IMPORT))){
+    symtable_free(parser.symtable);
+    return ERR_SYNTAX;
+  }
+
+  get_next_token(&parser);
+  
+  if(!(is_expected(&parser, TOKEN_IDENTIFIER)) || strcmp(parser.input_token.lexeme, "ifj26") != 0){
+    symtable_free(parser.symtable);
+    return ERR_SYNTAX;
+  }
+
+  get_next_token(&parser);
+  
+  if (!is_expected(&parser, TOKEN_DOT)){
+    symtable_free(parser.symtable);
+    return ERR_SYNTAX;
+  }
+  
+  get_next_token(&parser);
+
+  if (!is_expected(&parser, TOKEN_STAR)){
+    symtable_free(parser.symtable);
+    return ERR_SYNTAX;
+  }
+  
+  get_next_token(&parser);
+
+  if (!is_expected(&parser, TOKEN_NEWLINE) && !is_expected(&parser, TOKEN_EOF)){
+    symtable_free(parser.symtable);
+    return ERR_SYNTAX;
+  }
+  
+  while (!is_expected(&parser, TOKEN_EOF)){
+    if (is_expected(&parser, TOKEN_NEWLINE)){
+      get_next_token(&parser);
+      continue;
+    }
+
+    bool is_main = false;
+    if (is_expected(&parser, TOKEN_MAIN)) {
+      is_main = true;
+      get_next_token(&parser);
+      while (is_expected(&parser, TOKEN_NEWLINE)) 
+        get_next_token(&parser);
+    }
+  
+    if (is_expected(&parser, TOKEN_DEF)) {
+      int err = parser_func_declaration(&parser, out_ast, is_main);
+      if (err != ERR_OK) {
+          symtable_free(parser.symtable);
+          return err;
+      }
+    } 
+      
+    else {
+         symtable_free(parser.symtable);
+         return ERR_SYNTAX;
+    }
+  }
+  
+  symtable_free(parser.symtable);
+  return ERR_OK;
+    
+}
