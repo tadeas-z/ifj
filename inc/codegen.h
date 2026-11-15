@@ -295,4 +295,26 @@ void codegen_binary_op(codegen_t* codegen, binary_op_t op, var_t var, symb_t sym
  */
 void codegen_read(codegen_t* codegen, var_t var, const char* type);
 
+// AI-generated using: Claude Code
+//              model: Claude Opus 5.5
+// Prompt: "Write the Doxygen description of the new built-in functions
+//          codegen function in this header."
+// Scope: doc comment of codegen_builtins only
+
+/**
+ * @brief Writes the code of all built-in functions (readLine, readInt,
+ *        readDouble, toStr, toInt, strLength, subStr, ord, chr).
+ *
+ * Every built-in is called like a normal function: CREATEFRAME, DEFVAR and
+ * MOVE of the arguments into TF and CALL with its name. The arguments are
+ * named TF@value$0, TF@start$0, TF@end$0, TF@index$0 and TF@code$0, as in
+ * the IFJ26 specification. The result is left on the data stack. print is
+ * not here, it is just WRITE.
+ *
+ * @param codegen Generator created by codegen_init.
+ * @note Call it once, after codegen_program_begin, so the jump to $end
+ *       goes over this code.
+ */
+void codegen_builtins(codegen_t* codegen);
+
 #endif

@@ -40,6 +40,148 @@ static const char* binary_names[] = {
     "STRI2INT"
 };
 
+// built in functions, result goes on the stack
+static const char* builtins =
+    // readLine()
+    "LABEL readLine\n"
+    "PUSHFRAME\n"
+    "DEFVAR LF@r$0\n"
+    "READ LF@r$0 string\n"
+    "JUMPIFNEQ $readLine$ok LF@r$0 nil@nil\n"
+    "MOVE LF@r$0 string@\n"
+    "LABEL $readLine$ok\n"
+    "PUSHS LF@r$0\n"
+    "POPFRAME\n"
+    "RETURN\n"
+
+    // readInt()
+    "LABEL readInt\n"
+    "PUSHFRAME\n"
+    "DEFVAR LF@r$0\n"
+    "READ LF@r$0 int\n"
+    "JUMPIFNEQ $readInt$ok LF@r$0 nil@nil\n"
+    "MOVE LF@r$0 int@0\n"
+    "LABEL $readInt$ok\n"
+    "PUSHS LF@r$0\n"
+    "POPFRAME\n"
+    "RETURN\n"
+
+    // readDouble()
+    "LABEL readDouble\n"
+    "PUSHFRAME\n"
+    "DEFVAR LF@r$0\n"
+    "READ LF@r$0 float\n"
+    "JUMPIFNEQ $readDouble$ok LF@r$0 nil@nil\n"
+    "MOVE LF@r$0 float@0x0p+0\n"
+    "LABEL $readDouble$ok\n"
+    "PUSHS LF@r$0\n"
+    "POPFRAME\n"
+    "RETURN\n"
+
+    // toStr(value)
+    "LABEL toStr\n"
+    "PUSHFRAME\n"
+    "DEFVAR LF@r$0\n"
+    "TYPE LF@r$0 LF@value$0\n"
+    "JUMPIFEQ $toStr$int LF@r$0 string@int\n"
+    "JUMPIFEQ $toStr$float LF@r$0 string@float\n"
+    "JUMPIFEQ $toStr$nil LF@r$0 string@nil\n"
+    "MOVE LF@r$0 LF@value$0\n"
+    "JUMP $toStr$end\n"
+    "LABEL $toStr$int\n"
+    "INT2STR LF@r$0 LF@value$0\n"
+    "JUMP $toStr$end\n"
+    "LABEL $toStr$float\n"
+    "FLOAT2STR LF@r$0 LF@value$0\n"
+    "JUMP $toStr$end\n"
+    "LABEL $toStr$nil\n"
+    "MOVE LF@r$0 string@()\n"
+    "LABEL $toStr$end\n"
+    "PUSHS LF@r$0\n"
+    "POPFRAME\n"
+    "RETURN\n"
+
+    // toInt(value)
+    "LABEL toInt\n"
+    "PUSHFRAME\n"
+    "DEFVAR LF@r$0\n"
+    "FLOAT2INT LF@r$0 LF@value$0\n"
+    "PUSHS LF@r$0\n"
+    "POPFRAME\n"
+    "RETURN\n"
+
+    // strLength(value)
+    "LABEL strLength\n"
+    "PUSHFRAME\n"
+    "DEFVAR LF@r$0\n"
+    "STRLEN LF@r$0 LF@value$0\n"
+    "PUSHS LF@r$0\n"
+    "POPFRAME\n"
+    "RETURN\n"
+
+    // subStr(value, start, end), incorect index exits with 40
+    "LABEL subStr\n"
+    "PUSHFRAME\n"
+    "DEFVAR LF@len$0\n"
+    "STRLEN LF@len$0 LF@value$0\n"
+    "DEFVAR LF@b$0\n"
+    "LT LF@b$0 LF@start$0 int@0\n"
+    "JUMPIFEQ $subStr$err LF@b$0 bool@true\n"
+    "LT LF@b$0 LF@end$0 int@0\n"
+    "JUMPIFEQ $subStr$err LF@b$0 bool@true\n"
+    "GT LF@b$0 LF@start$0 LF@end$0\n"
+    "JUMPIFEQ $subStr$err LF@b$0 bool@true\n"
+    "GT LF@b$0 LF@start$0 LF@len$0\n"
+    "JUMPIFEQ $subStr$err LF@b$0 bool@true\n"
+    "JUMPIFEQ $subStr$err LF@start$0 LF@len$0\n"
+    "GT LF@b$0 LF@end$0 LF@len$0\n"
+    "JUMPIFEQ $subStr$err LF@b$0 bool@true\n"
+    "DEFVAR LF@r$0\n"
+    "MOVE LF@r$0 string@\n"
+    "DEFVAR LF@c$0\n"
+    "LABEL $subStr$loop\n"
+    "JUMPIFEQ $subStr$end LF@start$0 LF@end$0\n"
+    "GETCHAR LF@c$0 LF@value$0 LF@start$0\n"
+    "CONCAT LF@r$0 LF@r$0 LF@c$0\n"
+    "ADD LF@start$0 LF@start$0 int@1\n"
+    "JUMP $subStr$loop\n"
+    "LABEL $subStr$end\n"
+    "PUSHS LF@r$0\n"
+    "POPFRAME\n"
+    "RETURN\n"
+    "LABEL $subStr$err\n"
+    "EXIT int@40\n"
+
+    // ord(value, index), -1 if index is incorrect
+    "LABEL ord\n"
+    "PUSHFRAME\n"
+    "DEFVAR LF@len$0\n"
+    "STRLEN LF@len$0 LF@value$0\n"
+    "DEFVAR LF@b$0\n"
+    "LT LF@b$0 LF@index$0 int@0\n"
+    "JUMPIFEQ $ord$bad LF@b$0 bool@true\n"
+    "GT LF@b$0 LF@index$0 LF@len$0\n"
+    "JUMPIFEQ $ord$bad LF@b$0 bool@true\n"
+    "JUMPIFEQ $ord$bad LF@index$0 LF@len$0\n"
+    "DEFVAR LF@r$0\n"
+    "STRI2INT LF@r$0 LF@value$0 LF@index$0\n"
+    "PUSHS LF@r$0\n"
+    "POPFRAME\n"
+    "RETURN\n"
+    "LABEL $ord$bad\n"
+    "PUSHS int@-1\n"
+    "POPFRAME\n"
+    "RETURN\n"
+
+    // chr(code)
+    "LABEL chr\n"
+    "PUSHFRAME\n"
+    "DEFVAR LF@r$0\n"
+    "INT2CHAR LF@r$0 LF@code$0\n"
+    "PUSHS LF@r$0\n"
+    "POPFRAME\n"
+    "RETURN\n";
+
 // ===== print =====
 
 // string@
@@ -278,4 +420,9 @@ void codegen_read(codegen_t* codegen, var_t var, const char* type)
     fprintf(codegen->out, "READ ");
     print_var(codegen, var);
     fprintf(codegen->out, " %s\n", type);
+}
+
+void codegen_builtins(codegen_t* codegen)
+{
+    fprintf(codegen->out, "%s", builtins);
 }

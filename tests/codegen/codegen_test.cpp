@@ -355,3 +355,37 @@ TEST_F(CodegenStringTest, ReadWritesType)
     codegen_read(codegen, make_var(FRAME_LF, "s", 2), "string");
     EXPECT_EQ(output(), "READ LF@x$1 int\nREAD LF@s$2 string\n");
 }
+
+// AI-generated using: Claude Code
+//              model: Claude Opus 5.5
+// Prompt: "Add tests for codegen_builtins: every built-in has its label
+//          and PUSHFRAME and every built-in ends with RETURN"
+// Scope: CodegenBuiltinTest and all tests below
+
+// Same fixture, separate suite name for the built-in tests
+class CodegenBuiltinTest : public CodegenTest { };
+
+// Every built-in starts with its label and PUSHFRAME
+TEST_F(CodegenBuiltinTest, AllBuiltinsHaveLabel)
+{
+    codegen_builtins(codegen);
+    std::string text = output();
+
+    const char* names[] = { "readLine", "readInt", "readDouble", "toStr", "toInt",
+        "strLength", "subStr", "ord", "chr" };
+    for (const char* name : names) {
+        std::string label = std::string("LABEL ") + name + "\nPUSHFRAME\n";
+        EXPECT_NE(text.find(label), std::string::npos) << name;
+    }
+}
+
+// Code ends with RETURN, so nothing runs after the last built-in
+TEST_F(CodegenBuiltinTest, EndsWithReturn)
+{
+    codegen_builtins(codegen);
+    std::string text = output();
+    std::string end = "RETURN\n";
+
+    ASSERT_GE(text.size(), end.size());
+    EXPECT_EQ(text.substr(text.size() - end.size()), end);
+}
