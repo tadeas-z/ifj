@@ -141,7 +141,85 @@ void codegen_expr(codegen_t* codegen, ast_node_t* expr)
         generate_convert(codegen, expr);
         break;
     default:
-        // calls are not done yet
+        // TODO add calls
+        break;
+    }
+}
+
+// value into the variable
+static void generate_store(codegen_t* codegen, ast_node_t* value, const char* name, int id)
+{
+    var_t var = { FRAME_LF, name, id };
+
+    codegen_expr(codegen, value);
+    codegen_pops(codegen, var);
+}
+
+// jump if the condition is false
+static void generate_cond(codegen_t* codegen, ast_node_t* cond, int num, const char* suffix)
+{
+    symb_t false_val = { 0 };
+    false_val.type = S_BOOL;
+    false_val.bool_val = false;
+
+    codegen_expr(codegen, cond);
+    codegen_pushs(codegen, false_val);
+    codegen_jumpifeqs(codegen, num, suffix);
+}
+
+// then block, else block
+static void generate_if(codegen_t* codegen, ast_node_t* stmt)
+{
+    int num = codegen_new_label(codegen);
+
+    generate_cond(codegen, stmt->if_stmt.cond, num, "else");
+    codegen_stmt(codegen, stmt->if_stmt.then_block);
+    codegen_jump(codegen, num, "end");
+    codegen_label(codegen, num, "else");
+    codegen_stmt(codegen, stmt->if_stmt.else_block);
+    codegen_label(codegen, num, "end");
+}
+
+// check, body, jump back
+static void generate_while(codegen_t* codegen, ast_node_t* stmt)
+{
+    int num = codegen_new_label(codegen);
+
+    codegen_label(codegen, num, "while");
+    generate_cond(codegen, stmt->while_stmt.cond, num, "end");
+    codegen_stmt(codegen, stmt->while_stmt.body);
+    codegen_jump(codegen, num, "while");
+    codegen_label(codegen, num, "end");
+}
+
+// statements one by one
+static void generate_block(codegen_t* codegen, ast_node_t* stmt)
+{
+    for (size_t i = 0; i < stmt->block.statements.count; i++)
+        codegen_stmt(codegen, dyn_arr_get(&stmt->block.statements, i));
+}
+
+// generate a statement
+void codegen_stmt(codegen_t* codegen, ast_node_t* stmt)
+{
+    switch (stmt->kind) {
+    case AST_BLOCK:
+        generate_block(codegen, stmt);
+        break;
+    case AST_VAR_DEF:
+        generate_store(codegen, stmt->var_def.init, stmt->var_def.name, stmt->var_def.id);
+        break;
+    case AST_ASSIGN:
+        generate_store(codegen, stmt->assign.value, stmt->assign.name, stmt->assign.id);
+        break;
+    case AST_IF:
+        generate_if(codegen, stmt);
+        break;
+    case AST_WHILE:
+        generate_while(codegen, stmt);
+        break;
+    default:
+        // TODO add return and calls
         break;
     }
 }

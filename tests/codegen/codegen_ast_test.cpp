@@ -9,6 +9,7 @@
 //          like semantics would and check the exact IFJcode26 text for
 //          literals, variables, operator order, Int and Double division,
 //          <= >= !=, string concatenation, unary minus and conversion"
+// Prompt: "Create tests using google-tests for codegen_stmt"
 // Scope: whole file
 
 extern "C" {
@@ -180,4 +181,69 @@ TEST_F(CodegenExprTest, Convert)
 
     codegen_expr(codegen, tree);
     EXPECT_EQ(output(), "PUSHS int@5\nINT2FLOATS\n");
+}
+
+// Same setup for the statement tests
+class CodegenStmtTest : public CodegenExprTest {
+};
+
+static ast_node_t* assign(const char* name, int id, ast_node_t* value)
+{
+    ast_node_t* node = ast_new_assign(name, value, 1, 1);
+    node->assign.id = id;
+    return node;
+}
+
+static ast_node_t* block(ast_node_t* stmt)
+{
+    ast_node_t* node = ast_new_block(1, 1);
+    dyn_arr_append(&node->block.statements, stmt);
+    return node;
+}
+
+// var x = 1 and x = x + 2 both end with POPS into the variable
+TEST_F(CodegenStmtTest, VarDefAndAssign)
+{
+    ast_node_t* def = ast_new_var_def("x", false, nullptr, int_lit(1), 1, 1);
+    def->var_def.id = 1;
+    tree = block(def);
+    dyn_arr_append(&tree->block.statements,
+        assign("x", 1, binary(AST_OP_ADD, var_ref("x", 1, TYPE_INT), int_lit(2), TYPE_INT)));
+
+    codegen_stmt(codegen, tree);
+    EXPECT_EQ(output(),
+        "PUSHS int@1\nPOPS LF@x$1\n"
+        "PUSHS LF@x$1\nPUSHS int@2\nADDS\nPOPS LF@x$1\n");
+}
+
+// if jumps to else when the condition is false
+TEST_F(CodegenStmtTest, IfElse)
+{
+    tree = ast_new_if(binary(AST_OP_LT, var_ref("a", 1, TYPE_INT), int_lit(2), TYPE_BOOL),
+        block(assign("a", 1, int_lit(3))), block(assign("a", 1, int_lit(4))), 1, 1);
+
+    codegen_stmt(codegen, tree);
+    EXPECT_EQ(output(),
+        "PUSHS LF@a$1\nPUSHS int@2\nLTS\n"
+        "PUSHS bool@false\nJUMPIFEQS $1$else\n"
+        "PUSHS int@3\nPOPS LF@a$1\nJUMP $1$end\n"
+        "LABEL $1$else\n"
+        "PUSHS int@4\nPOPS LF@a$1\n"
+        "LABEL $1$end\n");
+}
+
+// while checks the condition first and jumps back after the body
+TEST_F(CodegenStmtTest, While)
+{
+    tree = ast_new_while(binary(AST_OP_LT, var_ref("i", 1, TYPE_INT), int_lit(3), TYPE_BOOL),
+        block(assign("i", 1, binary(AST_OP_ADD, var_ref("i", 1, TYPE_INT), int_lit(1), TYPE_INT))), 1, 1);
+
+    codegen_stmt(codegen, tree);
+    EXPECT_EQ(output(),
+        "LABEL $1$while\n"
+        "PUSHS LF@i$1\nPUSHS int@3\nLTS\n"
+        "PUSHS bool@false\nJUMPIFEQS $1$end\n"
+        "PUSHS LF@i$1\nPUSHS int@1\nADDS\nPOPS LF@i$1\n"
+        "JUMP $1$while\n"
+        "LABEL $1$end\n");
 }

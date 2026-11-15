@@ -28,4 +28,24 @@
  */
 void codegen_expr(codegen_t* codegen, ast_node_t* expr);
 
+// AI-generated using: Claude Code
+//              model: Claude Opus 5.5
+// Prompt: "Write the Doxygen description of the statement codegen
+//          function in this header."
+// Scope: doc comment of codegen_stmt only
+
+/**
+ * @brief Writes the code of a statement.
+ *
+ * Works for blocks, variable definitions, assignments, if and while.
+ * Values are stored with POPS into LF@name$id.
+ *
+ * @param codegen Generator created by codegen_init.
+ * @param stmt Statement node from the AST.
+ * @note The variables are not defined here, DEFVAR of all locals must be
+ *       written at the start of the function (so while does not define
+ *       them again).
+ */
+void codegen_stmt(codegen_t* codegen, ast_node_t* stmt);
+
 #endif
