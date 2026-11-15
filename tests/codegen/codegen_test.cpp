@@ -53,7 +53,7 @@ protected:
 TEST_F(CodegenTest, ProgramBeginWritesHeader)
 {
     codegen_program_begin(codegen);
-    EXPECT_EQ(output(), ".IFJcode26\nCREATEFRAME\nCALL $main\nJUMP $end\n");
+    EXPECT_EQ(output(), ".IFJcode26\nDEFVAR GF@tmp$1\nDEFVAR GF@tmp$2\nCREATEFRAME\nCALL $main\nJUMP $end\n");
 }
 
 // Program end writes the end label and exits with 0
@@ -61,7 +61,7 @@ TEST_F(CodegenTest, ProgramEndWritesExit)
 {
     codegen_program_begin(codegen);
     codegen_program_end(codegen);
-    EXPECT_EQ(output(), ".IFJcode26\nCREATEFRAME\nCALL $main\nJUMP $end\nLABEL $end\nEXIT int@0\n");
+    EXPECT_EQ(output(), ".IFJcode26\nDEFVAR GF@tmp$1\nDEFVAR GF@tmp$2\nCREATEFRAME\nCALL $main\nJUMP $end\nLABEL $end\nEXIT int@0\n");
 }
 
 // Free of NULL does nothing

@@ -288,6 +288,9 @@ void codegen_free(codegen_t* codegen)
 void codegen_program_begin(codegen_t* codegen)
 {
     fprintf(codegen->out, ".IFJcode26\n");
+    // temp vars for string +
+    fprintf(codegen->out, "DEFVAR GF@tmp$1\n");
+    fprintf(codegen->out, "DEFVAR GF@tmp$2\n");
     // main needs TF for PUSHFRAME
     fprintf(codegen->out, "CREATEFRAME\n");
     fprintf(codegen->out, "CALL $main\n");
