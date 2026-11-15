@@ -193,4 +193,51 @@ void codegen_pops(codegen_t* codegen, var_t var);
  */
 void codegen_stack_op(codegen_t* codegen, stack_op_t op);
 
+// AI-generated using: Claude Code
+//              model: Claude Opus 5.5
+// Prompt: "Write the Doxygen descriptions of the new label and jump codegen
+//          functions in this header."
+// Scope: doc comments of codegen_new_label, codegen_label, codegen_jump
+//        and codegen_jumpifeqs only
+
+/**
+ * @brief Gives a new label number, unique in the whole program.
+ *
+ * One number is used for all labels of one if or while, they differ
+ * only by the suffix ($1$else, $1$end).
+ *
+ * @param codegen Generator created by codegen_init.
+ * @return New number (1, 2, ...).
+ */
+int codegen_new_label(codegen_t* codegen);
+
+/**
+ * @brief Writes LABEL $num$suffix.
+ * @param codegen Generator created by codegen_init.
+ * @param num Number from codegen_new_label.
+ * @param suffix Part of the if or while (else, end, ...).
+ */
+void codegen_label(codegen_t* codegen, int num, const char* suffix);
+
+/**
+ * @brief Writes JUMP to the label $num$suffix.
+ * @param codegen Generator created by codegen_init.
+ * @param num Number from codegen_new_label.
+ * @param suffix Part of the if or while (else, end, ...).
+ */
+void codegen_jump(codegen_t* codegen, int num, const char* suffix);
+
+/**
+ * @brief Writes JUMPIFEQS to the label $num$suffix.
+ *
+ * Takes two values from the data stack and jumps if they are equal.
+ * For a condition push its result and then bool@false, so the jump
+ * is taken when the condition is false.
+ *
+ * @param codegen Generator created by codegen_init.
+ * @param num Number from codegen_new_label.
+ * @param suffix Part of the if or while (else, end, ...).
+ */
+void codegen_jumpifeqs(codegen_t* codegen, int num, const char* suffix);
+
 #endif

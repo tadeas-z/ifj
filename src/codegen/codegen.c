@@ -7,6 +7,7 @@
 
 struct codegen {
     FILE* out;
+    int label_count;
 };
 
 // same order as stack_op_t in header
@@ -22,6 +23,8 @@ static const char* op_names[] = {
     "NOTS",
     "INT2FLOATS"
 };
+
+// ===== print =====
 
 // string@
 static void print_string(codegen_t* codegen, const char* s)
@@ -100,6 +103,14 @@ static void print_symb(codegen_t* codegen, symb_t symb)
         print_string(codegen, symb.string_val);
 }
 
+// $num$suffix
+static void print_label(codegen_t* codegen, int num, const char* suffix)
+{
+    fprintf(codegen->out, "$%d$%s", num, suffix);
+}
+
+// ===== codegen =====
+
 codegen_t* codegen_init(FILE* output)
 {
     codegen_t* codegen = malloc(sizeof(codegen_t));
@@ -107,6 +118,7 @@ codegen_t* codegen_init(FILE* output)
         return NULL;
 
     codegen->out = output;
+    codegen->label_count = 0;
     return codegen;
 }
 
@@ -196,4 +208,31 @@ void codegen_pops(codegen_t* codegen, var_t var)
 void codegen_stack_op(codegen_t* codegen, stack_op_t op)
 {
     fprintf(codegen->out, "%s\n", op_names[op]);
+}
+
+int codegen_new_label(codegen_t* codegen)
+{
+    codegen->label_count++;
+    return codegen->label_count;
+}
+
+void codegen_label(codegen_t* codegen, int num, const char* suffix)
+{
+    fprintf(codegen->out, "LABEL ");
+    print_label(codegen, num, suffix);
+    fprintf(codegen->out, "\n");
+}
+
+void codegen_jump(codegen_t* codegen, int num, const char* suffix)
+{
+    fprintf(codegen->out, "JUMP ");
+    print_label(codegen, num, suffix);
+    fprintf(codegen->out, "\n");
+}
+
+void codegen_jumpifeqs(codegen_t* codegen, int num, const char* suffix)
+{
+    fprintf(codegen->out, "JUMPIFEQS ");
+    print_label(codegen, num, suffix);
+    fprintf(codegen->out, "\n");
 }

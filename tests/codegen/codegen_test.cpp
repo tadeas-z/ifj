@@ -249,3 +249,59 @@ TEST_F(CodegenStackTest, WholeExpression)
         "PUSHS int@1\nPUSHS int@2\nPUSHS int@3\n"
         "MULS\nADDS\nPOPS LF@x$1\n");
 }
+
+// AI-generated using: Claude Code
+//              model: Claude Opus 5.5
+// Prompt: "Add tests for the label and jump functions: new label numbers
+//          go up, LABEL, JUMP and JUMPIFEQS write $num$suffix and a whole
+//          if-else in the right order"
+// Scope: CodegenLabelTest and all tests below
+
+// Same fixture, separate suite name for the label tests
+class CodegenLabelTest : public CodegenTest { };
+
+// Every call gives the next number
+TEST_F(CodegenLabelTest, NewLabelNumbersGoUp)
+{
+    EXPECT_EQ(codegen_new_label(codegen), 1);
+    EXPECT_EQ(codegen_new_label(codegen), 2);
+    EXPECT_EQ(codegen_new_label(codegen), 3);
+}
+
+// LABEL, JUMP and JUMPIFEQS use the $num$suffix format
+TEST_F(CodegenLabelTest, LabelAndJumps)
+{
+    codegen_label(codegen, 1, "end");
+    codegen_jump(codegen, 1, "end");
+    codegen_jumpifeqs(codegen, 1, "end");
+    EXPECT_EQ(output(), "LABEL $1$end\nJUMP $1$end\nJUMPIFEQS $1$end\n");
+}
+
+// if a < 3 then ... else ... jumps to else when the condition is false
+TEST_F(CodegenLabelTest, WholeIfElse)
+{
+    symb_t a = {};
+    a.type = S_VAR;
+    a.var = make_var(FRAME_LF, "a", 1);
+    symb_t f = {};
+    f.type = S_BOOL;
+    f.bool_val = false;
+
+    int n = codegen_new_label(codegen);
+    codegen_pushs(codegen, a);
+    codegen_pushs(codegen, make_int(3));
+    codegen_stack_op(codegen, OP_LTS);
+    codegen_pushs(codegen, f);
+    codegen_jumpifeqs(codegen, n, "else");
+    codegen_write(codegen, make_string("then"));
+    codegen_jump(codegen, n, "end");
+    codegen_label(codegen, n, "else");
+    codegen_write(codegen, make_string("else"));
+    codegen_label(codegen, n, "end");
+    EXPECT_EQ(output(),
+        "PUSHS LF@a$1\nPUSHS int@3\nLTS\nPUSHS bool@false\n"
+        "JUMPIFEQS $1$else\n"
+        "WRITE string@then\nJUMP $1$end\n"
+        "LABEL $1$else\nWRITE string@else\n"
+        "LABEL $1$end\n");
+}
