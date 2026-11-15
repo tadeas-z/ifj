@@ -276,6 +276,16 @@ ast_node_t* ast_new_unit_lit(size_t line, size_t column)
     return node;
 }
 
+ast_node_t* ast_new_bool_lit(bool value, size_t line, size_t column)
+{
+    ast_node_t* node = new_node(AST_BOOL_LIT, line, column);
+    if (node == NULL)
+        return NULL;
+
+    node->bool_lit.value = value;
+    return node;
+}
+
 ast_node_t* ast_new_var_ref(const char* name, size_t line, size_t column)
 {
     if (name == NULL)
@@ -443,6 +453,9 @@ void ast_free(ast_node_t* node)
     case AST_UNIT_LIT:
         break;
 
+    case AST_BOOL_LIT:
+        break;
+
     case AST_VAR_REF:
         free(node->var_ref.name);
         break;
@@ -480,13 +493,21 @@ void ast_free(ast_node_t* node)
 //          but not too much"
 // Scope: KIND_NAMES, BINARY_OP_NAMES, print_list, print_node and ast_print
 
-// Same order as ast_node_kind_t and ast_binary_op_t
+// AI-generated using: Claude Code
+//              model: Claude Fable 5.2
+// Prompt: "update ast_print so that it works with boolthen" + "Dont make the debug
+//          print function too complicated make it print the same info as before"
+// Scope: the BOOL_LIT, && and || entries of the tables below, UNARY_OP_NAMES and the
+//        AST_BOOL_LIT and AST_UNARY cases in print_header
+
+// Same order as ast_node_kind_t, ast_unary_op_t and ast_binary_op_t
 static const char* KIND_NAMES[] = {
     "PROGRAM", "FUNC_DEF", "BLOCK",
     "VAR_DEF", "ASSIGN", "RETURN", "IF", "WHILE", "EXPR_STMT",
-    "INT_LIT", "DOUBLE_LIT", "STRING_LIT", "UNIT_LIT", "VAR_REF", "UNARY", "BINARY", "CALL", "CONVERT"
+    "INT_LIT", "DOUBLE_LIT", "STRING_LIT", "UNIT_LIT", "BOOL_LIT", "VAR_REF", "UNARY", "BINARY", "CALL", "CONVERT"
 };
-static const char* BINARY_OP_NAMES[] = { "+", "-", "*", "/", "<", "<=", ">", ">=", "==", "!=" };
+static const char* UNARY_OP_NAMES[] = { "-", "!" };
+static const char* BINARY_OP_NAMES[] = { "+", "-", "*", "/", "<", "<=", ">", ">=", "==", "!=", "&&", "||" };
 
 // AI-generated using: Claude Code
 //              model: Claude Opus 5.5
@@ -578,12 +599,15 @@ static void print_header(const ast_node_t* node, FILE* out)
     case AST_STRING_LIT:
         fprintf(out, " \"%s\"", node->string_lit.value);
         break;
+    case AST_BOOL_LIT:
+        fprintf(out, " %s", node->bool_lit.value ? "true" : "false");
+        break;
     case AST_VAR_REF:
         fprintf(out, " %s", node->var_ref.name);
         print_id(node->var_ref.id, out);
         break;
     case AST_UNARY:
-        fprintf(out, " -");
+        fprintf(out, " %s", UNARY_OP_NAMES[node->unary.op]);
         break;
     case AST_BINARY:
         fprintf(out, " %s", BINARY_OP_NAMES[node->binary.op]);
