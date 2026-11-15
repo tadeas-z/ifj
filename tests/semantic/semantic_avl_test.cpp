@@ -170,12 +170,12 @@ extern "C" void* __wrap_calloc(size_t count, size_t size)
 // }
 //
 // def is_balanced(mem: String, node: Int): Boolean = {
-//     if (node == 0) { return 0 == 0 }
+//     if (node == 0) { return true }
 //     val bf = balance_factor(mem, node)
-//     if (bf < -1) { return 0 == 1 }
-//     if (bf > 1) { return 0 == 1 }
+//     if (bf < -1) { return false }
+//     if (bf > 1) { return false }
 //     if (is_balanced(mem, get(mem, node, 1))) { return is_balanced(mem, get(mem, node, 2)) }
-//     else { return 0 == 1 }
+//     else { return false }
 // }
 //
 // @main def main(): Unit = {
@@ -207,6 +207,7 @@ enum avl_variant_t {
     P_MAX_INFERRED,
     P_ALL_EXPLICIT,
     P_BOOLEAN_FLAG,
+    P_BOOL_OPERATORS,
 
     // 3 - undefined
     U_TYPO_VARIABLE,
@@ -246,6 +247,8 @@ enum avl_variant_t {
     T_NEG_STRING,
     T_COMPARE_INT_STRING,
     T_BOOL_ARITHMETIC,
+    T_NOT_INT,
+    T_AND_INT,
 
     // 7 - assignment
     A_ASSIGN_VAL,
@@ -285,8 +288,8 @@ static ast_node_t* add_(ast_node_t* l, ast_node_t* r) { return bin(AST_OP_ADD, l
 static ast_node_t* sub_(ast_node_t* l, ast_node_t* r) { return bin(AST_OP_SUB, l, r); }
 static ast_node_t* mul_(ast_node_t* l, ast_node_t* r) { return bin(AST_OP_MUL, l, r); }
 static ast_node_t* div_(ast_node_t* l, ast_node_t* r) { return bin(AST_OP_DIV, l, r); }
-static ast_node_t* true_() { return eq_(I(0), I(0)); }
-static ast_node_t* false_() { return eq_(I(0), I(1)); }
+static ast_node_t* true_() { return B(true); }
+static ast_node_t* false_() { return B(false); }
 static ast_node_t* chr_(int64_t code) { return call("chr", { I(code) }); }
 static ast_node_t* print_(const char* text) { return expr(call("print", { S(text) })); }
 
@@ -478,7 +481,7 @@ static avl_program_t build_avl(avl_variant_t v, avl_order_t order = ORDER_SOURCE
         // var node = root; var found = 0; var searching = node != 0
         // while (searching) {
         //     val node_key = get(mem, node, 0)
-        //     if (key == node_key) { found = node; searching = 0 == 1 }
+        //     if (key == node_key) { found = node; searching = false }
         //     else { if (key < node_key) { node = get(mem, node, 1) } else { node = get(mem, node, 2) }; searching = node != 0 }
         // }
         // found
@@ -517,13 +520,33 @@ static avl_program_t build_avl(avl_variant_t v, avl_order_t order = ORDER_SOURCE
                 expr(call("in_order", { V("mem"), get_(V("mem"), V("node"), RIGHT) })) }) });
 
     // def is_balanced(mem: String, node: Int): Boolean   (BOOLTHEN: a Boolean result)
-    def("is_balanced", TYPE_BOOL, mem_node,
-        { if_(eq_(V("node"), I(0)), { ret(true_()) }),
-            val("bf", call("balance_factor", { V("mem"), V("node") })),
-            if_(lt_(V("bf"), neg(I(1))), { ret(false_()) }),
-            if_(gt_(V("bf"), I(1)), { ret(false_()) }),
-            if_else(call("is_balanced", { V("mem"), get_(V("mem"), V("node"), LEFT) }),
-                { ret(call("is_balanced", { V("mem"), get_(V("mem"), V("node"), RIGHT) })) }, { ret(false_()) }) });
+    //   P_BOOL_OPERATORS: the same check written with ! && || (AI-generated using: Claude Code,
+    //                     model: Claude Fable 5.2, prompt: "can you also add the proposed tests for boolthen")
+    //       if (node == 0) { return true }
+    //       val bf = balance_factor(mem, node)
+    //       val ok = !(bf < -1 || bf > 1)
+    //       ok && is_balanced(mem, get(mem, node, 1)) && is_balanced(mem, get(mem, node, 2))
+    //   T_NOT_INT: val ok = !bf
+    //   T_AND_INT: bf && is_balanced(...) && is_balanced(...)
+    if (v == P_BOOL_OPERATORS || v == T_NOT_INT || v == T_AND_INT) {
+        def("is_balanced", TYPE_BOOL, mem_node,
+            { if_(eq_(V("node"), I(0)), { ret(true_()) }),
+                val("bf", call("balance_factor", { V("mem"), V("node") })),
+                val("ok",
+                    not_(v == T_NOT_INT ? V("bf") : bin(AST_OP_OR, lt_(V("bf"), neg(I(1))), gt_(V("bf"), I(1))))),
+                expr(bin(AST_OP_AND,
+                    bin(AST_OP_AND, V(v == T_AND_INT ? "bf" : "ok"),
+                        call("is_balanced", { V("mem"), get_(V("mem"), V("node"), LEFT) })),
+                    call("is_balanced", { V("mem"), get_(V("mem"), V("node"), RIGHT) }))) });
+    } else {
+        def("is_balanced", TYPE_BOOL, mem_node,
+            { if_(eq_(V("node"), I(0)), { ret(true_()) }),
+                val("bf", call("balance_factor", { V("mem"), V("node") })),
+                if_(lt_(V("bf"), neg(I(1))), { ret(false_()) }),
+                if_(gt_(V("bf"), I(1)), { ret(false_()) }),
+                if_else(call("is_balanced", { V("mem"), get_(V("mem"), V("node"), LEFT) }),
+                    { ret(call("is_balanced", { V("mem"), get_(V("mem"), V("node"), RIGHT) })) }, { ret(false_()) }) });
+    }
 
     // @main def main(): Unit
     //   U_NO_MAIN:            def main(): Unit = ...        (no @main annotation)
@@ -728,7 +751,9 @@ INSTANTIATE_TEST_SUITE_P(Variants, SemanticAvlValidVariantTest,
                            // every inferred function gets its type written
                            avl_valid_case_t { P_ALL_EXPLICIT, "AllTypesWritten" },
                            // bst_find loops on a Boolean variable (BOOLTHEN) instead of returning from the loop
-                           avl_valid_case_t { P_BOOLEAN_FLAG, "FindWithBooleanFlag" }),
+                           avl_valid_case_t { P_BOOLEAN_FLAG, "FindWithBooleanFlag" },
+                           // is_balanced written with !, && and || instead of ifs (BOOLTHEN)
+                           avl_valid_case_t { P_BOOL_OPERATORS, "IsBalancedWithBooleanOperators" }),
         ::testing::Values(ORDER_SOURCE, ORDER_MAIN_FIRST, ORDER_REVERSED)),
     [](const ::testing::TestParamInfo<std::tuple<avl_valid_case_t, avl_order_t>>& info) {
         return std::string(std::get<0>(info.param).name) + "_" + order_name(std::get<1>(info.param));
@@ -842,6 +867,10 @@ static const avl_fail_case_t FAILING[] = {
     { T_COMPARE_INT_STRING, "IntComparedWithString", ERR_SEM_TYPE },
     // main: val ok = is_balanced(mem, root) + 1
     { T_BOOL_ARITHMETIC, "BooleanInArithmetic", ERR_SEM_TYPE },
+    // is_balanced (operator version): val ok = !bf - ! on an Int
+    { T_NOT_INT, "NotOfInt", ERR_SEM_TYPE },
+    // is_balanced (operator version): bf && is_balanced(...) - Int operand of &&
+    { T_AND_INT, "AndWithIntOperand", ERR_SEM_TYPE },
 
     // ---- 7: assignment ----
     // bst_find: node_key = get(mem, node, 1) - node_key is a val

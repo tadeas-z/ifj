@@ -170,13 +170,13 @@ typedef struct
 
 typedef struct
 {
-    ast_unary_op_t op; // (P) only negation (without extensions)
+    ast_unary_op_t op; // (P) NEG or NOT
     ast_node_t* operand; // (P)
 } ast_unary_t;
 
 typedef struct
 {
-    ast_binary_op_t op; // (P) + - * / < <= > >= == !=
+    ast_binary_op_t op; // (P) + - * / < <= > >= == != && ||
     ast_node_t* left; // (P)
     ast_node_t* right; // (P)
 } ast_binary_t;
@@ -415,7 +415,7 @@ ast_node_t* ast_new_var_ref(const char* name, size_t line, size_t column);
 
 /**
  * @brief Constructs a unary operation node (-x)
- * @param op the operator - only AST_OP_NEG without extensions
+ * @param op the operator - AST_OP_NEG or AST_OP_NOT
  * @param operand the expression the operator is applied to - REQUIRED
  * @param line line of the operator
  * @param column column of the operator

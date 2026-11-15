@@ -40,6 +40,10 @@ inline ast_node_t* U() { return ast_new_unit_lit(1, 1); }
 inline ast_node_t* V(const char* name) { return ast_new_var_ref(name, 1, 1); }
 inline ast_node_t* neg(ast_node_t* operand) { return ast_new_unary(AST_OP_NEG, operand, 1, 1); }
 
+// BOOLTHEN: true / false, !<operand>
+inline ast_node_t* B(bool value) { return ast_new_bool_lit(value, 1, 1); }
+inline ast_node_t* not_(ast_node_t* operand) { return ast_new_unary(AST_OP_NOT, operand, 1, 1); }
+
 inline ast_node_t* bin(ast_binary_op_t op, ast_node_t* left, ast_node_t* right)
 {
     return ast_new_binary(op, left, right, 1, 1);
