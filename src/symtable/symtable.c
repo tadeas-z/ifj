@@ -2,9 +2,12 @@
 // symtable.c
 // Author(s): Adam Zatloukal (xzatloa01)
 
-#include "symtable.h"
+
 #include <stdlib.h>
 #include <string.h>
+#include "symtable.h"
+#include "types.h"
+#include "utils.h"
 
 typedef struct bst_node {
     char* key; // identifier name
@@ -38,16 +41,18 @@ struct symtable {
         .type = (t),              \
         .is_const = (c) })
 
-#define SYMBOL_INIT_FUNC(st)   \
-    ((symbol_t) {              \
-        .id = (st)->next_id++, \
-        .kind = (SYM_FUNC),    \
-        .type = NULL,          \
-        .is_const = true,      \
-        .ret_inferred = false, \
-        .param_count = 0,      \
-        .param_types = NULL,   \
-        .param_names = NULL })
+#define SYMBOL_INIT_FUNC(st)        \
+    ((symbol_t) {                   \
+        .id = (st)->next_id++,      \
+        .kind = (SYM_FUNC),         \
+        .type = NULL,               \
+        .is_const = true,           \
+        .ret_inferred = false,      \
+        .param_count = 0,           \
+        .param_types = NULL,        \
+        .param_names = NULL,        \
+        .sema_marker = SEMA_UNCHECKED,   \
+        .decl = NULL })
 
 #define CHECK_MEM_ERR(ptr)   \
     do {                     \
@@ -76,52 +81,6 @@ static int max(int n1, int n2);
 static bst_node_t* allocate_node(const char* key, symbol_t symbol);
 
 static void in_order(bst_node_t* node, symtable_visit_fn fn, void* ctx);
-
-static type_t INT_INST = { .kind = T_INT };
-static type_t DOUBLE_INST = { .kind = T_DOUBLE };
-static type_t STRING_INST = { .kind = T_STRING };
-static type_t UNIT_INST = { .kind = T_UNIT };
-static type_t BOOL_INST = { .kind = T_BOOL };
-static type_t ANY_INST = { .kind = T_ANY };
-
-/* CAN be accessed outside of this file */
-type_t* const TYPE_INT = &INT_INST;
-type_t* const TYPE_DOUBLE = &DOUBLE_INST;
-type_t* const TYPE_STRING = &STRING_INST;
-type_t* const TYPE_UNIT = &UNIT_INST;
-type_t* const TYPE_BOOL = &BOOL_INST;
-type_t* const TYPE_ANY = &ANY_INST;
-
-// ========================================
-//  Type checks
-// ========================================
-
-bool type_equal(const type_t* a, const type_t* b)
-{
-    if (a == NULL || b == NULL)
-        return false;
-
-    return a->kind == b->kind; // Might need to be expanded as type_t struct grows with extensions
-}
-
-// AI-generated using: Claude Code
-//              model: Claude Opus 5.5
-// Prompt: "Implement the type_compatible function. return true only when:
-//          type is T_ANY OR both types match OR we are assigning T_INT to
-//          T_DOUBLE. Also count in any other edge cases"
-
-bool type_compatible(const type_t* target, const type_t* source)
-{
-    if (target == NULL || source == NULL)
-        return false;
-    if (target->kind == T_ANY)
-        return true;
-    if (type_equal(target, source))
-        return true;
-    if (target->kind == T_DOUBLE && source->kind == T_INT)
-        return true;
-    return false;
-}
 
 // ========================================
 //  Binary search tree (AVL)
@@ -191,14 +150,13 @@ static bst_node_t* bst_insert(bst_node_t* node, const char* key, symbol_t symbol
 static bst_node_t* allocate_node(const char* key, symbol_t symbol)
 {
     bst_node_t* node = calloc(1, sizeof(bst_node_t));
-    char* key_copy = malloc((strlen(key) + 1) * sizeof(char));
+    char* key_copy = copy_string(key);
 
     if (node == NULL || key_copy == NULL) {
         free(node);
         free(key_copy);
         return NULL;
     }
-    strcpy(key_copy, key);
 
     // Insert symbol data into newly allocated node
     node->key = key_copy;
@@ -544,10 +502,8 @@ st_result_t symtable_func_add_param(symbol_t* func, const char* name, type_t* ty
     func->param_names = new_param_names;
 
     // Copy and set the name
-    char* name_copy = malloc(strlen(name) + 1);
+    char* name_copy = copy_string(name);
     CHECK_MEM_ERR(name_copy);
-
-    strcpy(name_copy, name);
 
     func->param_types[func->param_count] = type;
     func->param_names[func->param_count] = name_copy;
