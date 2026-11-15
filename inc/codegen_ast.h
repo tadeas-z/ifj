@@ -48,4 +48,23 @@ void codegen_expr(codegen_t* codegen, ast_node_t* expr);
  */
 void codegen_stmt(codegen_t* codegen, ast_node_t* stmt);
 
+// AI-generated using: Claude Code
+//              model: Claude Opus 5.5
+// Prompt: "Write the Doxygen description of the function codegen_func
+//          in this header."
+// Scope: doc comment of codegen_func only
+
+/**
+ * @brief Writes the code of a function definition.
+ *
+ * Params are taken from the data stack (last arg is on top), all locals
+ * are defined at the start, then the body is written. The result is left
+ * on the data stack, a Unit function always returns ().
+ *
+ * @param codegen Generator created by codegen_init.
+ * @param func AST_FUNC_DEF node with return_type and locals filled in
+ *             by semantics.
+ */
+void codegen_func(codegen_t* codegen, ast_node_t* func);
+
 #endif

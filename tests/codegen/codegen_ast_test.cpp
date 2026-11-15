@@ -12,6 +12,7 @@
 // Prompt: "Create tests using google-tests for codegen_stmt"
 // Prompt: "Create tests using google-tests for function calls"
 // Prompt: "Create tests using google-tests for return and expression statement"
+// Prompt: "Create tests using google-tests for codegen_func"
 // Scope: whole file
 
 extern "C" {
@@ -355,4 +356,63 @@ TEST_F(CodegenReturnTest, ExprStmt)
     EXPECT_EQ(output(),
         "PUSHS int@7\nPOPS GF@tmp$1\nWRITE GF@tmp$1\nPUSHS nil@nil\n"
         "POPS GF@tmp$1\n");
+}
+
+// Same setup for the function tests
+class CodegenFuncTest : public CodegenExprTest {
+};
+
+static ast_node_t* func(const char* name, bool is_main, type_t* type, ast_node_t* body)
+{
+    ast_node_t* node = ast_new_func_def(name, is_main, 1, 1);
+    node->func_def.return_type = type;
+    node->func_def.body = body;
+    return node;
+}
+
+// params are popped from the stack in reverse, result is the last expression
+TEST_F(CodegenFuncTest, ParamsAndLastExpr)
+{
+    tree = func("add", false, TYPE_INT,
+        block(ast_new_expr_stmt(binary(AST_OP_ADD, var_ref("a", 1, TYPE_INT), var_ref("b", 2, TYPE_INT), TYPE_INT), 1, 1)));
+    ast_func_def_add_param(tree, "a", TYPE_INT);
+    ast_func_def_add_param(tree, "b", TYPE_INT);
+    ((ast_param_t*)dyn_arr_get(&tree->func_def.params, 0))->id = 1;
+    ((ast_param_t*)dyn_arr_get(&tree->func_def.params, 1))->id = 2;
+
+    codegen_func(codegen, tree);
+    EXPECT_EQ(output(),
+        "LABEL add\nPUSHFRAME\n"
+        "DEFVAR LF@b$2\nPOPS LF@b$2\n"
+        "DEFVAR LF@a$1\nPOPS LF@a$1\n"
+        "PUSHS LF@a$1\nPUSHS LF@b$2\nADDS\n"
+        "POPFRAME\nRETURN\n");
+}
+
+// locals are defined at the start, Unit function returns ()
+TEST_F(CodegenFuncTest, LocalsAndUnit)
+{
+    ast_node_t* def = ast_new_var_def("x", false, nullptr, int_lit(1), 1, 1);
+    def->var_def.id = 1;
+    tree = func("main", true, TYPE_UNIT, block(def));
+    dyn_arr_append(&tree->func_def.locals, def);
+
+    codegen_func(codegen, tree);
+    EXPECT_EQ(output(),
+        "LABEL $main\nLABEL main\nPUSHFRAME\n"
+        "DEFVAR LF@x$1\n"
+        "PUSHS int@1\nPOPS LF@x$1\n"
+        "PUSHS nil@nil\nPOPFRAME\nRETURN\n");
+}
+
+// return in a Unit function computes the value but returns ()
+TEST_F(CodegenFuncTest, ReturnInUnitFunc)
+{
+    tree = func("f", false, TYPE_UNIT, block(ast_new_return(int_lit(5), 1, 1)));
+
+    codegen_func(codegen, tree);
+    EXPECT_EQ(output(),
+        "LABEL f\nPUSHFRAME\n"
+        "PUSHS int@5\nPOPS GF@tmp$1\nPUSHS nil@nil\nPOPFRAME\nRETURN\n"
+        "PUSHS nil@nil\nPOPFRAME\nRETURN\n");
 }

@@ -5,6 +5,9 @@
 #include "codegen_ast.h"
 #include <string.h>
 
+// true when the current function returns Unit
+static bool unit_func = false;
+
 // minus, multiply by -1
 static void generate_neg(codegen_t* codegen, ast_node_t* expr)
 {
@@ -284,13 +287,20 @@ static void generate_expr_stmt(codegen_t* codegen, ast_node_t* stmt)
 // value on the stack, then leave the function
 static void generate_return(codegen_t* codegen, ast_node_t* stmt)
 {
+    var_t tmp = { FRAME_GF, "tmp", 1 };
     symb_t unit = { 0 };
     unit.type = S_NIL;
 
-    if (stmt->return_stmt.value == NULL)
+    if (stmt->return_stmt.value == NULL) {
         codegen_pushs(codegen, unit);
-    else
+    } else if (unit_func) {
+        // value is computed, but Unit function returns ()
         codegen_expr(codegen, stmt->return_stmt.value);
+        codegen_pops(codegen, tmp);
+        codegen_pushs(codegen, unit);
+    } else {
+        codegen_expr(codegen, stmt->return_stmt.value);
+    }
     codegen_func_end(codegen);
 }
 
@@ -322,4 +332,58 @@ void codegen_stmt(codegen_t* codegen, ast_node_t* stmt)
     default:
         break;
     }
+}
+
+// params from the stack, last arg is on top
+static void generate_params(codegen_t* codegen, ast_func_def_t* def)
+{
+    for (int i = (int)def->params.count - 1; i >= 0; i--) {
+        ast_param_t* param = dyn_arr_get(&def->params, i);
+        var_t var = { FRAME_LF, param->name, param->id };
+        codegen_defvar(codegen, var);
+        codegen_pops(codegen, var);
+    }
+}
+
+// all locals at the start, so while does not define them again
+static void generate_locals(codegen_t* codegen, ast_func_def_t* def)
+{
+    for (size_t i = 0; i < def->locals.count; i++) {
+        ast_node_t* local = dyn_arr_get(&def->locals, i);
+        var_t var = { FRAME_LF, local->var_def.name, local->var_def.id };
+        codegen_defvar(codegen, var);
+    }
+}
+
+// body, the last expression is the result
+static void generate_body(codegen_t* codegen, ast_node_t* body)
+{
+    dyn_arr_t* stmts = &body->block.statements;
+    symb_t unit = { 0 };
+    unit.type = S_NIL;
+
+    for (size_t i = 0; i < stmts->count; i++) {
+        ast_node_t* stmt = dyn_arr_get(stmts, i);
+        // last expression stays on the stack
+        if (i == stmts->count - 1 && !unit_func && stmt->kind == AST_EXPR_STMT) {
+            codegen_expr(codegen, stmt->expr_stmt.expr);
+            return;
+        }
+        codegen_stmt(codegen, stmt);
+    }
+    // no result, return ()
+    codegen_pushs(codegen, unit);
+}
+
+// generate a function
+void codegen_func(codegen_t* codegen, ast_node_t* func)
+{
+    ast_func_def_t* def = &func->func_def;
+
+    unit_func = def->return_type->kind == T_UNIT;
+    codegen_func_begin(codegen, def->name, def->is_main);
+    generate_params(codegen, def);
+    generate_locals(codegen, def);
+    generate_body(codegen, def->body);
+    codegen_func_end(codegen);
 }
