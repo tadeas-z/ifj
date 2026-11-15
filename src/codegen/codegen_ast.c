@@ -3,6 +3,7 @@
 // Author(s): Marek Zachensky (xzachem00)
 
 #include "codegen_ast.h"
+#include <string.h>
 
 // minus, multiply by -1
 static void generate_neg(codegen_t* codegen, ast_node_t* expr)
@@ -99,6 +100,76 @@ static void generate_convert(codegen_t* codegen, ast_node_t* expr)
     codegen_stack_op(codegen, OP_INT2FLOATS);
 }
 
+// print, Unit is printed as ()
+static void generate_print(codegen_t* codegen, ast_node_t* arg)
+{
+    var_t tmp = { FRAME_GF, "tmp", 1 };
+    symb_t tmp_val = { 0 };
+    tmp_val.type = S_VAR;
+    tmp_val.var = tmp;
+    symb_t unit_str = { 0 };
+    unit_str.type = S_STRING;
+    unit_str.string_val = "()";
+    symb_t unit = { 0 };
+    unit.type = S_NIL;
+
+    codegen_expr(codegen, arg);
+    codegen_pops(codegen, tmp);
+    if (arg->type->kind == T_UNIT)
+        codegen_write(codegen, unit_str);
+    else
+        codegen_write(codegen, tmp_val);
+    // print returns Unit
+    codegen_pushs(codegen, unit);
+}
+
+// name of the built in parameter in TF
+static const char* builtin_param(const char* name, int i)
+{
+    if (strcmp(name, "subStr") == 0) {
+        if (i == 0)
+            return "value";
+        else if (i == 1)
+            return "start";
+        else
+            return "end";
+    } else if (strcmp(name, "ord") == 0) {
+        if (i == 0)
+            return "value";
+        else
+            return "index";
+    } else if (strcmp(name, "chr") == 0) {
+        return "code";
+    } else {
+        return "value";
+    }
+}
+
+// args on the stack, then CALL
+static void generate_call(codegen_t* codegen, ast_node_t* expr)
+{
+    if (strcmp(expr->call.name, "print") == 0) {
+        generate_print(codegen, dyn_arr_get(&expr->call.args, 0));
+        return;
+    }
+
+    for (size_t i = 0; i < expr->call.args.count; i++)
+        codegen_expr(codegen, dyn_arr_get(&expr->call.args, i));
+
+    codegen_createframe(codegen);
+
+    // built in takes args from TF, last arg is on top
+    if (expr->call.is_builtin) {
+        for (int i = (int)expr->call.args.count - 1; i >= 0; i--) {
+            var_t param = { FRAME_TF, builtin_param(expr->call.name, i), 0 };
+            codegen_defvar(codegen, param);
+            codegen_pops(codegen, param);
+        }
+    }
+
+    codegen_call(codegen, expr->call.name);
+}
+
 // push expression on the stack
 void codegen_expr(codegen_t* codegen, ast_node_t* expr)
 {
@@ -140,8 +211,10 @@ void codegen_expr(codegen_t* codegen, ast_node_t* expr)
     case AST_CONVERT:
         generate_convert(codegen, expr);
         break;
+    case AST_CALL:
+        generate_call(codegen, expr);
+        break;
     default:
-        // TODO add calls
         break;
     }
 }

@@ -10,6 +10,7 @@
 //          literals, variables, operator order, Int and Double division,
 //          <= >= !=, string concatenation, unary minus and conversion"
 // Prompt: "Create tests using google-tests for codegen_stmt"
+// Prompt: "Create tests using google-tests for function calls"
 // Scope: whole file
 
 extern "C" {
@@ -246,4 +247,76 @@ TEST_F(CodegenStmtTest, While)
         "PUSHS LF@i$1\nPUSHS int@1\nADDS\nPOPS LF@i$1\n"
         "JUMP $1$while\n"
         "LABEL $1$end\n");
+}
+
+// Same setup for the call tests
+class CodegenCallTest : public CodegenExprTest {
+};
+
+static ast_node_t* call(const char* name, bool is_builtin, type_t* type)
+{
+    ast_node_t* node = ast_new_call(name, 1, 1);
+    node->call.is_builtin = is_builtin;
+    node->type = type;
+    return node;
+}
+
+// print writes the value and leaves Unit on the stack
+TEST_F(CodegenCallTest, PrintValue)
+{
+    tree = call("print", true, TYPE_UNIT);
+    dyn_arr_append(&tree->call.args, int_lit(5));
+
+    codegen_expr(codegen, tree);
+    EXPECT_EQ(output(), "PUSHS int@5\nPOPS GF@tmp$1\nWRITE GF@tmp$1\nPUSHS nil@nil\n");
+}
+
+// print of Unit writes ()
+TEST_F(CodegenCallTest, PrintUnit)
+{
+    ast_node_t* u = ast_new_unit_lit(1, 1);
+    u->type = TYPE_UNIT;
+    tree = call("print", true, TYPE_UNIT);
+    dyn_arr_append(&tree->call.args, u);
+
+    codegen_expr(codegen, tree);
+    EXPECT_EQ(output(), "PUSHS nil@nil\nPOPS GF@tmp$1\nWRITE string@()\nPUSHS nil@nil\n");
+}
+
+// built in gets its args in TF with the names from the spec
+TEST_F(CodegenCallTest, BuiltinArgsInTF)
+{
+    tree = call("subStr", true, TYPE_STRING);
+    dyn_arr_append(&tree->call.args, var_ref("s", 1, TYPE_STRING));
+    dyn_arr_append(&tree->call.args, int_lit(1));
+    dyn_arr_append(&tree->call.args, int_lit(3));
+
+    codegen_expr(codegen, tree);
+    EXPECT_EQ(output(),
+        "PUSHS LF@s$1\nPUSHS int@1\nPUSHS int@3\n"
+        "CREATEFRAME\n"
+        "DEFVAR TF@end$0\nPOPS TF@end$0\n"
+        "DEFVAR TF@start$0\nPOPS TF@start$0\n"
+        "DEFVAR TF@value$0\nPOPS TF@value$0\n"
+        "CALL subStr\n");
+}
+
+// built in without args is only CREATEFRAME and CALL
+TEST_F(CodegenCallTest, BuiltinWithoutArgs)
+{
+    tree = call("readInt", true, TYPE_INT);
+
+    codegen_expr(codegen, tree);
+    EXPECT_EQ(output(), "CREATEFRAME\nCALL readInt\n");
+}
+
+// user function gets its args on the stack
+TEST_F(CodegenCallTest, UserFunctionArgsOnStack)
+{
+    tree = call("foo", false, TYPE_INT);
+    dyn_arr_append(&tree->call.args, int_lit(1));
+    dyn_arr_append(&tree->call.args, var_ref("x", 2, TYPE_INT));
+
+    codegen_expr(codegen, tree);
+    EXPECT_EQ(output(), "PUSHS int@1\nPUSHS LF@x$2\nCREATEFRAME\nCALL foo\n");
 }
