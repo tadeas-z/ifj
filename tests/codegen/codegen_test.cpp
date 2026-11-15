@@ -305,3 +305,53 @@ TEST_F(CodegenLabelTest, WholeIfElse)
         "LABEL $1$else\nWRITE string@else\n"
         "LABEL $1$end\n");
 }
+
+// AI-generated using: Claude Code
+//              model: Claude Opus 5.5
+// Prompt: "Add tests for the string, conversion and read functions: every
+//          unary_op_t and binary_op_t gives the right instruction with its
+//          operands and READ writes the type"
+// Scope: CodegenStringTest and all tests below
+
+// Same fixture, separate suite name for the string tests
+class CodegenStringTest : public CodegenTest { };
+
+// Every unary op is written with its name, var and symb
+TEST_F(CodegenStringTest, AllUnaryOps)
+{
+    var_t r = make_var(FRAME_LF, "r", 1);
+
+    codegen_unary_op(codegen, OP_INT2CHAR, r, make_int(65));
+    codegen_unary_op(codegen, OP_FLOAT2INT, r, make_int(1));
+    codegen_unary_op(codegen, OP_INT2STR, r, make_int(2));
+    codegen_unary_op(codegen, OP_FLOAT2STR, r, make_int(3));
+    codegen_unary_op(codegen, OP_STRLEN, r, make_string("abc"));
+    EXPECT_EQ(output(),
+        "INT2CHAR LF@r$1 int@65\n"
+        "FLOAT2INT LF@r$1 int@1\n"
+        "INT2STR LF@r$1 int@2\n"
+        "FLOAT2STR LF@r$1 int@3\n"
+        "STRLEN LF@r$1 string@abc\n");
+}
+
+// Every binary op is written with its name, var and both symbs
+TEST_F(CodegenStringTest, AllBinaryOps)
+{
+    var_t r = make_var(FRAME_LF, "r", 1);
+
+    codegen_binary_op(codegen, OP_CONCAT, r, make_string("a"), make_string("b"));
+    codegen_binary_op(codegen, OP_GETCHAR, r, make_string("abc"), make_int(1));
+    codegen_binary_op(codegen, OP_STRI2INT, r, make_string("abc"), make_int(0));
+    EXPECT_EQ(output(),
+        "CONCAT LF@r$1 string@a string@b\n"
+        "GETCHAR LF@r$1 string@abc int@1\n"
+        "STRI2INT LF@r$1 string@abc int@0\n");
+}
+
+// READ writes the variable and the type
+TEST_F(CodegenStringTest, ReadWritesType)
+{
+    codegen_read(codegen, make_var(FRAME_LF, "x", 1), "int");
+    codegen_read(codegen, make_var(FRAME_LF, "s", 2), "string");
+    EXPECT_EQ(output(), "READ LF@x$1 int\nREAD LF@s$2 string\n");
+}

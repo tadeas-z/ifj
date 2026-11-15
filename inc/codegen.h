@@ -56,6 +56,22 @@ typedef enum {
     OP_INT2FLOATS
 } stack_op_t;
 
+// OP var symb
+typedef enum {
+    OP_INT2CHAR,
+    OP_FLOAT2INT,
+    OP_INT2STR,
+    OP_FLOAT2STR,
+    OP_STRLEN
+} unary_op_t;
+
+// OP var symb symb
+typedef enum {
+    OP_CONCAT,
+    OP_GETCHAR,
+    OP_STRI2INT
+} binary_op_t;
+
 // AI-generated using: Claude Code
 //              model: Claude Opus 5.5
 // Prompt: "Edit and complete the Doxygen descriptions of the public
@@ -239,5 +255,44 @@ void codegen_jump(codegen_t* codegen, int num, const char* suffix);
  * @param suffix Part of the if or while (else, end, ...).
  */
 void codegen_jumpifeqs(codegen_t* codegen, int num, const char* suffix);
+
+// AI-generated using: Claude Code
+//              model: Claude Opus 5.5
+// Prompt: "Write the Doxygen descriptions of the new string, conversion
+//          and read codegen functions in this header."
+// Scope: doc comments of codegen_unary_op, codegen_binary_op
+//        and codegen_read only
+
+/**
+ * @brief Writes an instruction with a variable and one symbol
+ *        (INT2CHAR, FLOAT2INT, INT2STR, FLOAT2STR, STRLEN).
+ * @param codegen Generator created by codegen_init.
+ * @param op Instruction to write.
+ * @param var Variable for the result.
+ * @param symb Operand.
+ */
+void codegen_unary_op(codegen_t* codegen, unary_op_t op, var_t var, symb_t symb);
+
+/**
+ * @brief Writes an instruction with a variable and two symbols
+ *        (CONCAT, GETCHAR, STRI2INT).
+ * @param codegen Generator created by codegen_init.
+ * @param op Instruction to write.
+ * @param var Variable for the result.
+ * @param symb1 First operand.
+ * @param symb2 Second operand.
+ */
+void codegen_binary_op(codegen_t* codegen, binary_op_t op, var_t var, symb_t symb1, symb_t symb2);
+
+/**
+ * @brief Writes READ, reads one line from standard input into var.
+ *
+ * On wrong input or EOF the interpreter stores nil into var.
+ *
+ * @param codegen Generator created by codegen_init.
+ * @param var Variable for the read value.
+ * @param type Type to read: "int", "float" or "string".
+ */
+void codegen_read(codegen_t* codegen, var_t var, const char* type);
 
 #endif
