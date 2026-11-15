@@ -5,12 +5,18 @@
 #ifndef IFJ_PARSER_H
 #define IFJ_PARSER_H
 
-#include "error.h"      //compiler exit
+#include "comp_error.h"      //compiler exit
 #include "parser_expression.h"
-#include "symtable.h"
 #include "types.h"
 
+// AI-generated using: Gemini
+//               model: Gemini 4 hydrogen
+// Prompt (summary): "Generate comment of parse_main() function for 
+//                    syntactic analysis of an IFJ26 source program."
+// Scope: parser_main
+
 /**
+
  * @brief Main entry point for syntactic analysis of an IFJ26 source program.
  *
  * Validates the mandatory program prolog (`import ifj26.*`), parses all top-level
