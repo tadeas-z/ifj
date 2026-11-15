@@ -2,22 +2,33 @@
 // parser_expression.h
 // Author(s): Dusan Popovic (xpopovd00)
 
-#ifndef PARSER_H
-#define PARSER_H
+#ifndef IFJ_PARSER_EXPRESSION_H
+#define IFJ_PARSER_EXPRESSION_H
 
 #include <stdbool.h>
 #include "lexer.h"
 #include "astree.h"
 #include "parser_stack.h"
 
+// AI-generated using: Gemini
+//               model: Gemini 4 hydrogen
+// Prompt (summary): "Generate comments of parse_expression() function for 
+//                    shift-reduce precedence algorithm."
+// Scope: parser_expression, get_precedence_index, reduce_rules, get_next_token
+
 /**
  * @brief Parses an expression using the shift-reduce precedence algorithm.
- * 
+ *
+ * Enters with `current_token` positioned on the first token of the expression,
+ * and exits with `current_token` positioned on the first token following the expression.
+ *
  * @param lexer Pointer to the lexer instance used for retrieving tokens.
+ * @param current_token Pointer to the shared current token between parser and expression parser.
  * @param out_node Pointer to an AST node pointer where the root of the generated tree will be stored.
- * @return int 0 on success, syntax error code (e.g., 2) on failure.
+ * @return ERR_OK (0) on success, or an error code (ERR_LEXICAL, ERR_SYNTAX, ERR_INTERNAL).
  */
-int parse_expression(lexer_t *lexer, ast_node_t **out_node);
+
+int parser_expression(lexer_t *lexer, token_t *current_token, ast_node_t **out_node);
 
 /* --- Helper Functions --- */
 
