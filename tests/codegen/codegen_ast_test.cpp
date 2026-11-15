@@ -11,6 +11,7 @@
 //          <= >= !=, string concatenation, unary minus and conversion"
 // Prompt: "Create tests using google-tests for codegen_stmt"
 // Prompt: "Create tests using google-tests for function calls"
+// Prompt: "Create tests using google-tests for return and expression statement"
 // Scope: whole file
 
 extern "C" {
@@ -319,4 +320,39 @@ TEST_F(CodegenCallTest, UserFunctionArgsOnStack)
 
     codegen_expr(codegen, tree);
     EXPECT_EQ(output(), "PUSHS int@1\nPUSHS LF@x$2\nCREATEFRAME\nCALL foo\n");
+}
+
+// Same setup for the return tests
+class CodegenReturnTest : public CodegenExprTest {
+};
+
+// return pushes the value and leaves the function
+TEST_F(CodegenReturnTest, ReturnValue)
+{
+    tree = ast_new_return(var_ref("x", 1, TYPE_INT), 1, 1);
+
+    codegen_stmt(codegen, tree);
+    EXPECT_EQ(output(), "PUSHS LF@x$1\nPOPFRAME\nRETURN\n");
+}
+
+// bare return gives Unit
+TEST_F(CodegenReturnTest, ReturnUnit)
+{
+    tree = ast_new_return(nullptr, 1, 1);
+
+    codegen_stmt(codegen, tree);
+    EXPECT_EQ(output(), "PUSHS nil@nil\nPOPFRAME\nRETURN\n");
+}
+
+// value of the expression statement is thrown away
+TEST_F(CodegenReturnTest, ExprStmt)
+{
+    ast_node_t* c = call("print", true, TYPE_UNIT);
+    dyn_arr_append(&c->call.args, int_lit(7));
+    tree = ast_new_expr_stmt(c, 1, 1);
+
+    codegen_stmt(codegen, tree);
+    EXPECT_EQ(output(),
+        "PUSHS int@7\nPOPS GF@tmp$1\nWRITE GF@tmp$1\nPUSHS nil@nil\n"
+        "POPS GF@tmp$1\n");
 }

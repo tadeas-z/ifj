@@ -272,6 +272,28 @@ static void generate_block(codegen_t* codegen, ast_node_t* stmt)
         codegen_stmt(codegen, dyn_arr_get(&stmt->block.statements, i));
 }
 
+// value is not used, throw it away
+static void generate_expr_stmt(codegen_t* codegen, ast_node_t* stmt)
+{
+    var_t tmp = { FRAME_GF, "tmp", 1 };
+
+    codegen_expr(codegen, stmt->expr_stmt.expr);
+    codegen_pops(codegen, tmp);
+}
+
+// value on the stack, then leave the function
+static void generate_return(codegen_t* codegen, ast_node_t* stmt)
+{
+    symb_t unit = { 0 };
+    unit.type = S_NIL;
+
+    if (stmt->return_stmt.value == NULL)
+        codegen_pushs(codegen, unit);
+    else
+        codegen_expr(codegen, stmt->return_stmt.value);
+    codegen_func_end(codegen);
+}
+
 // generate a statement
 void codegen_stmt(codegen_t* codegen, ast_node_t* stmt)
 {
@@ -291,8 +313,13 @@ void codegen_stmt(codegen_t* codegen, ast_node_t* stmt)
     case AST_WHILE:
         generate_while(codegen, stmt);
         break;
+    case AST_RETURN:
+        generate_return(codegen, stmt);
+        break;
+    case AST_EXPR_STMT:
+        generate_expr_stmt(codegen, stmt);
+        break;
     default:
-        // TODO add return and calls
         break;
     }
 }
