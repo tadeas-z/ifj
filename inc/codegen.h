@@ -42,6 +42,20 @@ typedef struct {
     const char* string_val;
 } symb_t;
 
+// stack instructions for expressions
+typedef enum {
+    OP_ADDS,
+    OP_SUBS,
+    OP_MULS,
+    OP_DIVS,
+    OP_IDIVS,
+    OP_LTS,
+    OP_GTS,
+    OP_EQS,
+    OP_NOTS,
+    OP_INT2FLOATS
+} stack_op_t;
+
 // AI-generated using: Claude Code
 //              model: Claude Opus 5.5
 // Prompt: "Edit and complete the Doxygen descriptions of the public
@@ -146,5 +160,37 @@ void codegen_createframe(codegen_t* codegen);
  * @param name Function name from the IFJ26 source.
  */
 void codegen_call(codegen_t* codegen, const char* name);
+
+// AI-generated using: Claude Code
+//              model: Claude Opus 5.5
+// Prompt: "Write the Doxygen descriptions of the new stack codegen
+//          functions in this header."
+// Scope: doc comments of codegen_pushs, codegen_pops and
+//        codegen_stack_op only
+
+/**
+ * @brief Writes PUSHS, puts symb on the data stack.
+ * @param codegen Generator created by codegen_init.
+ * @param symb Variable or constant to push.
+ */
+void codegen_pushs(codegen_t* codegen, symb_t symb);
+
+/**
+ * @brief Writes POPS, moves the top of the data stack into var.
+ * @param codegen Generator created by codegen_init.
+ * @param var Target variable.
+ */
+void codegen_pops(codegen_t* codegen, var_t var);
+
+/**
+ * @brief Writes one stack instruction (ADDS, LTS, NOTS, ...).
+ *
+ * The operands are taken from the data stack and the result is pushed
+ * back, so the operands must be pushed before with codegen_pushs.
+ *
+ * @param codegen Generator created by codegen_init.
+ * @param op Instruction to write.
+ */
+void codegen_stack_op(codegen_t* codegen, stack_op_t op);
 
 #endif

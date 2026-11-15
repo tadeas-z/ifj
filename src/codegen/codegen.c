@@ -9,6 +9,20 @@ struct codegen {
     FILE* out;
 };
 
+// same order as stack_op_t in header
+static const char* op_names[] = {
+    "ADDS",
+    "SUBS",
+    "MULS",
+    "DIVS",
+    "IDIVS",
+    "LTS",
+    "GTS",
+    "EQS",
+    "NOTS",
+    "INT2FLOATS"
+};
+
 // string@
 static void print_string(codegen_t* codegen, const char* s)
 {
@@ -163,4 +177,23 @@ void codegen_createframe(codegen_t* codegen)
 void codegen_call(codegen_t* codegen, const char* name)
 {
     fprintf(codegen->out, "CALL %s\n", name);
+}
+
+void codegen_pushs(codegen_t* codegen, symb_t symb)
+{
+    fprintf(codegen->out, "PUSHS ");
+    print_symb(codegen, symb);
+    fprintf(codegen->out, "\n");
+}
+
+void codegen_pops(codegen_t* codegen, var_t var)
+{
+    fprintf(codegen->out, "POPS ");
+    print_var(codegen, var);
+    fprintf(codegen->out, "\n");
+}
+
+void codegen_stack_op(codegen_t* codegen, stack_op_t op)
+{
+    fprintf(codegen->out, "%s\n", op_names[op]);
 }

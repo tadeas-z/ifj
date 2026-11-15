@@ -188,3 +188,64 @@ TEST_F(CodegenTest, CallWithParameter)
     codegen_call(codegen, "foo");
     EXPECT_EQ(output(), "CREATEFRAME\nDEFVAR TF@n$1\nMOVE TF@n$1 int@3\nCALL foo\n");
 }
+
+// AI-generated using: Claude Code
+//              model: Claude Opus 5.5
+// Prompt: "Now add tests for the stack functions: PUSHS of a constant and
+//          a variable, POPS, every stack_op_t gives the right instruction
+//          and a whole expression 1 + 2 * 3 in the right order"
+// Scope: CodegenStackTest and all tests below
+
+// Same fixture, separate suite name for the stack tests
+class CodegenStackTest : public CodegenTest { };
+
+// PUSHS works for constants and variables
+TEST_F(CodegenStackTest, PushsConstantAndVariable)
+{
+    symb_t symb = {};
+    symb.type = S_VAR;
+    symb.var = make_var(FRAME_LF, "a", 1);
+
+    codegen_pushs(codegen, make_int(7));
+    codegen_pushs(codegen, symb);
+    EXPECT_EQ(output(), "PUSHS int@7\nPUSHS LF@a$1\n");
+}
+
+// POPS writes the target variable
+TEST_F(CodegenStackTest, PopsVariable)
+{
+    codegen_pops(codegen, make_var(FRAME_LF, "r", 2));
+    EXPECT_EQ(output(), "POPS LF@r$2\n");
+}
+
+// Every op is written with its own name
+TEST_F(CodegenStackTest, AllOpsHaveRightName)
+{
+    codegen_stack_op(codegen, OP_ADDS);
+    codegen_stack_op(codegen, OP_SUBS);
+    codegen_stack_op(codegen, OP_MULS);
+    codegen_stack_op(codegen, OP_DIVS);
+    codegen_stack_op(codegen, OP_IDIVS);
+    codegen_stack_op(codegen, OP_LTS);
+    codegen_stack_op(codegen, OP_GTS);
+    codegen_stack_op(codegen, OP_EQS);
+    codegen_stack_op(codegen, OP_NOTS);
+    codegen_stack_op(codegen, OP_INT2FLOATS);
+    EXPECT_EQ(output(),
+        "ADDS\nSUBS\nMULS\nDIVS\nIDIVS\n"
+        "LTS\nGTS\nEQS\nNOTS\nINT2FLOATS\n");
+}
+
+// 1 + 2 * 3 pushes the operands first, then MULS and ADDS
+TEST_F(CodegenStackTest, WholeExpression)
+{
+    codegen_pushs(codegen, make_int(1));
+    codegen_pushs(codegen, make_int(2));
+    codegen_pushs(codegen, make_int(3));
+    codegen_stack_op(codegen, OP_MULS);
+    codegen_stack_op(codegen, OP_ADDS);
+    codegen_pops(codegen, make_var(FRAME_LF, "x", 1));
+    EXPECT_EQ(output(),
+        "PUSHS int@1\nPUSHS int@2\nPUSHS int@3\n"
+        "MULS\nADDS\nPOPS LF@x$1\n");
+}
