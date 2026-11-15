@@ -1,3 +1,7 @@
+// Implementation of the IFJ26 imperative language compiler
+// parser_expression.h
+// Author(s): Dusan Popovic (xpopovd00)
+
 #ifndef PARSER_H
 #define PARSER_H
 
