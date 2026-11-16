@@ -13,6 +13,7 @@
 // Prompt: "Create tests using google-tests for function calls"
 // Prompt: "Create tests using google-tests for return and expression statement"
 // Prompt: "Create tests using google-tests for codegen_func"
+// Prompt: "Create tests using google-tests for codegen_program"
 // Scope: whole file
 
 extern "C" {
@@ -415,4 +416,27 @@ TEST_F(CodegenFuncTest, ReturnInUnitFunc)
         "LABEL f\nPUSHFRAME\n"
         "PUSHS int@5\nPOPS GF@tmp$1\nPUSHS nil@nil\nPOPFRAME\nRETURN\n"
         "PUSHS nil@nil\nPOPFRAME\nRETURN\n");
+}
+
+// Same setup for the program tests
+class CodegenProgramTest : public CodegenExprTest {
+};
+
+// program starts with the header, then functions, built ins and the end
+TEST_F(CodegenProgramTest, WholeProgram)
+{
+    tree = ast_new_program();
+    dyn_arr_append(&tree->program.func_list, func("main", true, TYPE_UNIT, ast_new_block(1, 1)));
+
+    codegen_program(codegen, tree);
+    std::string text = output();
+    std::string start = ".IFJcode26\n"
+                        "DEFVAR GF@tmp$1\nDEFVAR GF@tmp$2\n"
+                        "CREATEFRAME\nCALL $main\nJUMP $end\n"
+                        "LABEL $main\nLABEL main\nPUSHFRAME\n"
+                        "PUSHS nil@nil\nPOPFRAME\nRETURN\n"
+                        "LABEL readLine\n";
+    std::string end = "LABEL $end\nEXIT int@0\n";
+    EXPECT_EQ(text.substr(0, start.size()), start);
+    EXPECT_EQ(text.substr(text.size() - end.size()), end);
 }

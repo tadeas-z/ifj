@@ -67,4 +67,21 @@ void codegen_stmt(codegen_t* codegen, ast_node_t* stmt);
  */
 void codegen_func(codegen_t* codegen, ast_node_t* func);
 
+// AI-generated using: Claude Code
+//              model: Claude Opus 5.5
+// Prompt: "Write the Doxygen description of the function codegen_program
+//          in this header."
+// Scope: doc comment of codegen_program only
+
+/**
+ * @brief Writes the code of the whole program.
+ *
+ * Writes the start of the program, all functions in source order, the
+ * built in functions and the end of the program.
+ *
+ * @param codegen Generator created by codegen_init.
+ * @param program AST_PROGRAM node checked by semantics.
+ */
+void codegen_program(codegen_t* codegen, ast_node_t* program);
+
 #endif

@@ -387,3 +387,13 @@ void codegen_func(codegen_t* codegen, ast_node_t* func)
     generate_body(codegen, def->body);
     codegen_func_end(codegen);
 }
+
+// begin, all functions, built ins, end
+void codegen_program(codegen_t* codegen, ast_node_t* program)
+{
+    codegen_program_begin(codegen);
+    for (size_t i = 0; i < program->program.func_list.count; i++)
+        codegen_func(codegen, dyn_arr_get(&program->program.func_list, i));
+    codegen_builtins(codegen);
+    codegen_program_end(codegen);
+}
