@@ -362,7 +362,7 @@ ast_node_t* ast_new_member(const char* name, ast_node_t* receiver, size_t line, 
     if (receiver == NULL || name == NULL)
         return NULL;
 
-    ast_node_t *node = new_node(AST_MEMBER, line, column);
+    ast_node_t* node = new_node(AST_MEMBER, line, column);
     if (node == NULL)
         return NULL;
 

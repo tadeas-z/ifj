@@ -9,11 +9,11 @@
 // different rule checks, type checks, type conversions, type compatibility,
 // type inferrence + adds useful information into the ast for codegen.
 
-#include <string.h>
 #include "semantic.h"
 #include "comp_error.h"
 #include "dynamic_array.h"
 #include "symtable.h"
+#include <string.h>
 
 #define TRY(call)                       \
     do {                                \
@@ -994,7 +994,6 @@ static error_code_t check_call(sema_ctx_t* semantic_ctx, ast_node_t* ast_call)
     return ERR_OK;
 }
 
-
 // -----------------------------------------------------------
 //  VALMEM extension
 // -----------------------------------------------------------
@@ -1020,7 +1019,7 @@ static error_code_t check_member(sema_ctx_t* semantic_ctx, ast_node_t* ast_membe
     // Now we know ast_member->member.receiver->type
 
     // Find the member
-    const member_decl_t *found = NULL;
+    const member_decl_t* found = NULL;
 
     for (size_t i = 0; i < member_cnt; i++) {
         if (strcmp(MEMBERS[i].name, ast_member->member.name) == 0) {
