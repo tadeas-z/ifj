@@ -1,10 +1,14 @@
+// Implementation of the IFJ26 imperative language compiler
+// parser_expression.h
+// Author(s): Dusan Popovic (xpopovd00)
+
 #ifndef SYNTATIC_STACK_H
 #define SYNTATIC_STACK_H
 
 #include <stdio.h>
 #include <stdbool.h>
 #include "token.h"
-#include "astree.h"
+#include "ast.h"
 
 typedef enum{
 	SYMBOL_TERMINAL,
