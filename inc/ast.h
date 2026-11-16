@@ -36,7 +36,7 @@ typedef enum {
     AST_DOUBLE_LIT, // 1.01e-3 stored as double
     AST_STRING_LIT, // "a\n"
     AST_UNIT_LIT, // () nothing literal
-    AST_BOOL_LIT,  // Boolthen extension
+    AST_BOOL_LIT, // Boolthen extension
     AST_VAR_REF, // Existing variable reference
     AST_UNARY, // Unary operators -x
     AST_BINARY, // Binary operators a + b, ...
@@ -68,7 +68,7 @@ typedef enum {
     AST_OP_EQ, // ==
     AST_OP_NE, // !=
     AST_OP_AND, // &&
-    AST_OP_OR   // ||
+    AST_OP_OR // ||
 } ast_binary_op_t;
 
 typedef struct
@@ -159,8 +159,7 @@ typedef struct
 typedef struct
 {
     bool value;
-}ast_bool_lit_t;
-
+} ast_bool_lit_t;
 
 typedef struct
 {
