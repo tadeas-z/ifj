@@ -14,6 +14,7 @@
 // Prompt: "Create tests using google-tests for return and expression statement"
 // Prompt: "Create tests using google-tests for codegen_func"
 // Prompt: "Create tests using google-tests for codegen_program"
+// Prompt: "Create tests using google-tests for calls inside expressions (FUNEXP)"
 // Scope: whole file
 
 extern "C" {
@@ -439,4 +440,46 @@ TEST_F(CodegenProgramTest, WholeProgram)
     std::string end = "LABEL $end\nEXIT int@0\n";
     EXPECT_EQ(text.substr(0, start.size()), start);
     EXPECT_EQ(text.substr(text.size() - end.size()), end);
+}
+
+// Same setup for the FUNEXP tests
+class CodegenFunexpTest : public CodegenExprTest {
+};
+
+// call result is used like any other value in the expression
+TEST_F(CodegenFunexpTest, CallInBinary)
+{
+    tree = binary(AST_OP_MUL, int_lit(2), call("readInt", true, TYPE_INT), TYPE_INT);
+
+    codegen_expr(codegen, tree);
+    EXPECT_EQ(output(), "PUSHS int@2\nCREATEFRAME\nCALL readInt\nMULS\n");
+}
+
+// inner call is done first, its result is the arg of the outer call
+TEST_F(CodegenFunexpTest, NestedBuiltinCalls)
+{
+    ast_node_t* inner = call("strLength", true, TYPE_INT);
+    dyn_arr_append(&inner->call.args, var_ref("s", 1, TYPE_STRING));
+    tree = call("toStr", true, TYPE_STRING);
+    dyn_arr_append(&tree->call.args, inner);
+
+    codegen_expr(codegen, tree);
+    EXPECT_EQ(output(),
+        "PUSHS LF@s$1\nCREATEFRAME\nDEFVAR TF@value$0\nPOPS TF@value$0\nCALL strLength\n"
+        "CREATEFRAME\nDEFVAR TF@value$0\nPOPS TF@value$0\nCALL toStr\n");
+}
+
+// args are done left to right, an arg can be an expression with a call
+TEST_F(CodegenFunexpTest, UserCallWithExprArgs)
+{
+    ast_node_t* inner = call("foo", false, TYPE_INT);
+    dyn_arr_append(&inner->call.args, int_lit(1));
+    tree = call("bar", false, TYPE_INT);
+    dyn_arr_append(&tree->call.args, binary(AST_OP_ADD, inner, int_lit(2), TYPE_INT));
+    dyn_arr_append(&tree->call.args, var_ref("x", 1, TYPE_INT));
+
+    codegen_expr(codegen, tree);
+    EXPECT_EQ(output(),
+        "PUSHS int@1\nCREATEFRAME\nCALL foo\nPUSHS int@2\nADDS\n"
+        "PUSHS LF@x$1\nCREATEFRAME\nCALL bar\n");
 }
