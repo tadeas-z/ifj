@@ -5,9 +5,9 @@
 #ifndef IFJ_PARSER_H
 #define IFJ_PARSER_H
 
-#include "comp_error.h"      //compiler exit
-#include "parser_expression.h"
-#include "types.h"
+#include "lexer.h"
+#include "ast.h"
+
 
 // AI-generated using: Gemini
 //               model: Gemini 4 hydrogen
