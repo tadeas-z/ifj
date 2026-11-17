@@ -36,6 +36,7 @@ typedef enum {
     AST_DOUBLE_LIT, // 1.01e-3 stored as double
     AST_STRING_LIT, // "a\n"
     AST_UNIT_LIT, // () nothing literal
+    AST_BOOL_LIT, // Boolthen extension
     AST_VAR_REF, // Existing variable reference
     AST_UNARY, // Unary operators -x
     AST_BINARY, // Binary operators a + b, ...
@@ -51,7 +52,8 @@ typedef struct
 } ast_param_t;
 
 typedef enum {
-    AST_OP_NEG
+    AST_OP_NEG,
+    AST_OP_NOT
 } ast_unary_op_t;
 
 typedef enum {
@@ -64,7 +66,9 @@ typedef enum {
     AST_OP_GT, // >
     AST_OP_GE, // >=
     AST_OP_EQ, // ==
-    AST_OP_NE // !=
+    AST_OP_NE, // !=
+    AST_OP_AND, // &&
+    AST_OP_OR // ||
 } ast_binary_op_t;
 
 typedef struct
@@ -154,19 +158,24 @@ typedef struct
 
 typedef struct
 {
+    bool value;
+} ast_bool_lit_t;
+
+typedef struct
+{
     char* name; // (P) the identifier
     int id; // (S) id of the variable it refers to
 } ast_var_ref_t;
 
 typedef struct
 {
-    ast_unary_op_t op; // (P) only negation (without extensions)
+    ast_unary_op_t op; // (P) NEG or NOT
     ast_node_t* operand; // (P)
 } ast_unary_t;
 
 typedef struct
 {
-    ast_binary_op_t op; // (P) + - * / < <= > >= == !=
+    ast_binary_op_t op; // (P) + - * / < <= > >= == != && ||
     ast_node_t* left; // (P)
     ast_node_t* right; // (P)
 } ast_binary_t;
@@ -205,6 +214,7 @@ struct ast_node {
         ast_double_lit_t double_lit;
         ast_string_lit_t string_lit;
         // AST_UNIT_LIT has no data
+        ast_bool_lit_t bool_lit;
         ast_var_ref_t var_ref;
         ast_unary_t unary;
         ast_binary_t binary;
@@ -347,7 +357,7 @@ ast_node_t* ast_new_expr_stmt(ast_node_t* expr, size_t line, size_t column);
 
 /**
  * @brief Constructs an Int literal node
- * @param value value of the literal - separators (1_000) are already removed by the lexer
+ * @param value value of the literal - separators (1_000) are already removed by the parser
  * @param line line of the literal
  * @param column column where the literal starts
  * @return NULL on memory allocation failure, else new node
@@ -384,6 +394,15 @@ ast_node_t* ast_new_string_lit(const char* value, size_t line, size_t column);
 ast_node_t* ast_new_unit_lit(size_t line, size_t column);
 
 /**
+ * @brief Constructs a Boolean literal node
+ * @param value value of the literal
+ * @param line line of the literal
+ * @param column column where the literal starts
+ * @return NULL on memory allocation failure, else new node
+ */
+ast_node_t* ast_new_bool_lit(bool value, size_t line, size_t column);
+
+/**
  * @brief Constructs a variable reference node - a use of an existing variable in an expression
  * @param name name of the variable - REQUIRED. Copied to the heap (freed by ast_free)
  * @param line line of the reference
@@ -395,7 +414,7 @@ ast_node_t* ast_new_var_ref(const char* name, size_t line, size_t column);
 
 /**
  * @brief Constructs a unary operation node (-x)
- * @param op the operator - only AST_OP_NEG without extensions
+ * @param op the operator - AST_OP_NEG or AST_OP_NOT
  * @param operand the expression the operator is applied to - REQUIRED
  * @param line line of the operator
  * @param column column of the operator

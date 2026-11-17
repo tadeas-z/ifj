@@ -778,6 +778,10 @@ static error_code_t check_expression(sema_ctx_t* semantic_ctx, ast_node_t* ast_e
         ast_expression->type = TYPE_UNIT;
         break;
 
+    case AST_BOOL_LIT:
+        ast_expression->type = TYPE_BOOL;
+        break;
+
     case AST_VAR_REF: {
         symbol_t* var_sym = lookup_var_in_function(semantic_ctx, ast_expression->var_ref.name);
         if (var_sym == NULL)
@@ -816,8 +820,15 @@ static error_code_t check_unary(sema_ctx_t* semantic_ctx, ast_node_t* ast_expres
     // Now we know ast_expression ast_expression->unary.operand->type
 
     switch (ast_expression->unary.op) {
+    // Negative value
     case AST_OP_NEG:
         if (!is_numeric(ast_expression->unary.operand->type))
+            return ERR_SEM_TYPE;
+        break;
+
+    // Boolean NOT
+    case AST_OP_NOT:
+        if (ast_expression->unary.operand->type->kind != T_BOOL)
             return ERR_SEM_TYPE;
         break;
 
@@ -898,6 +909,16 @@ static error_code_t check_binary(sema_ctx_t* semantic_ctx, ast_node_t* ast_expre
         // Both INT - OK, Atlest one DOUBLE -> convert
         // Both types match - OK
         TRY(unify_numeric(ast_expression));
+
+        result = TYPE_BOOL;
+        break;
+
+    // Boolean operators
+    case AST_OP_AND:
+    case AST_OP_OR:
+        // Both sides must be Booleans
+        if (!(left_type->kind == T_BOOL && right_type->kind == T_BOOL))
+            return ERR_SEM_TYPE;
 
         result = TYPE_BOOL;
         break;

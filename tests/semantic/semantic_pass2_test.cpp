@@ -282,6 +282,19 @@ static std::vector<binary_case_t> binary_cases()
         bad(op, T_BOOL, T_INT);
         bad(op, T_UNIT, T_INT);
     }
+
+    // && ||: BOOLTHEN, both operands must be Boolean -> Boolean
+    for (ast_binary_op_t op : { AST_OP_AND, AST_OP_OR }) {
+        ok(op, T_BOOL, T_BOOL, T_BOOL, false, false);
+        bad(op, T_BOOL, T_INT);
+        bad(op, T_INT, T_BOOL);
+        bad(op, T_INT, T_INT);
+        bad(op, T_DOUBLE, T_BOOL);
+        bad(op, T_STRING, T_STRING);
+        bad(op, T_BOOL, T_STRING);
+        bad(op, T_UNIT, T_UNIT);
+        bad(op, T_BOOL, T_UNIT);
+    }
     return cases;
 }
 
@@ -308,6 +321,10 @@ static std::string op_name(ast_binary_op_t op)
         return "Eq";
     case AST_OP_NE:
         return "Ne";
+    case AST_OP_AND:
+        return "And";
+    case AST_OP_OR:
+        return "Or";
     default:
         return "Op";
     }
@@ -1807,6 +1824,359 @@ TEST_F(SemanticPass2Test, FunctionCallingIntoCycleMayBeInferred)
 
     ASSERT_EQ(analyze(), ERR_OK);
     EXPECT_EQ(type_name(h->func_def.return_type), "Int");
+}
+
+// ========================================
+//  BOOLTHEN: true / false, !, && and ||, else if
+// ========================================
+// AI-generated using: Claude Code
+//              model: Claude Fable 5.2
+// Prompt: "can you also add the proposed tests for boolthen" (! and && / || against
+//          every operand type, Boolean literals also as conditions and in returns,
+//          else if chains; the && / || rows are in binary_cases above)
+// Scope: this section up to "Open questions"
+
+// ----------------------------------------
+//  Literals
+// ----------------------------------------
+
+TEST_F(SemanticPass2Test, TrueLiteralIsBoolean)
+{
+    ast_node_t* e = B(true);
+    ASSERT_EQ(analyze_expr(e), ERR_OK);
+    EXPECT_EQ(type_name(e->type), "Boolean");
+}
+
+TEST_F(SemanticPass2Test, FalseLiteralIsBoolean)
+{
+    ast_node_t* e = B(false);
+    ASSERT_EQ(analyze_expr(e), ERR_OK);
+    EXPECT_EQ(type_name(e->type), "Boolean");
+}
+
+// val b = true; val x = 1; x   -> a literal must not disturb what follows it
+TEST_F(SemanticPass2Test, StatementsAfterBooleanLiteralAreChecked)
+{
+    ast_node_t* ref = V("x");
+    main_({ val("b", B(true)), val("x", I(1)), expr(ref) });
+
+    ASSERT_EQ(analyze(), ERR_OK);
+    EXPECT_EQ(type_name(ref->type), "Int");
+}
+
+// ----------------------------------------
+//  Unary !: Boolean only, result Boolean
+// ----------------------------------------
+
+struct not_case_t {
+    type_kind_t operand;
+    error_code_t err;
+};
+
+static void PrintTo(const not_case_t& c, std::ostream* os) { *os << "!" << kind_name(c.operand); }
+
+class SemanticNotTest : public SemanticPass2Test, public ::testing::WithParamInterface<not_case_t> { };
+
+// val r = !<operand>
+TEST_P(SemanticNotTest, NotOfOperand)
+{
+    const not_case_t& c = GetParam();
+    ast_node_t* e = not_(operand_of(c.operand));
+
+    ASSERT_EQ(analyze_expr(e), c.err);
+    if (c.err == ERR_OK) {
+        EXPECT_EQ(type_name(e->type), "Boolean");
+    }
+}
+
+INSTANTIATE_TEST_SUITE_P(Operands, SemanticNotTest,
+    ::testing::Values(not_case_t { T_BOOL, ERR_OK }, not_case_t { T_INT, ERR_SEM_TYPE },
+        not_case_t { T_DOUBLE, ERR_SEM_TYPE }, not_case_t { T_STRING, ERR_SEM_TYPE },
+        not_case_t { T_UNIT, ERR_SEM_TYPE }),
+    [](const ::testing::TestParamInfo<not_case_t>& info) { return kind_name(info.param.operand); });
+
+// !true
+TEST_F(SemanticPass2Test, NotOfLiteralIsBoolean)
+{
+    ast_node_t* e = not_(B(true));
+    ASSERT_EQ(analyze_expr(e), ERR_OK);
+    EXPECT_EQ(type_name(e->type), "Boolean");
+}
+
+// !!false
+TEST_F(SemanticPass2Test, DoubleNotIsOk)
+{
+    ast_node_t* e = not_(not_(B(false)));
+    ASSERT_EQ(analyze_expr(e), ERR_OK);
+    EXPECT_EQ(type_name(e->type), "Boolean");
+}
+
+// -true   -> minus works on numbers only
+TEST_F(SemanticPass2Test, NegationOfBooleanLiteralIsTypeError)
+{
+    EXPECT_EQ(analyze_expr(neg(B(true))), ERR_SEM_TYPE);
+}
+
+// !x   (x undefined) -> the operand's error wins
+TEST_F(SemanticPass2Test, NotOfUndefinedVariableIsUndefined)
+{
+    EXPECT_EQ(analyze_expr(not_(V("x"))), ERR_SEM_UNDEF);
+}
+
+// ----------------------------------------
+//  && and || in larger expressions
+// ----------------------------------------
+
+// !(1 < 2) && (2.5 > 1 || true)   -> Boolean, the inner 1 is still converted
+TEST_F(SemanticPass2Test, MixedBooleanExpressionIsOk)
+{
+    ast_node_t* greater = bin(AST_OP_GT, D(2.5), I(1));
+    ast_node_t* e = bin(AST_OP_AND, not_(cond()), bin(AST_OP_OR, greater, B(true)));
+
+    ASSERT_EQ(analyze_expr(e), ERR_OK);
+    EXPECT_EQ(type_name(e->type), "Boolean");
+    EXPECT_TRUE(is_convert_of(greater->binary.right, AST_INT_LIT));
+    EXPECT_EQ(e->binary.left->kind, AST_UNARY) << "Boolean operands are never converted";
+}
+
+// true && false || true
+TEST_F(SemanticPass2Test, ChainedBooleanOperatorsAreOk)
+{
+    ast_node_t* e = bin(AST_OP_OR, bin(AST_OP_AND, B(true), B(false)), B(true));
+    ASSERT_EQ(analyze_expr(e), ERR_OK);
+    EXPECT_EQ(type_name(e->type), "Boolean");
+}
+
+// true == false
+TEST_F(SemanticPass2Test, BooleanLiteralsCanBeCompared)
+{
+    ast_node_t* e = bin(AST_OP_EQ, B(true), B(false));
+    ASSERT_EQ(analyze_expr(e), ERR_OK);
+    EXPECT_EQ(type_name(e->type), "Boolean");
+}
+
+// true < false   -> only == and != work on Booleans
+TEST_F(SemanticPass2Test, OrderingOfBooleanLiteralsIsTypeError)
+{
+    EXPECT_EQ(analyze_expr(bin(AST_OP_LT, B(true), B(false))), ERR_SEM_TYPE);
+}
+
+// true + 1
+TEST_F(SemanticPass2Test, BooleanLiteralPlusIntIsTypeError)
+{
+    EXPECT_EQ(analyze_expr(bin(AST_OP_ADD, B(true), I(1))), ERR_SEM_TYPE);
+}
+
+// true && (1 + 2)   -> the non-Boolean side is found even when it is nested
+TEST_F(SemanticPass2Test, AndWithArithmeticOperandIsTypeError)
+{
+    EXPECT_EQ(analyze_expr(bin(AST_OP_AND, B(true), bin(AST_OP_ADD, I(1), I(2)))), ERR_SEM_TYPE);
+}
+
+// true || x   (x undefined) -> the right side is checked although || would skip it at runtime
+TEST_F(SemanticPass2Test, UndefinedRightOperandOfOrIsUndefined)
+{
+    EXPECT_EQ(analyze_expr(bin(AST_OP_OR, B(true), V("x"))), ERR_SEM_UNDEF);
+}
+
+// ----------------------------------------
+//  Booleans stored, passed and returned
+// ----------------------------------------
+
+// val b: Boolean = true
+TEST_F(SemanticPass2Test, DeclaredBooleanVariableIsOk)
+{
+    main_({ val("b", B(true), TYPE_BOOL) });
+    EXPECT_EQ(analyze(), ERR_OK);
+}
+
+// val b: Boolean = 1
+TEST_F(SemanticPass2Test, DeclaredBooleanWithIntInitIsTypeError)
+{
+    main_({ val("b", I(1), TYPE_BOOL) });
+    EXPECT_EQ(analyze(), ERR_SEM_TYPE);
+}
+
+// val x: Int = true
+TEST_F(SemanticPass2Test, DeclaredIntWithBooleanInitIsTypeError)
+{
+    main_({ val("x", B(true), TYPE_INT) });
+    EXPECT_EQ(analyze(), ERR_SEM_TYPE);
+}
+
+// var b = true; b = !b && 1 < 2
+TEST_F(SemanticPass2Test, AssignBooleanExpressionToBooleanVarIsOk)
+{
+    main_({ var("b", B(true)), assign("b", bin(AST_OP_AND, not_(V("b")), cond())) });
+    EXPECT_EQ(analyze(), ERR_OK);
+}
+
+// var b = true; b = 1
+TEST_F(SemanticPass2Test, AssignIntToBooleanVarIsTypeError)
+{
+    main_({ var("b", B(true)), assign("b", I(1)) });
+    EXPECT_EQ(analyze(), ERR_SEM_TYPE);
+}
+
+// var x = 1; x = false
+TEST_F(SemanticPass2Test, AssignBooleanToIntVarIsTypeError)
+{
+    main_({ var("x", I(1)), assign("x", B(false)) });
+    EXPECT_EQ(analyze(), ERR_SEM_TYPE);
+}
+
+// def both(a: Boolean, b: Boolean) = { a && b }; val r = both(true, 1 < 2)
+TEST_F(SemanticPass2Test, BooleanParamsAndInferredBooleanResult)
+{
+    ast_node_t* f = func("both", nullptr, { { "a", TYPE_BOOL }, { "b", TYPE_BOOL } },
+        { expr(bin(AST_OP_AND, V("a"), V("b"))) });
+    ast_node_t* c = call("both", { B(true), cond() });
+
+    ASSERT_EQ(analyze_expr(c), ERR_OK);
+    EXPECT_EQ(type_name(f->func_def.return_type), "Boolean");
+    EXPECT_EQ(type_name(c->type), "Boolean");
+}
+
+// def f(a: Int): Unit = {}; f(true)   -> a wrong argument type is 5
+TEST_F(SemanticPass2Test, BooleanArgumentForIntParamIsCallError)
+{
+    func("f", TYPE_UNIT, { { "a", TYPE_INT } }, {});
+    main_({ expr(call("f", { B(true) })) });
+    EXPECT_EQ(analyze(), ERR_SEM_CALL);
+}
+
+// def f(a: Boolean): Unit = {}; f(1)
+TEST_F(SemanticPass2Test, IntArgumentForBooleanParamIsCallError)
+{
+    func("f", TYPE_UNIT, { { "a", TYPE_BOOL } }, {});
+    main_({ expr(call("f", { I(1) })) });
+    EXPECT_EQ(analyze(), ERR_SEM_CALL);
+}
+
+// def f(): Boolean = { return true }
+TEST_F(SemanticPass2Test, ReturnBooleanLiteralIsOk)
+{
+    func("f", TYPE_BOOL, {}, { ret(B(true)) });
+    main_({});
+    EXPECT_EQ(analyze(), ERR_OK);
+}
+
+// def f(): Boolean = { return 1 }
+TEST_F(SemanticPass2Test, ReturnIntInBooleanFunctionIsTypeError)
+{
+    func("f", TYPE_BOOL, {}, { ret(I(1)) });
+    main_({});
+    EXPECT_EQ(analyze(), ERR_SEM_TYPE);
+}
+
+// def f(): Int = { return false }
+TEST_F(SemanticPass2Test, ReturnBooleanInIntFunctionIsTypeError)
+{
+    func("f", TYPE_INT, {}, { ret(B(false)) });
+    main_({});
+    EXPECT_EQ(analyze(), ERR_SEM_TYPE);
+}
+
+// def f(): Boolean = { !true }
+TEST_F(SemanticPass2Test, BooleanFunctionWithBooleanBodyIsOk)
+{
+    func("f", TYPE_BOOL, {}, { expr(not_(B(true))) });
+    main_({});
+    EXPECT_EQ(analyze(), ERR_OK);
+}
+
+// def f(): Boolean = { 1 }
+TEST_F(SemanticPass2Test, BooleanFunctionWithIntBodyIsTypeError)
+{
+    func("f", TYPE_BOOL, {}, { expr(I(1)) });
+    main_({});
+    EXPECT_EQ(analyze(), ERR_SEM_TYPE);
+}
+
+// print(true); val s: String = toStr(false)
+TEST_F(SemanticPass2Test, PrintAndToStrAcceptBooleanLiterals)
+{
+    main_({ expr(call("print", { B(true) })), val("s", call("toStr", { B(false) }), TYPE_STRING) });
+    EXPECT_EQ(analyze(), ERR_OK);
+}
+
+// ----------------------------------------
+//  Conditions
+// ----------------------------------------
+
+// if (true) { }; while (false) { }
+TEST_F(SemanticPass2Test, BooleanLiteralsAsConditionsAreOk)
+{
+    main_({ if_(B(true), {}), while_(B(false), {}) });
+    EXPECT_EQ(analyze(), ERR_OK);
+}
+
+// val x = 1; if (!(x < 2) || x == 3 && true) { }
+TEST_F(SemanticPass2Test, CompoundConditionIsOk)
+{
+    main_({ val("x", I(1)),
+        if_(bin(AST_OP_OR, not_(bin(AST_OP_LT, V("x"), I(2))), bin(AST_OP_AND, bin(AST_OP_EQ, V("x"), I(3)), B(true))),
+            {}) });
+    EXPECT_EQ(analyze(), ERR_OK);
+}
+
+// if (1 && true) { }   -> the error is in the condition's operand
+TEST_F(SemanticPass2Test, IntOperandInConditionIsTypeError)
+{
+    main_({ if_(bin(AST_OP_AND, I(1), B(true)), {}) });
+    EXPECT_EQ(analyze(), ERR_SEM_TYPE);
+}
+
+// val x = 1; while (!x) { }
+TEST_F(SemanticPass2Test, NotOfIntVariableInConditionIsTypeError)
+{
+    main_({ val("x", I(1)), while_(not_(V("x")), {}) });
+    EXPECT_EQ(analyze(), ERR_SEM_TYPE);
+}
+
+// ----------------------------------------
+//  else if (an if nested in the else block) as the last statement - rule 3
+// ----------------------------------------
+
+// def f(n: Int): Int = { if (n < 0) { return 1 } else if (n == 0) { return 2 } else { return 3 } }
+TEST_F(SemanticPass2Test, ElseIfChainWithReturnEverywhereIsOk)
+{
+    func("f", TYPE_INT, { { "n", TYPE_INT } },
+        { if_else(bin(AST_OP_LT, V("n"), I(0)), { ret(I(1)) },
+            { if_else(bin(AST_OP_EQ, V("n"), I(0)), { ret(I(2)) }, { ret(I(3)) }) }) });
+    main_({});
+    EXPECT_EQ(analyze(), ERR_OK);
+}
+
+// def f(n: Int): Int = { if (n < 0) { return 1 } else if (n == 0) { return 2 } }   -> no final else
+TEST_F(SemanticPass2Test, ElseIfChainWithoutFinalElseIsTypeError)
+{
+    func("f", TYPE_INT, { { "n", TYPE_INT } },
+        { if_else(bin(AST_OP_LT, V("n"), I(0)), { ret(I(1)) }, { if_(bin(AST_OP_EQ, V("n"), I(0)), { ret(I(2)) }) }) });
+    main_({});
+    EXPECT_EQ(analyze(), ERR_SEM_TYPE);
+}
+
+// def f(n: Int) = { if (n < 0) { print(1) } else if (n == 0) { print(2) } }   -> every path Unit
+TEST_F(SemanticPass2Test, InferredElseIfChainOfUnitBranchesIsUnit)
+{
+    ast_node_t* f = func("f", nullptr, { { "n", TYPE_INT } },
+        { if_else(bin(AST_OP_LT, V("n"), I(0)), { expr(call("print", { I(1) })) },
+            { if_(bin(AST_OP_EQ, V("n"), I(0)), { expr(call("print", { I(2) })) }) }) });
+    main_({});
+
+    ASSERT_EQ(analyze(), ERR_OK);
+    EXPECT_EQ(type_name(f->func_def.return_type), "Unit");
+}
+
+// def f(n: Int) = { if (n < 0) { print(1) } else if (n == 0) { 2 } }   -> one path has a value
+TEST_F(SemanticPass2Test, InferredElseIfChainWithValueBranchIsTypeError)
+{
+    func("f", nullptr, { { "n", TYPE_INT } },
+        { if_else(bin(AST_OP_LT, V("n"), I(0)), { expr(call("print", { I(1) })) },
+            { if_(bin(AST_OP_EQ, V("n"), I(0)), { expr(I(2)) }) }) });
+    main_({});
+    EXPECT_EQ(analyze(), ERR_SEM_TYPE);
 }
 
 // ========================================
