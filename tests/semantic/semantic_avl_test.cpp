@@ -9,6 +9,12 @@
 //          for all different kinds of reasons"
 // Scope: the whole file
 //
+// AI-generated using: Claude Code, model Claude Opus 5.5
+// Prompt: "Update the tests and write tests for the control"
+// Scope: the CONTROL variants (P_MAX_IF_VALUE, P_HEIGHT_IF_VALUE, P_CONTROL_FOR, T_IF_BRANCH_TYPES,
+//        T_FOR_BOUND, A_ASSIGN_LOOP_VAR, O_ZERO_STEP, the changed T_RULE3_MISSING_RETURN),
+//        HeightAsIfExpressionIsInt and ForLoopIsAMainLocal
+//
 // This is TEST INPUT for the semantic analyzer: an IFJ26 program (written below as a
 // hand-made AST) whose functions mirror the shape of the AVL tree in symtable.c. It is
 // not used by the compiler and does not replace or touch symtable.c.
@@ -209,6 +215,9 @@ enum avl_variant_t {
     P_BOOLEAN_FLAG,
     P_BOOL_OPERATORS,
     P_VALMEM,
+    P_MAX_IF_VALUE,
+    P_HEIGHT_IF_VALUE,
+    P_CONTROL_FOR,
 
     // 3 - undefined
     U_TYPO_VARIABLE,
@@ -243,7 +252,8 @@ enum avl_variant_t {
     T_RECURSION_INFERRED,
     T_RETURN_IN_INFERRED,
     T_RULE3_MISSING_RETURN,
-    T_RULE3_INFERRED_VALUES,
+    T_IF_BRANCH_TYPES,
+    T_FOR_BOUND,
     T_MAIN_NON_UNIT,
     T_NEG_STRING,
     T_COMPARE_INT_STRING,
@@ -256,9 +266,11 @@ enum avl_variant_t {
     // 7 - assignment
     A_ASSIGN_VAL,
     A_ASSIGN_PARAM,
+    A_ASSIGN_LOOP_VAR,
 
     // 10 - other
     O_BARE_RETURN,
+    O_ZERO_STEP,
 };
 
 // In which order the functions are put into program->func_list
@@ -343,23 +355,28 @@ static avl_program_t build_avl(avl_variant_t v, avl_order_t order = ORDER_SOURCE
     def("result", all_explicit ? TYPE_INT : nullptr, { { "mem", TYPE_STRING } }, { expr(get_(V("mem"), I(0), KEY)) });
 
     // def max(n1: Int, n2: Int): Int = { if (n1 > n2) { return n1 } else { return n2 } }
-    //   T_RULE3_MISSING_RETURN: ... else { n2 }
+    //   T_RULE3_MISSING_RETURN: if (n1 > n2) { return n1 }      (no else - the Int function has a path without a value)
     //   P_MAX_INFERRED:         def max(n1: Int, n2: Int) = { var m = n2; if (n1 > n2) { m = n1 }; m }
+    //   P_MAX_IF_VALUE:         def max(n1: Int, n2: Int): Int = if n1 > n2 then n1 else n2      (CONTROL)
     const param_list_t n1_n2 = { { "n1", TYPE_INT }, { "n2", TYPE_INT } };
     if (v == P_MAX_INFERRED)
         def("max", nullptr, n1_n2,
             { var("m", V("n2")), if_(gt_(V("n1"), V("n2")), { assign("m", V("n1")) }), expr(V("m")) });
+    else if (v == P_MAX_IF_VALUE)
+        def("max", TYPE_INT, n1_n2, { if_else(gt_(V("n1"), V("n2")), { expr(V("n1")) }, { expr(V("n2")) }) });
+    else if (v == T_RULE3_MISSING_RETURN)
+        def("max", TYPE_INT, n1_n2, { if_(gt_(V("n1"), V("n2")), { ret(V("n1")) }) });
     else
-        def("max", TYPE_INT, n1_n2,
-            { if_else(gt_(V("n1"), V("n2")), { ret(V("n1")) },
-                { v == T_RULE3_MISSING_RETURN ? expr(V("n2")) : ret(V("n2")) }) });
+        def("max", TYPE_INT, n1_n2, { if_else(gt_(V("n1"), V("n2")), { ret(V("n1")) }, { ret(V("n2")) }) });
 
     // def get_height(mem: String, node: Int) = { var h = 0; if (node != 0) { h = get(mem, node, 3) }; h }
-    //   T_BODY_TYPE:             def get_height(mem: String, node: Int): String = ...
-    //   T_RULE3_INFERRED_VALUES: def get_height(mem: String, node: Int) = { if (node == 0) { 0 } else { get(mem, node, 3) } }
-    if (v == T_RULE3_INFERRED_VALUES)
+    //   T_BODY_TYPE:       def get_height(mem: String, node: Int): String = ...
+    //   P_HEIGHT_IF_VALUE: def get_height(mem: String, node: Int) = if node == 0 then 0 else get(mem, node, 3)   (CONTROL)
+    //   T_IF_BRANCH_TYPES: def get_height(mem: String, node: Int) = if node == 0 then "0" else get(mem, node, 3)
+    if (v == P_HEIGHT_IF_VALUE || v == T_IF_BRANCH_TYPES)
         def("get_height", nullptr, mem_node,
-            { if_else(eq_(V("node"), I(0)), { expr(I(0)) }, { expr(get_(V("mem"), V("node"), HEIGHT)) }) });
+            { if_else(eq_(V("node"), I(0)), { expr(v == T_IF_BRANCH_TYPES ? S("0") : I(0)) },
+                { expr(get_(V("mem"), V("node"), HEIGHT)) }) });
     else
         def("get_height", v == T_BODY_TYPE ? TYPE_STRING : (all_explicit ? TYPE_INT : nullptr), mem_node,
             { var("h", I(0)), if_(ne_(V("node"), I(0)), { assign("h", get_(V("mem"), V("node"), HEIGHT)) }), expr(V("h")) });
@@ -569,6 +586,10 @@ static avl_program_t build_avl(avl_variant_t v, avl_order_t order = ORDER_SOURCE
     //   T_DOUBLE_TO_INT:      root = result(mem) / 2.0
     //   T_DECLARED_TYPE:      val height: String = get_height(mem, root)
     //   T_BOOL_ARITHMETIC:    val ok = is_balanced(mem, root) + 1
+    //   P_CONTROL_FOR:        for i <- 1 to count do { mem = ...; root = ... }   instead of var i + while   (CONTROL)
+    //   T_FOR_BOUND:          for i <- 1 to toStr(count) do ...
+    //   O_ZERO_STEP:          for i <- 1 to count by 0 do ...
+    //   A_ASSIGN_LOOP_VAR:    for i <- 1 to count do { ...; i = i + 1 }          (the while body left as it was)
     ast_node_t* new_root;
     if (v == T_ASSIGN_TYPE)
         new_root = V("mem");
@@ -582,14 +603,27 @@ static avl_program_t build_avl(avl_variant_t v, avl_order_t order = ORDER_SOURCE
     avl.ratio_div = div_(V("ratio"), I(2));
     avl.ratio_def = val("ratio", V("height"), TYPE_DOUBLE);
 
+    const bool control_for = (v == P_CONTROL_FOR || v == T_FOR_BOUND || v == O_ZERO_STEP || v == A_ASSIGN_LOOP_VAR);
+
     node_list_t main_body = {
         var("mem", add_(add_(add_(chr_(0), chr_(0)), chr_(0)), chr_(0))),
         var("root", I(0)),
-        var("i", I(1)),
-        val("count", call("readInt")),
-        while_(v == T_CONDITION_NOT_BOOL ? V("i") : le_(V("i"), V("count")),
-            { assign("mem", avl.insert_call), assign("root", new_root), assign("i", add_(V("i"), I(1))) }),
-        expr(call("in_order", { V("mem"), V("root") })),
+    };
+    if (control_for) {
+        main_body.push_back(val("count", call("readInt")));
+        node_list_t loop_body = { assign("mem", avl.insert_call), assign("root", new_root) };
+        if (v == A_ASSIGN_LOOP_VAR)
+            loop_body.push_back(assign("i", add_(V("i"), I(1))));
+        main_body.push_back(for_("i", I(1), v == T_FOR_BOUND ? call("toStr", { V("count") }) : V("count"),
+            v == O_ZERO_STEP ? I(0) : nullptr, true, {}, loop_body));
+    } else {
+        main_body.push_back(var("i", I(1)));
+        main_body.push_back(val("count", call("readInt")));
+        main_body.push_back(while_(v == T_CONDITION_NOT_BOOL ? V("i") : le_(V("i"), V("count")),
+            { assign("mem", avl.insert_call), assign("root", new_root), assign("i", add_(V("i"), I(1))) }));
+    }
+    for (ast_node_t* stmt : node_list_t {
+             expr(call("in_order", { V("mem"), V("root") })),
         expr(avl.print_call),
         val("height", call("get_height", { V("mem"), V("root") }), v == T_DECLARED_TYPE ? TYPE_STRING : nullptr),
         avl.ratio_def,
@@ -601,7 +635,8 @@ static avl_program_t build_avl(avl_variant_t v, avl_order_t order = ORDER_SOURCE
             v == T_BOOL_ARITHMETIC ? add_(call("is_balanced", { V("mem"), V("root") }), I(1))
                                    : call("is_balanced", { V("mem"), V("root") })),
         if_(V("ok"), { print_("balanced") }),
-    };
+         })
+        main_body.push_back(stmt);
     if (v == T_MAIN_NON_UNIT)
         main_body.push_back(expr(V("root")));
 
@@ -768,7 +803,13 @@ INSTANTIATE_TEST_SUITE_P(Variants, SemanticAvlValidVariantTest,
                            // is_balanced written with !, && and || instead of ifs (BOOLTHEN)
                            avl_valid_case_t { P_BOOL_OPERATORS, "IsBalancedWithBooleanOperators" },
                            // mem.length instead of strLength(mem), (ratio / 2).toString instead of toStr(...) (VALMEM)
-                           avl_valid_case_t { P_VALMEM, "MembersInsteadOfBuiltins" }),
+                           avl_valid_case_t { P_VALMEM, "MembersInsteadOfBuiltins" },
+                           // def max(n1: Int, n2: Int): Int = if n1 > n2 then n1 else n2 (CONTROL)
+                           avl_valid_case_t { P_MAX_IF_VALUE, "MaxAsIfExpression" },
+                           // def get_height(mem: String, node: Int) = if node == 0 then 0 else get(mem, node, 3) (CONTROL)
+                           avl_valid_case_t { P_HEIGHT_IF_VALUE, "HeightAsIfExpression" },
+                           // main inserts in for i <- 1 to count instead of var i + while (CONTROL)
+                           avl_valid_case_t { P_CONTROL_FOR, "MainWithForLoop" }),
         ::testing::Values(ORDER_SOURCE, ORDER_MAIN_FIRST, ORDER_REVERSED)),
     [](const ::testing::TestParamInfo<std::tuple<avl_valid_case_t, avl_order_t>>& info) {
         return std::string(std::get<0>(info.param).name) + "_" + order_name(std::get<1>(info.param));
@@ -798,6 +839,29 @@ TEST_F(SemanticAvlTest, InferredMaxIsInt)
 {
     ASSERT_EQ(analyze(P_MAX_INFERRED), ERR_OK);
     EXPECT_EQ(type_name(fn("max")->func_def.return_type), "Int");
+}
+
+// P_HEIGHT_IF_VALUE: the if-expression body gives get_height (and balance_factor through it) Int
+TEST_F(SemanticAvlTest, HeightAsIfExpressionIsInt)
+{
+    ASSERT_EQ(analyze(P_HEIGHT_IF_VALUE, ORDER_REVERSED), ERR_OK);
+    EXPECT_EQ(type_name(fn("get_height")->func_def.return_type), "Int");
+    EXPECT_EQ(type_name(fn("balance_factor")->func_def.return_type), "Int");
+}
+
+// P_CONTROL_FOR: var i is gone, the for node takes its place in main's locals
+//   mem, root, count, for, height, ratio, found, ok
+TEST_F(SemanticAvlTest, ForLoopIsAMainLocal)
+{
+    ASSERT_EQ(analyze(P_CONTROL_FOR), ERR_OK);
+    const dyn_arr_t* locals = &fn("main")->func_def.locals;
+    ASSERT_EQ(locals->count, 8u);
+    const ast_node_t* loop = static_cast<const ast_node_t*>(locals->items[3]); // after mem, root, count
+    ASSERT_EQ(loop->kind, AST_FOR);
+    EXPECT_GE(loop->for_stmt.var_id, 0);
+    EXPECT_EQ(avl.insert_call->call.args.count, 3u);
+    const ast_node_t* i_arg = static_cast<const ast_node_t*>(avl.insert_call->call.args.items[2]);
+    EXPECT_EQ(i_arg->var_ref.id, loop->for_stmt.var_id) << "bst_insert(mem, root, i) uses the loop variable";
 }
 
 // ========================================
@@ -870,10 +934,12 @@ static const avl_fail_case_t FAILING[] = {
     { T_RECURSION_INFERRED, "RecursiveFunctionWithoutType", ERR_SEM_TYPE },
     // left_right_case: return rotate_right(m2, node) - return in a function without a written type
     { T_RETURN_IN_INFERRED, "ReturnWithoutWrittenType", ERR_SEM_TYPE },
-    // max: if (n1 > n2) { return n1 } else { n2 } - one path without return
-    { T_RULE3_MISSING_RETURN, "IfPathWithoutReturn", ERR_SEM_TYPE },
-    // def get_height(...) = { if (node == 0) { 0 } else { get(mem, node, 3) } } - an if has no value
-    { T_RULE3_INFERRED_VALUES, "IfUsedAsValue", ERR_SEM_TYPE },
+    // max: if (n1 > n2) { return n1 } - no else, the Int function has a path without a value
+    { T_RULE3_MISSING_RETURN, "IfWithoutElseInIntFunction", ERR_SEM_TYPE },
+    // def get_height(...) = if node == 0 then "0" else get(mem, node, 3) - String and Int branches (CONTROL)
+    { T_IF_BRANCH_TYPES, "IfExpressionBranchTypes", ERR_SEM_TYPE },
+    // main: for i <- 1 to toStr(count) - a String bound (CONTROL)
+    { T_FOR_BOUND, "ForWithStringBound", ERR_SEM_TYPE },
     // @main def main() = { ...; root } - main inferred as Int
     { T_MAIN_NON_UNIT, "MainReturnsInt", ERR_SEM_TYPE },
     // rebalance: if (bf == -"2")
@@ -896,10 +962,14 @@ static const avl_fail_case_t FAILING[] = {
     { A_ASSIGN_VAL, "AssignToVal", ERR_SEM_ASSIGN },
     // def bst_find(mem: String, node: Int, key: Int) moving its node parameter like the C version
     { A_ASSIGN_PARAM, "AssignToParameter", ERR_SEM_ASSIGN },
+    // main: for i <- 1 to count do { ...; i = i + 1 } - the loop variable is immutable (CONTROL)
+    { A_ASSIGN_LOOP_VAR, "AssignToLoopVariable", ERR_SEM_ASSIGN },
 
     // ---- 10: other ----
     // rotate_left: if (old_root == 0) { return } - bare return in a String function (open forum question)
     { O_BARE_RETURN, "BareReturnInStringFunction", ERR_SEM_OTHER },
+    // main: for i <- 1 to count by 0 - literal zero step (CONTROL, code to be confirmed on the forum)
+    { O_ZERO_STEP, "ForWithZeroStep", ERR_SEM_OTHER },
 };
 
 class SemanticAvlFailTest : public SemanticAvlTest,

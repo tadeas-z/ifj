@@ -111,6 +111,23 @@ inline ast_node_t* while_(ast_node_t* c, const node_list_t& body)
     return ast_new_while(c, block(body), 1, 1);
 }
 
+// AI-generated using: Claude Code, model Claude Opus 5.5
+// Prompt: "Update the tests and write tests for the control" (shared for builder)
+// Scope: for_ only
+//
+// CONTROL: for <name> <- <from> to <to> [by <step>] [if <guard>]... do { <body> }
+//          inclusive == false -> until, step == nullptr -> no by
+inline ast_node_t* for_(const char* name, ast_node_t* from, ast_node_t* to, ast_node_t* step, bool inclusive,
+    const node_list_t& guards, const node_list_t& body)
+{
+    ast_node_t* node = ast_new_for(name, from, to, step, inclusive, 1, 1);
+    EXPECT_NE(node, nullptr);
+    for (ast_node_t* guard : guards)
+        EXPECT_TRUE(dyn_arr_append(&node->for_stmt.guards, guard));
+    node->for_stmt.body = block(body);
+    return node;
+}
+
 // [@main] def <name>(<params>): <ret_type> = { <body> }      ret_type == nullptr -> not written
 inline ast_node_t* make_func(const char* name, type_t* ret_type, const param_list_t& params, const node_list_t& body,
     bool is_main = false)
