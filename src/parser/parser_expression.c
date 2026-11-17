@@ -12,11 +12,22 @@
 #include "parser_stack.h"
 #include "ast.h"
 #include "lexer.h"
-#include "comp_error.h"
+#include "comp_error.h"		
+
+//macro relation_error, syntatic error
+#define R_ERR ' ' 
 
 bool stack_err_flag = false;
-//macro relation_error, syntatic error
-#define R_ERR ' ' 	
+
+static token_t pending_token;
+static bool has_pending = false;
+
+// Lookahead token to be consumed on the next expression token advance.
+void parser_expression_push_back(token_t *token) {
+    pending_token = *token;
+    memset(token, 0, sizeof(*token));
+    has_pending = true;
+}	
 
 /*
 ---------------------------------------------------------------------------------
@@ -58,6 +69,7 @@ static tdata_t top (tstack_t *s) {
 	return stack_is_empity;
 }
 
+// Searches from the top of the stack for the nearest terminal symbol
 static tselem_t* get_top_terminal (tstack_t *s){
     if(s == NULL || s->top == NULL)
             return NULL;
@@ -84,6 +96,12 @@ static void stack_free(tstack_t *s){
     }
 }
 //end stack function definition
+
+// AI-generated using: Gemini
+//                model: Gemini 4 HYDROGEN
+// Prompt (summary): "Generate functions for the literal parsing and decoding
+//                    helper functions (integer literals and string unescaping)."
+// Scope: parser_int_literal, decode_string_literal
 
 static int64_t parser_int_literal (const char *lexeme){
 	if(lexeme == NULL)
@@ -173,18 +191,19 @@ static char *decode_string_literal (const char *lexeme){
 	return out; 
 } 
 
-const char precedence_table [10] [10] = {
-		/*	  	 +		 -		 *		 /		 (			 )		 $		id		rel		u-		*/
-/*	+	*/{		'>',	'>',	'<',	'<',	'<',		'>',	'>',	'<',	'>',	'<'		},
-/*	-	*/{		'>',	'>',	'<',	'<',	'<',		'>',	'>',	'<',	'>',	'<'		},
-/*	*	*/{		'>',	'>',	'>',	'>',	'<',		'>',	'>',	'<',	'>',	'<'		},
-/*	/	*/{		'>',	'>',	'>',	'>',	'<',		'>',	'>',	'<',	'>',	'<'		},
-/*	(	*/{		'<',	'<',	'<',	'<',	'<',		'=',	R_ERR,	'<',	'<',	'<'		},
-/*	)	*/{		'>',	'>',	'>',	'>',	R_ERR,		'>',	'>',	R_ERR,	'>',	R_ERR	},
-/*	$	*/{		'<',	'<',	'<',	'<',	'<',		R_ERR,	R_ERR,	'<',	'<',	'<'		},		
-/*	id	*/{		'>',	'>',	'>',	'>',	R_ERR, 		'>', 	'>', 	R_ERR,	'>',	R_ERR	},
-/*	rel	*/{		'<',	'<',	'<',	'<',	'<',		'>',	'>',	'<',	'>',	'<'		},
-/*	u-	*/{		'>',   	'>',   	'>',   	'>',   	'<',   		'>',   	'>',   	'<',   	'>',   	'<' 	}
+const char precedence_table [11] [11] = {
+		/*	  	 +		 -		 *		 /		 (			 )		 $		id		rel		u-		eq		*/
+/*	+	*/{		'>',	'>',	'<',	'<',	'<',		'>',	'>',	'<',	'>',	'<',	'>'		},
+/*	-	*/{		'>',	'>',	'<',	'<',	'<',		'>',	'>',	'<',	'>',	'<',	'>'		},
+/*	*	*/{		'>',	'>',	'>',	'>',	'<',		'>',	'>',	'<',	'>',	'<',	'>'		},
+/*	/	*/{		'>',	'>',	'>',	'>',	'<',		'>',	'>',	'<',	'>',	'<',	'>'		},
+/*	(	*/{		'<',	'<',	'<',	'<',	'<',		'=',	R_ERR,	'<',	'<',	'<',	'<'		},
+/*	)	*/{		'>',	'>',	'>',	'>',	R_ERR,		'>',	'>',	R_ERR,	'>',	R_ERR,	'>'		},
+/*	$	*/{		'<',	'<',	'<',	'<',	'<',		R_ERR,	R_ERR,	'<',	'<',	'<',	'<'		},		
+/*	id	*/{		'>',	'>',	'>',	'>',	R_ERR, 		'>', 	'>', 	R_ERR,	'>',	R_ERR,	'>' 	},
+/*	rel	*/{		'<',	'<',	'<',	'<',	'<',		'>',	'>',	'<',	R_ERR,	'<',	'>'		},
+/*	u-	*/{		'>',   	'>',   	'>',   	'>',   	'<',   		'>',   	'>',   	'<',   	'>',   	'<', 	'>' 	},
+/*  eq */ {     '<',   	'<',   	'<',   	'<',   	'<',   		'>',   	'>',  	'<',   	'<',   	'<', 	R_ERR 	},
 };
 
 typedef enum {
@@ -197,7 +216,8 @@ typedef enum {
 	index_dollar = 6,
 	index_id = 7,
 	index_rel = 8,
-	index_uminus = 9
+	index_uminus = 9,
+	index_eq = 10
 }PrecedenceIndex;
 
 int get_precedence_index (token_type_t t, bool is_unary){
@@ -218,13 +238,15 @@ int get_precedence_index (token_type_t t, bool is_unary){
 		return index_dollar;
 	else if (t == TOKEN_IDENTIFIER || t == TOKEN_INTEGER || t == TOKEN_DOUBLE || t == TOKEN_STRING)
 		return index_id;
-	else if (t == TOKEN_EQUAL || t == TOKEN_NOT_EQUAL || t == TOKEN_LESS || 
-		t == TOKEN_LESS_EQUAL || t == TOKEN_GREATER || t == TOKEN_GREATER_EQUAL)
-		return index_rel;
+	else if (t == TOKEN_LESS || t == TOKEN_LESS_EQUAL ||  t == TOKEN_GREATER || t == TOKEN_GREATER_EQUAL)
+    	return index_rel;
+	else if (t == TOKEN_EQUAL || t == TOKEN_NOT_EQUAL)
+    	return index_eq;
 	else
 		return -1;
 }
 
+// Returns true if token type represents a literal or identifier 
 static bool is_operand (token_type_t token) {
 	if(token == TOKEN_IDENTIFIER || token == TOKEN_INTEGER ||
 		token == TOKEN_DOUBLE || token == TOKEN_STRING){
@@ -233,6 +255,7 @@ static bool is_operand (token_type_t token) {
 	return false;
 }
 
+// Frees AST nodes held inside a temporary reduction buffer on error
 static void free_control (tdata_t* control, int count){
 	for(int i = 0; i < count; i++){
 		if (control[i].ast_node != NULL){
@@ -242,6 +265,7 @@ static void free_control (tdata_t* control, int count){
 	}	
 }
 
+// Pops symbols down to the shift mark and reduces them into a non-terminal AST node
 int reduce_rules (tstack_t *stack, size_t line, size_t col){
     tdata_t control[5];
     int count_control = 0;
@@ -275,7 +299,7 @@ int reduce_rules (tstack_t *stack, size_t line, size_t col){
 		return ERR_SYNTAX;
 	}
 	
-    //rule E -> id 
+    // 1) E -> id 
     if(count_control == 1 && control[0].symbol_type == SYMBOL_TERMINAL && 
 		is_operand (control[0].token_type)){
 		
@@ -287,7 +311,7 @@ int reduce_rules (tstack_t *stack, size_t line, size_t col){
 			return ERR_OK;
     	}
     	if (count_control == 2){
-			// 1) E -> ()
+			// 2) E -> ()
 			if(control[1].symbol_type == SYMBOL_TERMINAL && control[1].token_type == TOKEN_LPAREN &&
 				control[0].symbol_type == SYMBOL_TERMINAL && control[0].token_type == TOKEN_RPAREN){
 				
@@ -304,7 +328,7 @@ int reduce_rules (tstack_t *stack, size_t line, size_t col){
 				return ERR_OK;
 			}
 
-			// 2) E -> - E
+			// 3) E -> - E
 			if(control[1].symbol_type == SYMBOL_TERMINAL && control[1].token_type == TOKEN_MINUS &&
 				control[0].symbol_type == SYMBOL_NON_TERMINAL){
 
@@ -323,7 +347,7 @@ int reduce_rules (tstack_t *stack, size_t line, size_t col){
 		}
 
 		if(count_control == 3){
-			// 3) E -> ( E )
+			// 4) E -> ( E )
 			if(control[2].token_type == TOKEN_LPAREN && 
 				control[1].symbol_type == SYMBOL_NON_TERMINAL && 
 				control[0].token_type == TOKEN_RPAREN){
@@ -336,7 +360,7 @@ int reduce_rules (tstack_t *stack, size_t line, size_t col){
 				return ERR_OK;
 			}  
 			
-			//E -> E op E, op={+,-,*,/}
+			// 5) E -> E op E, op={+,-,*,/}
 			if(control[2].symbol_type == SYMBOL_NON_TERMINAL && 
 				control[1].symbol_type == SYMBOL_TERMINAL && 
 				control[0].symbol_type == SYMBOL_NON_TERMINAL){
@@ -386,11 +410,25 @@ int reduce_rules (tstack_t *stack, size_t line, size_t col){
 		return ERR_SYNTAX;
 }
 
+// AI-generated using: Gemini
+//                model: Gemini 4 HYDROGEN
+// Prompt (summary): "Generate a function for the advance_shared_token() helper
+//                    function used to advance the shared token stream from the
+//                    pending lookahead buffer or the lexer."
+// Scope: advance_shared_token
+
+// Advances the shared parser token from the pending buffer or directly from the lexer
 static int advance_shared_token(lexer_t *lexer, token_t *current_token) {
     token_dispose(current_token);
-    if (lexer_next(lexer, current_token) != ERR_OK) {
-        return ERR_LEXICAL;
+    if (has_pending) {
+        *current_token = pending_token;
+        memset(&pending_token, 0, sizeof(pending_token));
+        has_pending = false;
+        return ERR_OK;
     }
+
+    if (lexer_next(lexer, current_token) != ERR_OK)
+        return ERR_LEXICAL;
     return ERR_OK;
 }
 
@@ -407,6 +445,7 @@ int parser_expression(lexer_t *lexer, token_t *current_token, ast_node_t **out_n
 	*out_node = NULL;
 	stack_err_flag = false;
 
+	// Initialize stack with end marker ('$')
 	tstack_t stack;
     stack_init(&stack);
 
@@ -416,6 +455,7 @@ int parser_expression(lexer_t *lexer, token_t *current_token, ast_node_t **out_n
 
     bool end_parsing = false;
 	bool expect_operand = true;
+	int paren_depth = 0;
 
     while(!(end_parsing)){
         tselem_t *terminal_top = get_top_terminal(&stack);
@@ -423,6 +463,8 @@ int parser_expression(lexer_t *lexer, token_t *current_token, ast_node_t **out_n
             stack_free(&stack);
             return ERR_SYNTAX;
         }
+
+		// Handle identifiers as either function calls 'id(...)' or variable references
 		if(expect_operand && current_token->type == TOKEN_IDENTIFIER){
 			size_t id_line = current_token->line;
 			size_t id_col = current_token->column;
@@ -470,6 +512,7 @@ int parser_expression(lexer_t *lexer, token_t *current_token, ast_node_t **out_n
 							}
 						}
 
+						// Recursively parse each argument expression
 						ast_node_t *arg_node = NULL;
 						int arg_err = parser_expression(lexer, current_token, &arg_node);
 						if(arg_err != ERR_OK){
@@ -502,8 +545,11 @@ int parser_expression(lexer_t *lexer, token_t *current_token, ast_node_t **out_n
                                 }
 							}
 
-							if(current_token->type == TOKEN_RPAREN)
-								break;
+							if(current_token->type == TOKEN_RPAREN){
+								ast_free(operand_node);
+								stack_free(&stack);
+								return ERR_SYNTAX;
+							}
 							continue; 
 						}
 						break;
@@ -524,6 +570,7 @@ int parser_expression(lexer_t *lexer, token_t *current_token, ast_node_t **out_n
                 }
 			}
 
+			// Plain variable reference
 			else{
 				operand_node = ast_new_var_ref(id_name, id_line, id_col);
 				free(id_name);
@@ -536,7 +583,7 @@ int parser_expression(lexer_t *lexer, token_t *current_token, ast_node_t **out_n
 			bool top_is_unary = (terminal_top->data.token_type == TOKEN_MINUS &&
                                  (terminal_top->next == NULL || terminal_top->next->data.symbol_type == SYMBOL_TERMINAL));
 			int row = get_precedence_index(terminal_top->data.token_type, top_is_unary);
-			if (row < 0 || row >= 10 || precedence_table[row][index_id] != '<') {
+			if (row < 0 || row >= 11 || precedence_table[row][index_id] != '<') {
                 ast_free(operand_node);
                 stack_free(&stack);
                 return ERR_SYNTAX;
@@ -559,19 +606,24 @@ int parser_expression(lexer_t *lexer, token_t *current_token, ast_node_t **out_n
             continue;
 		}
 
+		 // Determine precedence table indices for the top stack terminal and current input token
 		bool input_is_unary = (current_token->type == TOKEN_MINUS && expect_operand);
         bool top_is_unary = (terminal_top->data.token_type == TOKEN_MINUS &&
                              (terminal_top->next == NULL || terminal_top->next->data.symbol_type == SYMBOL_TERMINAL));
 
-        int row = get_precedence_index (terminal_top->data.token_type, top_is_unary);
-        int col = get_precedence_index (current_token->type, input_is_unary);
+        int row = get_precedence_index(terminal_top->data.token_type, top_is_unary);
+        int col = get_precedence_index(current_token->type, input_is_unary);
+		
+		if (current_token->type == TOKEN_RPAREN && paren_depth == 0)
+    		col = index_dollar;
 
-        if(row < 0 || row >= 10 || col < 0 || col >=  10){
+        if(row < 0 || row >= 11 || col < 0 || col >=  11){
             stack_free (&stack);
             return ERR_SYNTAX;
         }
         char rel = precedence_table[row][col];
-        switch (rel){
+        switch(rel){
+			// Equal precedence, match closing parenthesis ')' with '('
             case '=': {
                 tdata_t data = {SYMBOL_TERMINAL, current_token->type, false, NULL};
                 if (!(push(&stack, data))){ 
@@ -579,6 +631,7 @@ int parser_expression(lexer_t *lexer, token_t *current_token, ast_node_t **out_n
 					return ERR_INTERNAL;
 				}
 				expect_operand = false;
+				paren_depth--;
                 int adv_err = advance_shared_token(lexer, current_token);
                 if (adv_err != ERR_OK) {
                     stack_free(&stack);
@@ -587,6 +640,7 @@ int parser_expression(lexer_t *lexer, token_t *current_token, ast_node_t **out_n
                 break;
             }
 
+			// Higher precedence on stack, reduce handle according to grammar rules
             case '>': {
 				size_t token_line = current_token->line;
                 size_t token_col = current_token->column;
@@ -596,7 +650,8 @@ int parser_expression(lexer_t *lexer, token_t *current_token, ast_node_t **out_n
                     return r_rules;
                 }
                 tselem_t *first_elem = stack.top;
-                
+				
+				// Stop parsing once only '$ E' remains and the input token is end-of-expression
                 if(first_elem != NULL && 
                     first_elem->data.symbol_type == SYMBOL_NON_TERMINAL &&
                     first_elem->next != NULL && 
@@ -611,7 +666,8 @@ int parser_expression(lexer_t *lexer, token_t *current_token, ast_node_t **out_n
                 }
 				break;
             }
-            
+			
+			// Lower precedence on stack: shift literal or operator token onto the stack
             case '<': {
                 terminal_top->data.shift_mark = true;
                 ast_node_t *leaf_node = NULL;
@@ -653,6 +709,8 @@ int parser_expression(lexer_t *lexer, token_t *current_token, ast_node_t **out_n
 					expect_operand = false;
 				}
 				else{
+					if (token_type == TOKEN_LPAREN)
+       					paren_depth++;
 					expect_operand = true;
 				}
 				
