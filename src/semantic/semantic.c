@@ -43,6 +43,7 @@ static error_code_t check_assign(sema_ctx_t* semantic_ctx, ast_node_t* ast_state
 static error_code_t check_return(sema_ctx_t* semantic_ctx, ast_node_t* ast_statement);
 static error_code_t check_if(sema_ctx_t* semantic_ctx, ast_node_t* ast_statement);
 static error_code_t check_while(sema_ctx_t* semantic_ctx, ast_node_t* ast_statement);
+static error_code_t check_for(sema_ctx_t* semantic_ctx, ast_node_t* ast_statement);
 
 static error_code_t check_unary(sema_ctx_t* semantic_ctx, ast_node_t* ast_expression);
 static error_code_t check_binary(sema_ctx_t* semantic_ctx, ast_node_t* ast_expression);
@@ -201,6 +202,19 @@ static error_code_t unify_numeric(ast_node_t* ast_binary)
         TRY(coerce(&ast_binary->binary.right, TYPE_DOUBLE, ERR_SEM_TYPE));
     }
     return ERR_OK;
+}
+
+// Checks if provided literal is 0 or -0
+static bool is_zero_literal(ast_node_t* node)
+{
+    if (node->kind == AST_INT_LIT && node->int_lit.value == 0)
+        return true;
+
+    else if (node->kind == AST_UNARY && node->unary.op == AST_OP_NEG)
+        return is_zero_literal(node->unary.operand);
+
+    else
+        return false;
 }
 
 // ========================================
@@ -572,6 +586,11 @@ static error_code_t check_statement(sema_ctx_t* semantic_ctx, ast_node_t* ast_st
         ast_statement->type = TYPE_UNIT;
         break;
 
+    case AST_FOR:
+        TRY(check_for(semantic_ctx, ast_statement));
+        ast_statement->type = TYPE_UNIT;
+        break;
+
     case AST_EXPR_STMT:
         TRY(check_expression(semantic_ctx, ast_statement->expr_stmt.expr));
         ast_statement->type = ast_statement->expr_stmt.expr->type;
@@ -685,6 +704,78 @@ static error_code_t check_while(sema_ctx_t* semantic_ctx, ast_node_t* ast_statem
     TRY(check_block(semantic_ctx, ast_statement->while_stmt.body));
 
     // Type of this statement is Unit - set in check_statement
+    return ERR_OK;
+}
+
+static error_code_t check_for(sema_ctx_t* semantic_ctx, ast_node_t* ast_statement)
+{
+    // Helpers
+    ast_for_t* for_stmt = &ast_statement->for_stmt;
+    bool is_step = false;
+
+    // Check loop variables
+    TRY(check_expression(semantic_ctx, for_stmt->from));
+    TRY(check_expression(semantic_ctx, for_stmt->to));
+
+    // From and to must be T_INT
+    if ((for_stmt->from->type->kind != T_INT) ||
+        (for_stmt->to->type->kind != T_INT))
+        return ERR_SEM_TYPE;
+
+    // step can be omitted
+    if (for_stmt->step != NULL) {
+        is_step = true;
+
+        TRY(check_expression(semantic_ctx, for_stmt->step));
+        // Must be INT
+        if (for_stmt->step->type->kind != T_INT)
+            return ERR_SEM_TYPE;
+
+        // step cant be 0 -> other checks are done during runtime
+        if (is_zero_literal(for_stmt->step))
+            return ERR_SEM_OTHER;   // Might be a different error
+    }
+
+    // Insert the loop vat, $end and $step into the symbol table
+    TRY_ST(symtable_push_scope(semantic_ctx->symbol_table));
+
+    symbol_t *var_sym;
+    symbol_t *end_sym;
+    symbol_t *step_sym;
+
+    // You cannot assign to loop variables -> ERR_SEM_ASSIGN
+    TRY_ST(symtable_insert_var(semantic_ctx->symbol_table, for_stmt->var_name, TYPE_INT, true, &var_sym));
+    TRY_ST(symtable_insert_var(semantic_ctx->symbol_table, "$end", TYPE_INT, true, &end_sym));
+    if (is_step) {
+        TRY_ST(symtable_insert_var(semantic_ctx->symbol_table, "$step", TYPE_INT, true, &step_sym));
+        for_stmt->step_id = step_sym->id;
+    }
+
+    for_stmt->var_id = var_sym->id;
+    for_stmt->end_id = end_sym->id;
+
+    // Append for node into func_def.locals
+    bool res = dyn_arr_append(&semantic_ctx->current_func->func_def.locals, ast_statement);
+    if (res == false)
+        return ERR_INTERNAL;
+
+    // Check each guard
+    dyn_arr_t *guards = &for_stmt->guards;
+
+    for (size_t guard_i = 0; guard_i < guards->count; guard_i++) {
+        ast_node_t *guard = dyn_arr_get(guards, guard_i);
+        TRY(check_expression(semantic_ctx, guard));
+        // Each guard must be T_BOOL
+        if (guard->type->kind != T_BOOL)
+            return ERR_SEM_TYPE;
+    }
+
+    // Check the body of the for loop
+    TRY(check_block(semantic_ctx, for_stmt->body));
+
+    // Pop the for loop var symtable scope
+    TRY_ST(symtable_pop_scope(semantic_ctx->symbol_table));
+
     return ERR_OK;
 }
 

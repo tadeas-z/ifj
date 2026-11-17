@@ -88,7 +88,7 @@ typedef struct
     dyn_arr_t params; // (P) array of ast_param_t* - also hold the count
     type_t* return_type; // (P, then S) NULL when not written. Semantics replaces it with the inferred type
     ast_node_t* body; // (P) AST_BLOCK node.
-    dyn_arr_t locals; // (S) every VAR_DEF in the body - pointers are borrowed
+    dyn_arr_t locals; // (S) every (VAR_DEF or AST_FOR) in the body - pointers are borrowed
 } ast_func_def_t;
 
 // ast_node_t
