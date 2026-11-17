@@ -5,6 +5,10 @@
 #include "parser.h"
 #include <string.h>
 #include <stdlib.h>
+#include "parser_expression.h"
+#include "parser_stack.h"
+#include "ast.h"
+#include "lexer.h"
 
 typedef struct {
   lexer_t *lexer;
@@ -35,17 +39,6 @@ static bool is_expected (parser_t *parser, token_type_t token){
     return false;
 }
 
-static int peek_next_token(parser_t *parser, token_t **out_peek){
-  if(!parser->has_peek){
-    int status = lexer_next(parser->lexer, &parser->peek_token);
-    if(status != ERR_OK)
-      return ERR_LEXICAL;
-    parser->has_peek = true;
-  }
-  *out_peek = &parser->peek_token;
-  return ERR_OK;
-}
-
 static char *copy_lexeme(char *src){
   if(src == NULL)
     return NULL;
@@ -72,7 +65,7 @@ static int parser_expr_shared(parser_t *parser, ast_node_t **out_expr){
 static int parser_block (parser_t *parser, ast_node_t **out_node);
 static int parser_statement (parser_t *parser, ast_node_t **out_node);
 static int parser_return(parser_t *parser, ast_node_t **out_node);
-static int statement_end(parser_t *parser);
+static int expect_statement_end(parser_t *parser);
 
 /*
 ---------------------------------------------------------------------------------
@@ -479,13 +472,13 @@ static int parser_func_declaration (parser_t *parser, ast_node_t **out_node, boo
           ast_free(func_node);
           return err;
         }
-        while (is_expected(parser, TOKEN_NEWLINE)) 
+        while(is_expected(parser, TOKEN_NEWLINE)){
           err = get_next_token(parser);
           if(err != ERR_OK){
             ast_free(func_node);
             return err;
           }
-        
+        }
         if (is_expected(parser, TOKEN_RPAREN))
           break;
 
@@ -567,7 +560,7 @@ static int parser_func_declaration (parser_t *parser, ast_node_t **out_node, boo
         return err;
       }
 
-      err = expect_statment_end(parser);
+      err = expect_statement_end(parser);
       if(err != ERR_OK){
         ast_free(body_expr);
         ast_free(func_node);
@@ -587,7 +580,6 @@ static int parser_func_declaration (parser_t *parser, ast_node_t **out_node, boo
     
     *out_node = func_node;
     return ERR_OK;
-  
 }
 
 /*
@@ -648,7 +640,7 @@ static int parser_block(parser_t *parser, ast_node_t **out_node) {
     }
 
     ast_node_t *stmt = NULL;
-    int err = parser_statements(parser, &stmt);
+    int err = parser_statement(parser, &stmt);
     if(err != ERR_OK){
       ast_free(block);
       return err;
@@ -687,7 +679,7 @@ static int parser_statement (parser_t *parser, ast_node_t **out_node){
     return parser_var_declaration (parser, out_node);
     
   else if(is_expected(parser, TOKEN_IDENTIFIER))
-    return parser_assignment_or_funcall (parser, out_node);
+    return parser_assignment (parser, out_node);
 
   else if(is_expected(parser, TOKEN_IF))
     return parser_if_statement (parser, out_node);
@@ -736,7 +728,7 @@ static int parser_statement (parser_t *parser, ast_node_t **out_node){
     if(err != ERR_OK) 
       return err;
 
-    err = expect_statment_end(parser);
+    err = expect_statement_end(parser);
     if(err != ERR_OK){
       ast_free(expr);
       return err;
@@ -774,7 +766,7 @@ static int parser_return(parser_t *parser, ast_node_t **out_node){
       is_expected(parser, TOKEN_SEMICOLON) ||
       is_expected(parser, TOKEN_EOF)) 
   {
-    err = expect_statment_end(parser);
+    err = expect_statement_end(parser);
     if(err != ERR_OK)
       return err;
 
