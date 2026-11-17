@@ -4,10 +4,9 @@
 
 // AI-generated using: Gemini
 //                model: Gemini 4 HYDROGEN
-// Prompt (summary): "Generate unit tests for the IFJ26 parser covering valid and
-//                    invalid syntax, declarations, control flow, and trailing commas."
-// Scope: test_parser.c 
-
+// Prompt (summary): "Generate unit tests for the IFJ26 expression parser covering
+//                    operator precedence, function calls, and trailing commas."
+// Scope: test_parser_expression.c
 
 #include <assert.h>
 #include <stdio.h>
