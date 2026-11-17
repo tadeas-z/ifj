@@ -22,14 +22,6 @@ bool stack_err_flag = false;
 static token_t pending_token;
 static bool has_pending = false;
 
-// Lookahead token to be consumed on the next expression token advance.
-void parser_expression_push_back(token_t* token)
-{
-    pending_token = *token;
-    memset(token, 0, sizeof(*token));
-    has_pending = true;
-}
-
 /*
 ---------------------------------------------------------------------------------
 |    Stack function definition                               				    |
