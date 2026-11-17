@@ -443,6 +443,13 @@ static int advance_shared_token(lexer_t* lexer, token_t* current_token)
     return ERR_OK;
 }
 
+// Lookahead token to be consumed on the next expression token advance.
+void parser_expression_push_back(token_t* token){
+    pending_token = *token;
+    memset(token, 0, sizeof(*token));
+    has_pending = true;
+}
+
 /*
 ---------------------------------------------------------------------------------
 |    Main precedence expression parser                              			|
