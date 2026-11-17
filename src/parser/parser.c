@@ -5,10 +5,13 @@
 #include "parser.h"
 #include <string.h>
 #include <stdlib.h>
+
+#include "comp_error.h"      //compiler exit
+#include "parser_expression.h"
+#include "types.h"
 #include "parser_expression.h"
 #include "parser_stack.h"
-#include "ast.h"
-#include "lexer.h"
+
 
 typedef struct {
   lexer_t *lexer;
@@ -17,6 +20,13 @@ typedef struct {
   bool has_peek;
   size_t current_indent;
 }parser_t;
+
+// AI-generated using: Gemini
+//                model: Gemini 4 HYDROGEN
+// Prompt (summary): "Generate comments for the helper functions used in
+//                    syntactic analysis (token retrieval, expectation check,
+//                    and lexeme copying)."
+// Scope: get_next_token, is_expected, copy_lexeme
 
 static int get_next_token(parser_t *parser){
   token_dispose(&parser->input_token);
@@ -28,7 +38,7 @@ static int get_next_token(parser_t *parser){
   }
   int status = lexer_next(parser->lexer, &parser->input_token);
   if(status != ERR_OK)
-    return ERR_LEXICAL;
+    return status;
   return ERR_OK;
 }
 
@@ -38,6 +48,12 @@ static bool is_expected (parser_t *parser, token_type_t token){
   else
     return false;
 }
+
+/*
+---------------------------------------------------------------------------------
+|  Chacking syntax of VAR/VAL declaration                                        |
+---------------------------------------------------------------------------------
+*/
 
 static char *copy_lexeme(char *src){
   if(src == NULL)
@@ -69,8 +85,8 @@ static int expect_statement_end(parser_t *parser);
 
 /*
 ---------------------------------------------------------------------------------
-|  Chacking syntax of VAR/VAL declaration                                           |
-|  (syntax:  var/val temp [: Data_Type] = <value>) ;                                    |
+|  Chacking syntax of VAR/VAL declaration                                        |
+|  (syntax:  var/val temp [: Data_Type] = <value>) ;                             |
 ---------------------------------------------------------------------------------
 */
 
@@ -82,6 +98,7 @@ static int parser_var_declaration (parser_t *parser, ast_node_t **out_node){
   if(err != ERR_OK)
     return err;
 
+  // Variable name identifier
   if(!is_expected(parser, TOKEN_IDENTIFIER))
       return ERR_SYNTAX;
 
@@ -95,6 +112,7 @@ static int parser_var_declaration (parser_t *parser, ast_node_t **out_node){
     return err;
   }
 
+  // Parse optional explicit type annotation
   type_t *var_type = NULL;
   if (is_expected(parser, TOKEN_COLON)){
     err = get_next_token (parser);
@@ -122,13 +140,14 @@ static int parser_var_declaration (parser_t *parser, ast_node_t **out_node){
     return ERR_SYNTAX;
   }
 
+  // Advance past the type keyword
   err = get_next_token(parser);
   if(err != ERR_OK){
     free(var_name);
     return err;
   }  
 
-
+  // Parse initializer expression
   ast_node_t *init_expr = NULL;
   err = parser_expr_shared(parser, &init_expr);
   if(err != ERR_OK){
@@ -136,6 +155,7 @@ static int parser_var_declaration (parser_t *parser, ast_node_t **out_node){
     ast_free(init_expr);
     return err;
   }  
+  // Build variable definition AST node
   ast_node_t *var_node = ast_new_var_def(var_name, is_const, var_type, init_expr, line, col);
   free(var_name);
   if(var_node == NULL){
@@ -158,6 +178,7 @@ static int parser_assignment (parser_t *parser, ast_node_t **out_node){
   size_t line = parser->input_token.line;
   size_t col = parser->input_token.column;
   
+   // Store target variable name and consume identifier token
   char *var_name = copy_lexeme(parser->input_token.lexeme);
   if(var_name == NULL)
     return ERR_INTERNAL;
@@ -180,6 +201,7 @@ static int parser_assignment (parser_t *parser, ast_node_t **out_node){
     return err;
   }  
 
+  // Parse right-hand side expression
   ast_node_t *var_expr = NULL;
   err = parser_expr_shared (parser, &var_expr);
   if (err != ERR_OK){
@@ -187,6 +209,7 @@ static int parser_assignment (parser_t *parser, ast_node_t **out_node){
     return err;
   }
 
+  // Verify statement termination
   err = expect_statement_end(parser);
   if(err != ERR_OK){
     free(var_name);
@@ -194,6 +217,7 @@ static int parser_assignment (parser_t *parser, ast_node_t **out_node){
     return err;
   }  
   
+  // Create assignment AST node
   ast_node_t *assign_node = ast_new_assign(var_name, var_expr, line, col);
   free(var_name);
   if(assign_node == NULL){
@@ -219,13 +243,15 @@ static int parser_assignment (parser_t *parser, ast_node_t **out_node){
 static int parser_if_statement (parser_t *parser, ast_node_t **out_node){
  size_t line = parser->input_token.line;
  size_t col = parser->input_token.column;
+ // Record 'if' indentation to match a corresponding 'else' at the same level
  size_t if_ident = parser->input_token.indentation;
 
  int err = get_next_token(parser);
   if(err != ERR_OK)
     return err;
 
-  ast_node_t *cond_expr = NULL;                                          //condition expression
+  //condition expression
+  ast_node_t *cond_expr = NULL;                                         
   err = parser_expr_shared (parser, &cond_expr);
   if(err != ERR_OK)
     return err;
@@ -237,10 +263,11 @@ static int parser_if_statement (parser_t *parser, ast_node_t **out_node){
 
   err = get_next_token(parser);
   if(err != ERR_OK){
-    free(cond_expr);
+    ast_free(cond_expr);
     return err;
   }  
 
+  // Parse indented 'if <expr> then' body block
   ast_node_t *if_block = NULL;
   err = parser_block(parser, &if_block); 
   if (err != ERR_OK){ 
@@ -301,6 +328,8 @@ static int parser_if_statement (parser_t *parser, ast_node_t **out_node){
         }
       }
     }
+
+    // Construct final conditional AST node
     ast_node_t *if_node = ast_new_if (cond_expr, if_block, else_block, line, col);
     if(if_node == NULL) {
       ast_free(cond_expr);
@@ -325,6 +354,7 @@ static int parser_while_statement (parser_t *parser, ast_node_t **out_node){
   size_t line = parser->input_token.line;
   size_t col = parser->input_token.column;
 
+   // Skip 'while' keyword
   int err = get_next_token(parser);
   if(err != ERR_OK)
     return err;
@@ -344,7 +374,7 @@ static int parser_while_statement (parser_t *parser, ast_node_t **out_node){
     ast_free(cond_expr);
     return err;
   }
-    //while_block
+    //while_block, parse indented loop body block
   ast_node_t *while_block = NULL;
   err = parser_block(parser, &while_block); 
   if (err != ERR_OK){ 
@@ -352,6 +382,7 @@ static int parser_while_statement (parser_t *parser, ast_node_t **out_node){
     return err;
   }
 
+  // Construct while-loop AST node
   ast_node_t *while_node = ast_new_while(cond_expr, while_block, line, col);
   if (while_node == NULL){ 
     ast_free(cond_expr);
@@ -370,10 +401,12 @@ static int parser_while_statement (parser_t *parser, ast_node_t **out_node){
 |  Syntax: def id (param_list) [: type] = <expr_or_block>                       |
 ---------------------------------------------------------------------------------
 */
+
 static int parser_func_declaration (parser_t *parser, ast_node_t **out_node, bool is_main){
   size_t line = parser->input_token.line;
   size_t col = parser->input_token.column;
 
+  // Check 'def' keyword
   if(!(is_expected(parser, TOKEN_DEF)))
     return ERR_SYNTAX;
 
@@ -381,6 +414,7 @@ static int parser_func_declaration (parser_t *parser, ast_node_t **out_node, boo
   if(err != ERR_OK)
     return err;
 
+  // Function name is required
   if(!is_expected(parser, TOKEN_IDENTIFIER))
         return ERR_SYNTAX;
 
@@ -453,6 +487,7 @@ static int parser_func_declaration (parser_t *parser, ast_node_t **out_node, boo
         return ERR_SYNTAX;
       }
 
+      // Register parameter in the function AST node
       bool added = ast_func_def_add_param(func_node, param_name, param_type);
       free(param_name);
       if(!added){
@@ -466,12 +501,15 @@ static int parser_func_declaration (parser_t *parser, ast_node_t **out_node, boo
         return err;
       }
 
+      // Continue parsing if a comma separates additional parameters
       if(is_expected(parser, TOKEN_COMMA)){
         err = get_next_token(parser);
         if(err != ERR_OK){
           ast_free(func_node);
           return err;
         }
+
+        // Allow line breaks after a comma in multi-line parameter lists
         while(is_expected(parser, TOKEN_NEWLINE)){
           err = get_next_token(parser);
           if(err != ERR_OK){
@@ -488,6 +526,7 @@ static int parser_func_declaration (parser_t *parser, ast_node_t **out_node, boo
     }
   }
     
+     // Expect closing ')' of parameter list
     if(!is_expected(parser, TOKEN_RPAREN)){
       ast_free(func_node);
       return ERR_SYNTAX;
@@ -526,6 +565,7 @@ static int parser_func_declaration (parser_t *parser, ast_node_t **out_node, boo
       }
     }
 
+    // Expect '=' separating function from its body
     if(!is_expected(parser, TOKEN_ASSIGN)){
       ast_free(func_node);
       return ERR_SYNTAX;
@@ -570,8 +610,8 @@ static int parser_func_declaration (parser_t *parser, ast_node_t **out_node, boo
       ast_node_t *body_block = ast_new_block(expr_line, expr_col);
       if(expr_stmt == NULL || body_block == NULL ||
         !dyn_arr_append(&body_block->block.statements, expr_stmt)){
-          ast_free(expr_stmt);
           ast_free(body_block);
+          ast_free(expr_stmt);
           ast_free(func_node);
           return ERR_INTERNAL;
         }
@@ -592,6 +632,7 @@ static int parser_block(parser_t *parser, ast_node_t **out_node) {
   size_t line = parser->input_token.line;
   size_t col = parser->input_token.column;
 
+  // Skip leading blank lines before the first statement of the block
   while (is_expected(parser, TOKEN_NEWLINE)) {
     int err = get_next_token(parser);
     if (err != ERR_OK) 
@@ -673,76 +714,82 @@ static int parser_block(parser_t *parser, ast_node_t **out_node) {
 ---------------------------------------------------------------------------------
 */
 
+static int parser_expression_statement(parser_t *parser, ast_node_t **out_node){
+  size_t line = parser->input_token.line;
+  size_t col = parser->input_token.column;
+
+  // Return the peeked token to the expression parser so it isn't skipped
+  if(parser->has_peek){
+    parser_expression_push_back(&parser->peek_token);
+    parser->has_peek = false;
+  }
+
+  ast_node_t *expr = NULL;
+  int err = parser_expr_shared(parser, &expr);
+  if(err != ERR_OK)
+    return err;
+
+  err = expect_statement_end(parser);
+  if(err != ERR_OK){
+    ast_free(expr);
+    return err;
+  }
+
+  ast_node_t *stmt = ast_new_expr_stmt(expr, line, col);
+  if(stmt == NULL){
+    ast_free(expr);
+    return ERR_INTERNAL;
+  }
+
+  *out_node = stmt;
+  return ERR_OK;
+}
+
 static int parser_statement (parser_t *parser, ast_node_t **out_node){
   
+  // Var or const declaration
   if(is_expected(parser, TOKEN_VAR) || is_expected(parser, TOKEN_VAL))
     return parser_var_declaration (parser, out_node);
-    
-  else if(is_expected(parser, TOKEN_IDENTIFIER))
-    return parser_assignment (parser, out_node);
 
-  else if(is_expected(parser, TOKEN_IF))
+  // Conditional statement
+  if(is_expected(parser, TOKEN_IF))
     return parser_if_statement (parser, out_node);
 
-  else if (is_expected(parser, TOKEN_WHILE)) 
+  // While loop statement
+  if (is_expected(parser, TOKEN_WHILE)) 
     return parser_while_statement(parser, out_node);
 
-  else if (is_expected(parser, TOKEN_RETURN))
+  // Return statement
+  if (is_expected(parser, TOKEN_RETURN))
     return parser_return(parser, out_node);
-    
-  else if(is_expected(parser, TOKEN_SEMICOLON)){
+
+  // Empty statement 
+  if(is_expected(parser, TOKEN_SEMICOLON)){
     *out_node = NULL;
     return get_next_token(parser);
   }
 
-  else if(is_expected(parser, TOKEN_IDENTIFIER)){
-    token_t *peek = NULL;
-
-    int err;
-    if (!parser->has_peek) {
-      err = lexer_next(parser->lexer, &parser->peek_token);
-      if (err != ERR_OK) 
-        return ERR_LEXICAL;
-
+  // Disambiguate assignment vs expression statement using 1-token peek
+  if(is_expected(parser, TOKEN_IDENTIFIER)){
+    if(!parser->has_peek){
+      int err = lexer_next(parser->lexer, &parser->peek_token);
+      if(err != ERR_OK)
+        return err;
       parser->has_peek = true;
     }
-    peek = &parser->peek_token;
 
-    if(err != ERR_OK)
-      return err;
-
-    if(peek->type == TOKEN_ASSIGN)
+    if(parser->peek_token.type == TOKEN_ASSIGN)
       return parser_assignment(parser, out_node);
+
+    return parser_expression_statement(parser, out_node);
   }
-  
-  else if(is_expected(parser, TOKEN_IDENTIFIER) || is_expected(parser, TOKEN_LPAREN) ||
-          is_expected(parser, TOKEN_INTEGER) || is_expected(parser, TOKEN_DOUBLE) ||
-          is_expected(parser, TOKEN_STRING) || is_expected(parser, TOKEN_MINUS) )
-  {
 
-    size_t line =parser->input_token.line;
-    size_t col = parser->input_token.column;
+  // Expression starting with a literal, unary minus, or parenthesis
+  if(is_expected(parser, TOKEN_LPAREN) ||
+     is_expected(parser, TOKEN_INTEGER) || is_expected(parser, TOKEN_DOUBLE) ||
+     is_expected(parser, TOKEN_STRING) || is_expected(parser, TOKEN_MINUS))
+    return parser_expression_statement(parser, out_node);
 
-    ast_node_t *expr = NULL;
-    int err = parser_expr_shared(parser, &expr);
-    if(err != ERR_OK) 
-      return err;
-
-    err = expect_statement_end(parser);
-    if(err != ERR_OK){
-      ast_free(expr);
-      return err;
-    }
-
-    ast_node_t *stmt = ast_new_expr_stmt(expr, line, col);
-    if(stmt == NULL){
-      ast_free(expr);
-      return ERR_INTERNAL;
-    }
-
-    *out_node = stmt;
-    return ERR_OK;
-  }
   return ERR_SYNTAX;
 }
 
@@ -761,7 +808,7 @@ static int parser_return(parser_t *parser, ast_node_t **out_node){
   if(err != ERR_OK)
     return err;
 
-  //empity return
+  // Return without a value expression
   if (is_expected(parser, TOKEN_NEWLINE) || 
       is_expected(parser, TOKEN_SEMICOLON) ||
       is_expected(parser, TOKEN_EOF)) 
@@ -777,6 +824,7 @@ static int parser_return(parser_t *parser, ast_node_t **out_node){
     return ERR_OK;
   }
   
+  // Parse return value expression
   ast_node_t *return_expr = NULL;
   err = parser_expr_shared(parser, &return_expr);
   if(err != ERR_OK){
@@ -784,6 +832,7 @@ static int parser_return(parser_t *parser, ast_node_t **out_node){
     return err;
   }
 
+  // Construct return AST node
   ast_node_t *ret_node = ast_new_return(return_expr, line, col);
   if(ret_node == NULL){
     ast_free(return_expr);
@@ -806,6 +855,7 @@ int parser_main(lexer_t *lexer, ast_node_t **out_ast){
 
   *out_ast = NULL;
 
+  // Initialize parser state and root program AST node
   parser_t parser;
   memset(&parser, 0, sizeof(parser_t));
   parser.lexer = lexer;
@@ -820,6 +870,7 @@ int parser_main(lexer_t *lexer, ast_node_t **out_ast){
     return err;
   }
 
+  // Skip newlines before the mandatory import prolog
   while (is_expected(&parser, TOKEN_NEWLINE)){
     err = get_next_token(&parser);
     if(err != ERR_OK){
@@ -881,6 +932,7 @@ int parser_main(lexer_t *lexer, ast_node_t **out_ast){
     return err; 
   }
 
+  // Prolog must be followed by a newline or EOF
   if (!is_expected(&parser, TOKEN_NEWLINE) && !is_expected(&parser, TOKEN_EOF)){
     ast_free(program);
     token_dispose(&parser.input_token);
@@ -898,6 +950,7 @@ int parser_main(lexer_t *lexer, ast_node_t **out_ast){
       continue;
     }
 
+    // Check for optional 'main' modifier preceding 'def'
     bool is_main = false;
     if (is_expected(&parser, TOKEN_MAIN)){
       is_main = true;
@@ -916,7 +969,8 @@ int parser_main(lexer_t *lexer, ast_node_t **out_ast){
         }
       }
     }
-  
+    
+    // Parse function declaration and append it to the program AST
     if (is_expected(&parser, TOKEN_DEF)) {
       ast_node_t *func_node = NULL;
       err = parser_func_declaration(&parser, &func_node, is_main);
@@ -939,6 +993,7 @@ int parser_main(lexer_t *lexer, ast_node_t **out_ast){
     }
   }
   
+  // Clean up input token and return AST
   token_dispose(&parser.input_token);
   *out_ast = program;
   return ERR_OK;
