@@ -126,8 +126,8 @@ static void words(void)
         TOKEN_DEF, TOKEN_DO, TOKEN_TYPE_DOUBLE, TOKEN_ELSE, TOKEN_IF,
         TOKEN_IMPORT, TOKEN_TYPE_INT, TOKEN_RETURN, TOKEN_TYPE_STRING,
         TOKEN_THEN, TOKEN_TYPE_UNIT, TOKEN_VAL, TOKEN_VAR, TOKEN_WHILE,
-        TOKEN_RESERVED_KEYWORD, TOKEN_RESERVED_KEYWORD, TOKEN_RESERVED_KEYWORD,
-        TOKEN_RESERVED_KEYWORD, TOKEN_RESERVED_KEYWORD, TOKEN_RESERVED_KEYWORD,
+        TOKEN_TYPE_BOOLEAN, TOKEN_RESERVED_KEYWORD, TOKEN_RESERVED_KEYWORD,
+        TOKEN_RESERVED_KEYWORD, TOKEN_FOR, TOKEN_RESERVED_KEYWORD,
         TOKEN_RESERVED_KEYWORD, TOKEN_RESERVED_KEYWORD, TOKEN_IDENTIFIER,
         TOKEN_IDENTIFIER, TOKEN_IDENTIFIER, TOKEN_IDENTIFIER,
         TOKEN_IDENTIFIER, TOKEN_IDENTIFIER, TOKEN_IDENTIFIER
@@ -215,7 +215,7 @@ static void errors(void)
         "_", "01", "0_1", "0__1", "1_", "1__", "1__x", "1e", "1e+", "1e_2", "1e2_",
         "1e2__", "1.0__", "1.0__d",
         "1.0_", "1ex", "1e+x", "1_x", "1.5_d", "01abc", "00_1", "1e2_x",
-        "@", "@ main", "@other", "@mainly", "!", "&", "|", "%", "{", "}",
+        "@", "@ main", "@other", "@mainly", "&", "|", "%", "{", "}",
         "`name`", "\x80",
         "1e309", "1e-9999"
     };
@@ -552,8 +552,139 @@ static void operator_boundaries(void)
         sequence(split[i].text, expected, 2);
     }
 
-    /* Unary ! belongs to the Boolean extension; base IFJ26 knows only !=. */
-    const char* bad[] = { "! =", "!a", "a!", "=!", "!\n=" };
+}
+
+// AI-generated using: Claude Code
+//              model: Claude Opus 5.5
+// Prompt (summary): "Write lexer tests for the BOOLTHEN and CONTROL tokens
+//          from my updated diagram: ! && || <- alone and in context, splits
+//          like !== <-- &&& ||| <=-, x<-1 as one arrow, lone & and | as
+//          error 1, Boolean/true/false/for keywords, to/until/by as
+//          identifiers, and VALMEM member chains after numbers."
+// Scope: extension_tokens.
+
+static void extension_tokens(void)
+{
+    const struct {
+        const char* text;
+        token_type_t type;
+    } single[] = {
+        { "!", TOKEN_NOT }, { "&&", TOKEN_AND }, { "||", TOKEN_OR },
+        { "<-", TOKEN_LARROW }, { "true", TOKEN_TRUE }, { "false", TOKEN_FALSE },
+        { "Boolean", TOKEN_TYPE_BOOLEAN }, { "for", TOKEN_FOR },
+        { "to", TOKEN_IDENTIFIER }, { "until", TOKEN_IDENTIFIER },
+        { "by", TOKEN_IDENTIFIER }, { "readBoolean", TOKEN_IDENTIFIER },
+        { "trueish", TOKEN_IDENTIFIER }, { "False", TOKEN_IDENTIFIER },
+        { "fort", TOKEN_IDENTIFIER }
+    };
+    for (size_t i = 0; i < sizeof single / sizeof single[0]; ++i) {
+        const expected_t expected[] = {
+            { single[i].type, single[i].text, 1, 1 },
+            { TOKEN_EOF, NULL, 1, strlen(single[i].text) + 1 }
+        };
+        sequence(single[i].text, expected, 2);
+    }
+
+    /* Longest match: each operator takes at most its two characters. */
+    const struct {
+        const char* text;
+        expected_t first, second;
+    } split[] = {
+        { "!!", { TOKEN_NOT, "!", 1, 1 }, { TOKEN_NOT, "!", 1, 2 } },
+        { "!a", { TOKEN_NOT, "!", 1, 1 }, { TOKEN_IDENTIFIER, "a", 1, 2 } },
+        { "a!", { TOKEN_IDENTIFIER, "a", 1, 1 }, { TOKEN_NOT, "!", 1, 2 } },
+        { "! =", { TOKEN_NOT, "!", 1, 1 }, { TOKEN_ASSIGN, "=", 1, 3 } },
+        { "=!", { TOKEN_ASSIGN, "=", 1, 1 }, { TOKEN_NOT, "!", 1, 2 } },
+        { "!(", { TOKEN_NOT, "!", 1, 1 }, { TOKEN_LPAREN, "(", 1, 2 } },
+        { "<--", { TOKEN_LARROW, "<-", 1, 1 }, { TOKEN_MINUS, "-", 1, 3 } },
+        { "<-=", { TOKEN_LARROW, "<-", 1, 1 }, { TOKEN_ASSIGN, "=", 1, 3 } },
+        { "<=-", { TOKEN_LESS_EQUAL, "<=", 1, 1 }, { TOKEN_MINUS, "-", 1, 3 } },
+        { "< -", { TOKEN_LESS, "<", 1, 1 }, { TOKEN_MINUS, "-", 1, 3 } },
+        { "-<", { TOKEN_MINUS, "-", 1, 1 }, { TOKEN_LESS, "<", 1, 2 } },
+        { "&&!", { TOKEN_AND, "&&", 1, 1 }, { TOKEN_NOT, "!", 1, 3 } },
+        { "||!", { TOKEN_OR, "||", 1, 1 }, { TOKEN_NOT, "!", 1, 3 } },
+        { "&&||", { TOKEN_AND, "&&", 1, 1 }, { TOKEN_OR, "||", 1, 3 } }
+    };
+    for (size_t i = 0; i < sizeof split / sizeof split[0]; ++i) {
+        const expected_t expected[] = { split[i].first, split[i].second };
+        sequence(split[i].text, expected, 2);
+    }
+    const expected_t not_newline[] = {
+        { TOKEN_NOT, "!", 1, 1 }, { TOKEN_NEWLINE, "\n", 1, 2 },
+        { TOKEN_ASSIGN, "=", 2, 1 }
+    };
+    sequence("!\n=", not_newline, 3);
+
+    const expected_t condition[] = {
+        { TOKEN_IF, "if", 1, 1 }, { TOKEN_NOT, "!", 1, 4 },
+        { TOKEN_IDENTIFIER, "a", 1, 5 }, { TOKEN_AND, "&&", 1, 7 },
+        { TOKEN_IDENTIFIER, "b", 1, 10 }, { TOKEN_OR, "||", 1, 12 },
+        { TOKEN_IDENTIFIER, "x", 1, 15 }, { TOKEN_NOT_EQUAL, "!=", 1, 16 },
+        { TOKEN_TRUE, "true", 1, 18 }, { TOKEN_THEN, "then", 1, 23 },
+        { TOKEN_EOF, NULL, 1, 27 }
+    };
+    sequence("if !a && b || x!=true then", condition,
+        sizeof condition / sizeof condition[0]);
+    const expected_t declaration[] = {
+        { TOKEN_VAL, "val", 1, 1 }, { TOKEN_IDENTIFIER, "b", 1, 5 },
+        { TOKEN_COLON, ":", 1, 6 }, { TOKEN_TYPE_BOOLEAN, "Boolean", 1, 8 },
+        { TOKEN_ASSIGN, "=", 1, 16 }, { TOKEN_FALSE, "false", 1, 18 },
+        { TOKEN_EOF, NULL, 1, 23 }
+    };
+    sequence("val b: Boolean = false", declaration,
+        sizeof declaration / sizeof declaration[0]);
+
+    /* CONTROL: the generator arrow is one token even without spaces. */
+    const expected_t generator[] = {
+        { TOKEN_FOR, "for", 1, 1 }, { TOKEN_IDENTIFIER, "i", 1, 5 },
+        { TOKEN_LARROW, "<-", 1, 7 }, { TOKEN_INTEGER, "1", 1, 10 },
+        { TOKEN_IDENTIFIER, "to", 1, 12 }, { TOKEN_INTEGER, "10", 1, 15 },
+        { TOKEN_IDENTIFIER, "by", 1, 18 }, { TOKEN_INTEGER, "2", 1, 21 },
+        { TOKEN_DO, "do", 1, 23 }, { TOKEN_EOF, NULL, 1, 25 }
+    };
+    sequence("for i <- 1 to 10 by 2 do", generator,
+        sizeof generator / sizeof generator[0]);
+    const expected_t tight[] = {
+        { TOKEN_IDENTIFIER, "x", 1, 1 }, { TOKEN_LARROW, "<-", 1, 2 },
+        { TOKEN_INTEGER, "1", 1, 4 }, { TOKEN_EOF, NULL, 1, 5 }
+    };
+    sequence("x<-1", tight, sizeof tight / sizeof tight[0]);
+    const expected_t spaced[] = {
+        { TOKEN_IDENTIFIER, "x", 1, 1 }, { TOKEN_LESS, "<", 1, 3 },
+        { TOKEN_MINUS, "-", 1, 5 }, { TOKEN_INTEGER, "1", 1, 6 },
+        { TOKEN_EOF, NULL, 1, 7 }
+    };
+    sequence("x < -1", spaced, sizeof spaced / sizeof spaced[0]);
+    const expected_t multiline_for[] = {
+        { TOKEN_FOR, "for", 1, 1 }, { TOKEN_NEWLINE, "\n", 1, 4 },
+        { TOKEN_IDENTIFIER, "i", 2, 5 }, { TOKEN_LARROW, "<-", 2, 7 },
+        { TOKEN_INTEGER, "0", 2, 10 }, { TOKEN_IDENTIFIER, "until", 2, 12 },
+        { TOKEN_IDENTIFIER, "n", 2, 18 }, { TOKEN_NEWLINE, "\n", 2, 19 },
+        { TOKEN_IF, "if", 3, 5 }, { TOKEN_IDENTIFIER, "i", 3, 8 },
+        { TOKEN_NOT_EQUAL, "!=", 3, 10 }, { TOKEN_INTEGER, "3", 3, 13 },
+        { TOKEN_NEWLINE, "\n", 3, 14 }, { TOKEN_DO, "do", 4, 1 },
+        { TOKEN_EOF, NULL, 4, 3 }
+    };
+    sequence("for\n    i <- 0 until n\n    if i != 3\ndo", multiline_for,
+        sizeof multiline_for / sizeof multiline_for[0]);
+
+    /* VALMEM needs no new token: members follow numbers and strings. */
+    const expected_t members[] = {
+        { TOKEN_INTEGER, "5", 1, 1 }, { TOKEN_DOT, ".", 1, 2 },
+        { TOKEN_IDENTIFIER, "toString", 1, 3 }, { TOKEN_DOUBLE, "1.5", 1, 12 },
+        { TOKEN_DOT, ".", 1, 15 }, { TOKEN_IDENTIFIER, "floor", 1, 16 },
+        { TOKEN_DOT, ".", 1, 21 }, { TOKEN_IDENTIFIER, "toInt", 1, 22 },
+        { TOKEN_STRING, "\"abc\"", 1, 28 }, { TOKEN_DOT, ".", 1, 33 },
+        { TOKEN_IDENTIFIER, "length", 1, 34 }, { TOKEN_DOUBLE, "1.0d", 1, 41 },
+        { TOKEN_DOT, ".", 1, 45 }, { TOKEN_IDENTIFIER, "toInt", 1, 46 },
+        { TOKEN_EOF, NULL, 1, 51 }
+    };
+    sequence("5.toString 1.5.floor.toInt \"abc\".length 1.0d.toInt", members,
+        sizeof members / sizeof members[0]);
+
+    /* Bitwise & and | are not part of IFJ26. */
+    const char* bad[] = { "&", "|", "& &", "| |", "a & b", "a | b", "&|", "|&",
+        "&&&", "|||", "&\n&", "&=", "|=" };
     for (size_t i = 0; i < sizeof bad / sizeof bad[0]; ++i)
         expect_error(bad[i]);
 }
@@ -799,7 +930,7 @@ static void automaton_boundaries(void)
 
     const char* bad[] = {
         ".5_", "01.", "01.x", "._", "1e2_d", "1_.5", "\"\"\x80", "@main1", "@main_",
-        "@mai", "@ma in", "/*/", "/* /* */", "!x"
+        "@mai", "@ma in", "/*/", "/* /* */", "&x"
     };
     for (size_t i = 0; i < sizeof bad / sizeof bad[0]; ++i)
         expect_error(bad[i]);
@@ -948,9 +1079,10 @@ int main(void)
     automaton_boundaries();
     layout_decisions();
     raw_string_quotes();
+    extension_tokens();
 #ifdef LEXER_TEST_ALLOC_FAILURES
     allocation_failures();
 #endif
-    puts("Lexer: all 21 test groups passed.");
+    puts("Lexer: all 22 test groups passed.");
     return 0;
 }

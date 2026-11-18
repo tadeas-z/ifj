@@ -51,7 +51,16 @@ typedef enum {
     TOKEN_LESS_EQUAL,
     TOKEN_GREATER,
     TOKEN_GREATER_EQUAL,
-    TOKEN_STRING
+    TOKEN_STRING,
+    /* Extensions BOOLTHEN and CONTROL, appended to keep earlier values. */
+    TOKEN_TYPE_BOOLEAN,
+    TOKEN_TRUE,
+    TOKEN_FALSE,
+    TOKEN_FOR,
+    TOKEN_NOT,
+    TOKEN_AND,
+    TOKEN_OR,
+    TOKEN_LARROW
 } token_type_t;
 
 typedef struct {

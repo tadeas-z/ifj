@@ -103,6 +103,13 @@ static lexer_status_t invalid(lexer_t* lexer)
     return lexer->status;
 }
 
+// AI-generated using: Claude Code
+//              model: Claude Opus 5.5
+// Prompt (summary): "Add BOOLTHEN and CONTROL words to keyword() per page 1
+//          of my diagram: true/false -> TOKEN_TRUE/TOKEN_FALSE, Boolean ->
+//          TOKEN_TYPE_BOOLEAN, for -> TOKEN_FOR; to/until/by stay identifiers."
+// Scope: the words table in keyword().
+
 /* Maps a complete name to its keyword or reserved-word token type, otherwise
  * returns TOKEN_IDENTIFIER. */
 static token_type_t keyword(const char* text)
@@ -116,11 +123,11 @@ static token_type_t keyword(const char* text)
         { "Int", TOKEN_TYPE_INT }, { "return", TOKEN_RETURN },
         { "String", TOKEN_TYPE_STRING }, { "then", TOKEN_THEN },
         { "Unit", TOKEN_TYPE_UNIT }, { "val", TOKEN_VAL }, { "var", TOKEN_VAR },
-        { "while", TOKEN_WHILE }, { "Boolean", TOKEN_RESERVED_KEYWORD },
+        { "while", TOKEN_WHILE }, { "Boolean", TOKEN_TYPE_BOOLEAN },
+        { "true", TOKEN_TRUE }, { "false", TOKEN_FALSE }, { "for", TOKEN_FOR },
         { "case", TOKEN_RESERVED_KEYWORD }, { "class", TOKEN_RESERVED_KEYWORD },
-        { "extension", TOKEN_RESERVED_KEYWORD }, { "for", TOKEN_RESERVED_KEYWORD },
-        { "List", TOKEN_RESERVED_KEYWORD }, { "match", TOKEN_RESERVED_KEYWORD },
-        { "type", TOKEN_RESERVED_KEYWORD }
+        { "extension", TOKEN_RESERVED_KEYWORD }, { "List", TOKEN_RESERVED_KEYWORD },
+        { "match", TOKEN_RESERVED_KEYWORD }, { "type", TOKEN_RESERVED_KEYWORD }
     };
     for (size_t i = 0; i < sizeof words / sizeof words[0]; ++i)
         if (strcmp(text, words[i].text) == 0)
@@ -279,16 +286,28 @@ static scan_result_t scan_main(lexer_t* lexer, buffer_t* buffer, token_type_t* t
 
 /* ---- Operators and delimiters ----------------------------------------- */
 
+// AI-generated using: Claude Code
+//              model: Claude Opus 5.5
+// Prompt (summary): "Implement page 2 of my updated diagram: q6 becomes the
+//          accepting f27 (TOKEN_NOT, '=' still leads to f17), s -&-> q19
+//          -&-> f28 TOKEN_AND, s -|-> q20 -|-> f29 TOKEN_OR (a lone & or |
+//          is an error), and f12 -'-'-> f30 TOKEN_LARROW."
+// Scope: operator_state_t, the '!' '&' '|' cases and the second switch in
+//        scan_operator, the '&' and '|' cases in scan_token.
+
 typedef enum {
     OP_SINGLE, /* f3..f10: ( ) : , ; + - * have no outgoing transition */
     OP_ASSIGN, /* f11: "=" */
     OP_LESS, /* f12: "<" */
     OP_GREATER, /* f13: ">" */
-    OP_BANG /* q6: a lone "!" is an error */
+    OP_BANG, /* f27: "!" (BOOLTHEN; q6 of the base diagram is gone) */
+    OP_AMP, /* q19: a lone "&" is an error */
+    OP_PIPE /* q20: a lone "|" is an error */
 } operator_state_t;
 
-/* Diagram 2: scans an operator or delimiter, including the optional '=' of
- * ==, <=, >=, != (states f3-f17, q6); returns SCAN_TOKEN or SCAN_ERROR. */
+/* Diagram 2: scans an operator or delimiter, including the optional second
+ * character of ==, <=, >=, !=, <-, && and || (states f3-f17, f27-f30, q19,
+ * q20); returns SCAN_TOKEN or SCAN_ERROR. */
 static scan_result_t scan_operator(lexer_t* lexer, buffer_t* buffer, token_type_t* type)
 {
     operator_state_t state = OP_SINGLE;
@@ -331,6 +350,13 @@ static scan_result_t scan_operator(lexer_t* lexer, buffer_t* buffer, token_type_
         break;
     case '!':
         state = OP_BANG;
+        *type = TOKEN_NOT;
+        break;
+    case '&':
+        state = OP_AMP;
+        break;
+    case '|':
+        state = OP_PIPE;
         break;
     default:
         invalid(lexer);
@@ -339,30 +365,44 @@ static scan_result_t scan_operator(lexer_t* lexer, buffer_t* buffer, token_type_
     if (!take(lexer, buffer))
         return SCAN_ERROR;
 
-    token_type_t with_equal = TOKEN_EOF;
+    int second = '='; /* the only character leaving f11, f12, f13, f27 */
+    token_type_t doubled = TOKEN_EOF;
     switch (state) {
     case OP_SINGLE:
         return SCAN_TOKEN;
     case OP_ASSIGN: /* f11 -'='-> f14 */
-        with_equal = TOKEN_EQUAL;
+        doubled = TOKEN_EQUAL;
         break;
-    case OP_LESS: /* f12 -'='-> f15 */
-        with_equal = TOKEN_LESS_EQUAL;
+    case OP_LESS: /* f12 -'='-> f15, f12 -'-'-> f30 */
+        if (lexer->current == '-') {
+            *type = TOKEN_LARROW;
+            return take(lexer, buffer) ? SCAN_TOKEN : SCAN_ERROR;
+        }
+        doubled = TOKEN_LESS_EQUAL;
         break;
     case OP_GREATER: /* f13 -'='-> f16 */
-        with_equal = TOKEN_GREATER_EQUAL;
+        doubled = TOKEN_GREATER_EQUAL;
         break;
-    case OP_BANG: /* q6 -'='-> f17, otherwise error */
-        if (lexer->current != '=') {
+    case OP_BANG: /* f27 -'='-> f17 */
+        doubled = TOKEN_NOT_EQUAL;
+        break;
+    case OP_AMP: /* q19 -'&'-> f28, otherwise error */
+        second = '&';
+        doubled = TOKEN_AND;
+        break;
+    case OP_PIPE: /* q20 -'|'-> f29, otherwise error */
+        second = '|';
+        doubled = TOKEN_OR;
+        break;
+    }
+    if (lexer->current != second) {
+        if (state == OP_AMP || state == OP_PIPE) {
             invalid(lexer);
             return SCAN_ERROR;
         }
-        with_equal = TOKEN_NOT_EQUAL;
-        break;
+        return SCAN_TOKEN; /* f11, f12, f13, f27 accept */
     }
-    if (lexer->current != '=')
-        return SCAN_TOKEN; /* f11, f12, f13 accept */
-    *type = with_equal; /* f14..f17 have no outgoing transition */
+    *type = doubled; /* f14..f17, f28, f29 have no outgoing transition */
     return take(lexer, buffer) ? SCAN_TOKEN : SCAN_ERROR;
 }
 
@@ -712,6 +752,8 @@ static scan_result_t scan_token(lexer_t* lexer, buffer_t* buffer, token_type_t* 
     case '<':
     case '>':
     case '!':
+    case '&':
+    case '|':
         return scan_operator(lexer, buffer, type);
     default:
         invalid(lexer);
