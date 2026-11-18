@@ -208,6 +208,7 @@ enum avl_variant_t {
     P_ALL_EXPLICIT,
     P_BOOLEAN_FLAG,
     P_BOOL_OPERATORS,
+    P_VALMEM,
 
     // 3 - undefined
     U_TYPO_VARIABLE,
@@ -249,6 +250,8 @@ enum avl_variant_t {
     T_BOOL_ARITHMETIC,
     T_NOT_INT,
     T_AND_INT,
+    T_MEMBER_RECEIVER,
+    U_UNKNOWN_MEMBER,
 
     // 7 - assignment
     A_ASSIGN_VAL,
@@ -327,12 +330,14 @@ static avl_program_t build_avl(avl_variant_t v, avl_order_t order = ORDER_SOURCE
         { expr(call("ord", { V("mem"), add_(mul_(v == C_BUILTIN_ARG_TYPE ? D(4.0) : I(4), V("node")), V("field")) })) });
 
     // def set(mem: String, node: Int, field: Int, value: Int): String
+    //   P_VALMEM: subStr(mem, pos + 1, mem.length)
     //   R_DUP_PARAM: set(mem: String, node: Int, field: Int, field: Int)
     def("set", TYPE_STRING,
         { { "mem", TYPE_STRING }, { "node", TYPE_INT }, { "field", TYPE_INT }, { v == R_DUP_PARAM ? "field" : "value", TYPE_INT } },
         { val("pos", add_(mul_(I(4), V("node")), V("field"))),
             expr(add_(add_(call("subStr", { V("mem"), I(0), V("pos") }), call("chr", { V("value") })),
-                call("subStr", { V("mem"), add_(V("pos"), I(1)), call("strLength", { V("mem") }) }))) });
+                call("subStr", { V("mem"), add_(V("pos"), I(1)),
+                    v == P_VALMEM ? M(V("mem"), "length") : call("strLength", { V("mem") }) }))) });
 
     // def result(mem: String) = { get(mem, 0, 0) }
     def("result", all_explicit ? TYPE_INT : nullptr, { { "mem", TYPE_STRING } }, { expr(get_(V("mem"), I(0), KEY)) });
@@ -439,12 +444,19 @@ static avl_program_t build_avl(avl_variant_t v, avl_order_t order = ORDER_SOURCE
             expr(set_(V("m"), I(0), KEY, V("node"))) });
 
     // def allocate_node(mem: String, key: Int) = { ... }
+    //   P_VALMEM:            val index = mem.length / 4
+    //   T_MEMBER_RECEIVER:   val index = mem.toInt / 4      (toInt needs a Double)
+    //   U_UNKNOWN_MEMBER:    val index = mem.size / 4       (not a member)
     //   U_USE_BEFORE_DEF:    val index = strLength(m) / 4       (m is defined on the next line)
     //   C_BUILTIN_ARG_COUNT: val index = strLength() / 4
     //   T_STRING_PLUS_INT:   val m = mem + key + chr(0) + ...
     def("allocate_node", all_explicit ? TYPE_STRING : nullptr, { { "mem", TYPE_STRING }, { "key", TYPE_INT } },
         { val("index",
-              div_(v == C_BUILTIN_ARG_COUNT ? call("strLength") : call("strLength", { V(v == U_USE_BEFORE_DEF ? "m" : "mem") }),
+              div_(v == P_VALMEM                ? M(V("mem"), "length")
+                      : v == T_MEMBER_RECEIVER     ? M(V("mem"), "toInt")
+                      : v == U_UNKNOWN_MEMBER      ? M(V("mem"), "size")
+                      : v == C_BUILTIN_ARG_COUNT   ? call("strLength")
+                                                   : call("strLength", { V(v == U_USE_BEFORE_DEF ? "m" : "mem") }),
                   I(4))),
             val("m",
                 add_(add_(add_(v == T_STRING_PLUS_INT ? add_(V("mem"), V("key")) : add_(V("mem"), call("chr", { V("key") })),
@@ -581,7 +593,8 @@ static avl_program_t build_avl(avl_variant_t v, avl_order_t order = ORDER_SOURCE
         expr(avl.print_call),
         val("height", call("get_height", { V("mem"), V("root") }), v == T_DECLARED_TYPE ? TYPE_STRING : nullptr),
         avl.ratio_def,
-        expr(call("print", { call("toStr", { avl.ratio_div }) })),
+        // P_VALMEM: print((ratio / 2).toString)
+        expr(call("print", { v == P_VALMEM ? M(avl.ratio_div, "toString") : call("toStr", { avl.ratio_div }) })),
         val("found", call("bst_find", { V("mem"), V("root"), call("readInt") })),
         if_else(ne_(V("found"), I(0)), { print_("found") }, { print_("not found") }),
         val("ok",
@@ -753,7 +766,9 @@ INSTANTIATE_TEST_SUITE_P(Variants, SemanticAvlValidVariantTest,
                            // bst_find loops on a Boolean variable (BOOLTHEN) instead of returning from the loop
                            avl_valid_case_t { P_BOOLEAN_FLAG, "FindWithBooleanFlag" },
                            // is_balanced written with !, && and || instead of ifs (BOOLTHEN)
-                           avl_valid_case_t { P_BOOL_OPERATORS, "IsBalancedWithBooleanOperators" }),
+                           avl_valid_case_t { P_BOOL_OPERATORS, "IsBalancedWithBooleanOperators" },
+                           // mem.length instead of strLength(mem), (ratio / 2).toString instead of toStr(...) (VALMEM)
+                           avl_valid_case_t { P_VALMEM, "MembersInsteadOfBuiltins" }),
         ::testing::Values(ORDER_SOURCE, ORDER_MAIN_FIRST, ORDER_REVERSED)),
     [](const ::testing::TestParamInfo<std::tuple<avl_valid_case_t, avl_order_t>>& info) {
         return std::string(std::get<0>(info.param).name) + "_" + order_name(std::get<1>(info.param));
@@ -871,6 +886,10 @@ static const avl_fail_case_t FAILING[] = {
     { T_NOT_INT, "NotOfInt", ERR_SEM_TYPE },
     // is_balanced (operator version): bf && is_balanced(...) - Int operand of &&
     { T_AND_INT, "AndWithIntOperand", ERR_SEM_TYPE },
+    // allocate_node: val index = mem.toInt / 4 - toInt needs a Double receiver (VALMEM)
+    { T_MEMBER_RECEIVER, "MemberWithWrongReceiver", ERR_SEM_TYPE },
+    // allocate_node: val index = mem.size / 4 - not a member (VALMEM, code to be confirmed)
+    { U_UNKNOWN_MEMBER, "UnknownMember", ERR_SEM_UNDEF },
 
     // ---- 7: assignment ----
     // bst_find: node_key = get(mem, node, 1) - node_key is a val

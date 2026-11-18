@@ -1,5 +1,5 @@
 // Implementation of the IFJ26 imperative language compiler
-// astree.c
+// ast.c
 // Author(s): Adam Zatloukal (xzatloa01)
 
 #include "ast.h"
@@ -357,6 +357,21 @@ ast_node_t* ast_new_convert(ast_node_t* operand)
     return node;
 }
 
+ast_node_t* ast_new_member(const char* name, ast_node_t* receiver, size_t line, size_t column)
+{
+    if (receiver == NULL || name == NULL)
+        return NULL;
+
+    ast_node_t* node = new_node(AST_MEMBER, line, column);
+    if (node == NULL)
+        return NULL;
+
+    COPY_STR_OR_FAIL(node, node->member.name, name);
+    node->member.receiver = receiver;
+
+    return node;
+}
+
 // ----------------------------------------
 //  Free AST (utility)
 // ----------------------------------------
@@ -477,6 +492,10 @@ void ast_free(ast_node_t* node)
     case AST_CONVERT:
         ast_free(node->convert.operand);
         break;
+
+    case AST_MEMBER:
+        free(node->member.name);
+        ast_free(node->member.receiver);
     }
 
     free(node);
@@ -499,12 +518,19 @@ void ast_free(ast_node_t* node)
 //          print function too complicated make it print the same info as before"
 // Scope: the BOOL_LIT, && and || entries of the tables below, UNARY_OP_NAMES and the
 //        AST_BOOL_LIT and AST_UNARY cases in print_header
+//
+// AI-generated using: Claude Code
+//              model: Claude Opus 5.5
+// Prompt: "update ast_print for MEMBER"
+// Scope: the MEMBER entry of KIND_NAMES and the AST_MEMBER cases in print_header
+//        and print_children
 
 // Same order as ast_node_kind_t, ast_unary_op_t and ast_binary_op_t
 static const char* KIND_NAMES[] = {
     "PROGRAM", "FUNC_DEF", "BLOCK",
     "VAR_DEF", "ASSIGN", "RETURN", "IF", "WHILE", "EXPR_STMT",
-    "INT_LIT", "DOUBLE_LIT", "STRING_LIT", "UNIT_LIT", "BOOL_LIT", "VAR_REF", "UNARY", "BINARY", "CALL", "CONVERT"
+    "INT_LIT", "DOUBLE_LIT", "STRING_LIT", "UNIT_LIT", "BOOL_LIT", "VAR_REF", "UNARY", "BINARY", "CALL", "CONVERT",
+    "MEMBER"
 };
 static const char* UNARY_OP_NAMES[] = { "-", "!" };
 static const char* BINARY_OP_NAMES[] = { "+", "-", "*", "/", "<", "<=", ">", ">=", "==", "!=", "&&", "||" };
@@ -615,6 +641,9 @@ static void print_header(const ast_node_t* node, FILE* out)
     case AST_CALL:
         fprintf(out, " %s%s", node->call.name, node->call.is_builtin ? " builtin" : "");
         break;
+    case AST_MEMBER:
+        fprintf(out, " .%s", node->member.name);
+        break;
     default:
         break;
     }
@@ -666,6 +695,9 @@ static void print_children(const ast_node_t* node, FILE* out, int depth)
         break;
     case AST_CONVERT:
         print_node(node->convert.operand, out, depth);
+        break;
+    case AST_MEMBER:
+        print_node(node->member.receiver, out, depth);
         break;
     default: // literals and variable references have no children
         break;

@@ -1,5 +1,5 @@
 // Implementation of the IFJ26 imperative language compiler
-// astree.h
+// ast.h
 // Author(s): Adam Zatloukal (xzatloa01)
 
 #ifndef ASTREE_H
@@ -41,7 +41,9 @@ typedef enum {
     AST_UNARY, // Unary operators -x
     AST_BINARY, // Binary operators a + b, ...
     AST_CALL, // f(a, 1)
-    AST_CONVERT // Int -> Double (Only inserted by the semantic analyzer)
+    AST_CONVERT, // Int -> Double (Only inserted by the semantic analyzer)
+
+    AST_MEMBER // VALMEM
 } ast_node_kind_t;
 
 typedef struct
@@ -192,6 +194,13 @@ typedef struct
     ast_node_t* operand; // (S) the Int expression being converted
 } ast_convert_t;
 
+// x.floor.toInt    MEMBER toInt -> MEMBER floor -> VAR_REF x
+typedef struct
+{
+    ast_node_t* receiver; // (P) the expression before the "."
+    char* name; // (P)
+} ast_member_t;
+
 // ----------------------------------------
 //  AST node
 // ----------------------------------------
@@ -220,6 +229,7 @@ struct ast_node {
         ast_binary_t binary;
         ast_call_t call;
         ast_convert_t convert;
+        ast_member_t member;
     };
 };
 
@@ -451,6 +461,21 @@ ast_node_t* ast_new_call(const char* name, size_t line, size_t column);
  * @note line and column are taken from operand, the node's type is TYPE_DOUBLE
  */
 ast_node_t* ast_new_convert(ast_node_t* operand);
+
+/**
+ * @brief Constructs a member access node (VALMEM extension): receiver.name
+ * @param name member name as written after the "." (toString, toInt, floor, length),
+ *        the string is copied - REQUIRED. Semantics checks that the member exists
+ * @param receiver the expression before the "." - REQUIRED
+ * @param line line of the member access
+ * @param column column where the member access starts
+ * @return NULL on invalid params or memory allocation failure, else new node
+ * @note the new node owns receiver (freed together with it). On failure nothing is
+ *       taken over, receiver still belongs to the caller
+ * @note chaining x.floor.toInt is built from the inside out: the receiver of the
+ *       toInt node is the floor node
+ */
+ast_node_t* ast_new_member(const char* name, ast_node_t* receiver, size_t line, size_t column);
 
 // ----------------------------------------
 //  Utility

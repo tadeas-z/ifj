@@ -2180,8 +2180,335 @@ TEST_F(SemanticPass2Test, InferredElseIfChainWithValueBranchIsTypeError)
 }
 
 // ========================================
+//  VALMEM: receiver.member
+// ========================================
+// AI-generated using: Claude Code
+//              model: Claude Opus 5.5
+// Prompt: "Now done? if so add tests" (VALMEM: every member against every receiver
+//          type, chaining, unknown member, members on calls and expressions, member
+//          results used in arithmetic, conditions, arguments, returns)
+// Scope: this section up to "Open questions"
+
+// ----------------------------------------
+//  The member table: toString (any) -> String, toInt (Double) -> Int,
+//  floor (Double) -> Double, length (String) -> Int
+// ----------------------------------------
+
+struct member_case_t {
+    const char* member;
+    type_kind_t receiver;
+    error_code_t err;
+    type_kind_t result; // only when err == ERR_OK
+};
+
+static void PrintTo(const member_case_t& c, std::ostream* os) { *os << kind_name(c.receiver) << "." << c.member; }
+
+static std::vector<member_case_t> member_cases()
+{
+    std::vector<member_case_t> cases;
+    for (type_kind_t receiver : { T_INT, T_DOUBLE, T_STRING, T_UNIT, T_BOOL }) {
+        // toString accepts any value
+        cases.push_back({ "toString", receiver, ERR_OK, T_STRING });
+        // the others accept exactly one receiver type (no Int -> Double conversion of the receiver)
+        cases.push_back({ "toInt", receiver, receiver == T_DOUBLE ? ERR_OK : ERR_SEM_TYPE, T_INT });
+        cases.push_back({ "floor", receiver, receiver == T_DOUBLE ? ERR_OK : ERR_SEM_TYPE, T_DOUBLE });
+        cases.push_back({ "length", receiver, receiver == T_STRING ? ERR_OK : ERR_SEM_TYPE, T_INT });
+    }
+    return cases;
+}
+
+class SemanticMemberTest : public SemanticPass2Test, public ::testing::WithParamInterface<member_case_t> { };
+
+// val r = <receiver>.<member>
+TEST_P(SemanticMemberTest, MemberOfReceiver)
+{
+    const member_case_t& c = GetParam();
+    ast_node_t* e = M(operand_of(c.receiver), c.member);
+
+    ASSERT_EQ(analyze_expr(e), c.err);
+    if (c.err == ERR_OK) {
+        EXPECT_EQ(type_name(e->type), kind_name(c.result));
+        EXPECT_NE(e->member.receiver->kind, AST_CONVERT) << "a receiver is never converted";
+    }
+}
+
+INSTANTIATE_TEST_SUITE_P(MemberTable, SemanticMemberTest, ::testing::ValuesIn(member_cases()),
+    [](const ::testing::TestParamInfo<member_case_t>& info) {
+        return std::string(info.param.member) + "_" + kind_name(info.param.receiver);
+    });
+
+// ----------------------------------------
+//  Names and receivers
+// ----------------------------------------
+
+// "abc".size   -> not one of the four members (code still to be confirmed on the forum)
+TEST_F(SemanticPass2Test, UnknownMemberIsUndefined)
+{
+    EXPECT_EQ(analyze_expr(M(S("abc"), "size")), ERR_SEM_UNDEF);
+}
+
+// "abc".Length   -> member names are case sensitive
+TEST_F(SemanticPass2Test, MemberNameIsCaseSensitive)
+{
+    EXPECT_EQ(analyze_expr(M(S("abc"), "Length")), ERR_SEM_UNDEF);
+}
+
+// "abc".strLength   -> builtin functions are not members
+TEST_F(SemanticPass2Test, BuiltinFunctionNameIsNotAMember)
+{
+    EXPECT_EQ(analyze_expr(M(S("abc"), "strLength")), ERR_SEM_UNDEF);
+}
+
+// x.length   (x undefined) -> the receiver's error comes first
+TEST_F(SemanticPass2Test, UndefinedReceiverIsUndefined)
+{
+    EXPECT_EQ(analyze_expr(M(V("x"), "length")), ERR_SEM_UNDEF);
+}
+
+// val s = "abc"; s.length   -> a variable as the receiver
+TEST_F(SemanticPass2Test, VariableReceiverIsOk)
+{
+    ast_node_t* e = M(V("s"), "length");
+    main_({ val("s", S("abc")), val("r", e) });
+
+    ASSERT_EQ(analyze(), ERR_OK);
+    EXPECT_EQ(type_name(e->type), "Int");
+}
+
+// def f(d: Double) = { d.floor }   -> a parameter as the receiver, inferred Double
+TEST_F(SemanticPass2Test, ParamReceiverInfersResultType)
+{
+    ast_node_t* f = func("f", nullptr, { { "d", TYPE_DOUBLE } }, { expr(M(V("d"), "floor")) });
+    main_({});
+
+    ASSERT_EQ(analyze(), ERR_OK);
+    EXPECT_EQ(type_name(f->func_def.return_type), "Double");
+}
+
+// readLine().length   -> FUNEXP: a call as the receiver
+TEST_F(SemanticPass2Test, CallReceiverIsOk)
+{
+    ast_node_t* e = M(call("readLine"), "length");
+    ASSERT_EQ(analyze_expr(e), ERR_OK);
+    EXPECT_EQ(type_name(e->type), "Int");
+}
+
+// readInt().toInt   -> the call result is Int, toInt needs Double
+TEST_F(SemanticPass2Test, IntCallReceiverOfToIntIsTypeError)
+{
+    EXPECT_EQ(analyze_expr(M(call("readInt"), "toInt")), ERR_SEM_TYPE);
+}
+
+// (1 + 2.5).floor   -> an expression as the receiver
+TEST_F(SemanticPass2Test, ExpressionReceiverIsOk)
+{
+    ast_node_t* e = M(bin(AST_OP_ADD, I(1), D(2.5)), "floor");
+    ASSERT_EQ(analyze_expr(e), ERR_OK);
+    EXPECT_EQ(type_name(e->type), "Double");
+}
+
+// (1 + 2).floor   -> Int + Int is Int, floor needs Double
+TEST_F(SemanticPass2Test, IntExpressionReceiverOfFloorIsTypeError)
+{
+    EXPECT_EQ(analyze_expr(M(bin(AST_OP_ADD, I(1), I(2)), "floor")), ERR_SEM_TYPE);
+}
+
+// print(1).toString   -> toString takes any value, also Unit
+TEST_F(SemanticPass2Test, ToStringOfUnitCallIsOk)
+{
+    ast_node_t* e = M(call("print", { I(1) }), "toString");
+    ASSERT_EQ(analyze_expr(e), ERR_OK);
+    EXPECT_EQ(type_name(e->type), "String");
+}
+
+// val length = 5; def floor(a: Int): Int = { a }; "abc".length + floor(2) + length
+// -> member names live outside the symbol table, no clash with variables or functions
+TEST_F(SemanticPass2Test, MemberNamesDoNotClashWithUserNames)
+{
+    func("floor", TYPE_INT, { { "a", TYPE_INT } }, { expr(V("a")) });
+    ast_node_t* e = bin(AST_OP_ADD, bin(AST_OP_ADD, M(S("abc"), "length"), call("floor", { I(2) })), V("length"));
+    main_({ val("length", I(5)), val("r", e) });
+
+    ASSERT_EQ(analyze(), ERR_OK);
+    EXPECT_EQ(type_name(e->type), "Int");
+}
+
+// ----------------------------------------
+//  Chaining
+// ----------------------------------------
+
+// val price = 19.99; price.floor.toInt.toString.length   -> Double -> Double -> Int -> String -> Int
+TEST_F(SemanticPass2Test, ChainOfMembersIsOk)
+{
+    ast_node_t* floor_ = M(V("price"), "floor");
+    ast_node_t* to_int = M(floor_, "toInt");
+    ast_node_t* to_string = M(to_int, "toString");
+    ast_node_t* length = M(to_string, "length");
+    main_({ val("price", D(19.99)), val("r", length) });
+
+    ASSERT_EQ(analyze(), ERR_OK);
+    EXPECT_EQ(type_name(floor_->type), "Double");
+    EXPECT_EQ(type_name(to_int->type), "Int");
+    EXPECT_EQ(type_name(to_string->type), "String");
+    EXPECT_EQ(type_name(length->type), "Int");
+}
+
+// "ab".length.length   -> the second length gets an Int
+TEST_F(SemanticPass2Test, BrokenChainIsTypeError)
+{
+    EXPECT_EQ(analyze_expr(M(M(S("ab"), "length"), "length")), ERR_SEM_TYPE);
+}
+
+// 2.5.toInt.floor   -> toInt gives Int, floor needs Double
+TEST_F(SemanticPass2Test, FloorAfterToIntIsTypeError)
+{
+    EXPECT_EQ(analyze_expr(M(M(D(2.5), "toInt"), "floor")), ERR_SEM_TYPE);
+}
+
+// "ab".length.size   -> an unknown member at the end of a chain
+TEST_F(SemanticPass2Test, UnknownMemberInChainIsUndefined)
+{
+    EXPECT_EQ(analyze_expr(M(M(S("ab"), "length"), "size")), ERR_SEM_UNDEF);
+}
+
+// ----------------------------------------
+//  Member results used elsewhere
+// ----------------------------------------
+
+// 2.5.floor + 1   -> Double + Int, the 1 gets converted
+TEST_F(SemanticPass2Test, MemberResultInArithmeticConvertsOtherSide)
+{
+    ast_node_t* e = bin(AST_OP_ADD, M(D(2.5), "floor"), I(1));
+
+    ASSERT_EQ(analyze_expr(e), ERR_OK);
+    EXPECT_EQ(type_name(e->type), "Double");
+    EXPECT_EQ(e->binary.left->kind, AST_MEMBER);
+    EXPECT_TRUE(is_convert_of(e->binary.right, AST_INT_LIT));
+}
+
+// "ab".length + 2.5   -> the Int member result itself gets converted
+TEST_F(SemanticPass2Test, IntMemberResultIsConvertedInDoubleArithmetic)
+{
+    ast_node_t* e = bin(AST_OP_ADD, M(S("ab"), "length"), D(2.5));
+
+    ASSERT_EQ(analyze_expr(e), ERR_OK);
+    EXPECT_TRUE(is_convert_of(e->binary.left, AST_MEMBER));
+}
+
+// -2.5.floor   -> -(2.5.floor), Double
+TEST_F(SemanticPass2Test, NegatedMemberIsOk)
+{
+    ast_node_t* e = neg(M(D(2.5), "floor"));
+    ASSERT_EQ(analyze_expr(e), ERR_OK);
+    EXPECT_EQ(type_name(e->type), "Double");
+}
+
+// "a" + 1.toString   -> String + String
+TEST_F(SemanticPass2Test, ConcatenationWithToStringIsOk)
+{
+    ast_node_t* e = bin(AST_OP_ADD, S("a"), M(I(1), "toString"));
+    ASSERT_EQ(analyze_expr(e), ERR_OK);
+    EXPECT_EQ(type_name(e->type), "String");
+}
+
+// "a" + "ab".length   -> String + Int is still an error
+TEST_F(SemanticPass2Test, StringPlusLengthIsTypeError)
+{
+    EXPECT_EQ(analyze_expr(bin(AST_OP_ADD, S("a"), M(S("ab"), "length"))), ERR_SEM_TYPE);
+}
+
+// val s = "abc"; if (s.length > 1) { }; while (s.length.toString == "3") { }
+TEST_F(SemanticPass2Test, MemberResultsInConditionsAreOk)
+{
+    main_({ val("s", S("abc")), if_(bin(AST_OP_GT, M(V("s"), "length"), I(1)), {}),
+        while_(bin(AST_OP_EQ, M(M(V("s"), "length"), "toString"), S("3")), {}) });
+    EXPECT_EQ(analyze(), ERR_OK);
+}
+
+// if ("abc".length) { }   -> an Int member is not a condition
+TEST_F(SemanticPass2Test, IntMemberAsConditionIsTypeError)
+{
+    main_({ if_(M(S("abc"), "length"), {}) });
+    EXPECT_EQ(analyze(), ERR_SEM_TYPE);
+}
+
+// chr("ab".length)   -> a member as an argument
+TEST_F(SemanticPass2Test, MemberAsArgumentIsOk)
+{
+    ast_node_t* c = call("chr", { M(S("ab"), "length") });
+    ASSERT_EQ(analyze_expr(c), ERR_OK);
+    EXPECT_EQ(type_name(c->type), "String");
+}
+
+// strLength("ab".length)   -> Int for a String param is 5
+TEST_F(SemanticPass2Test, MemberOfWrongTypeAsArgumentIsCallError)
+{
+    EXPECT_EQ(analyze_expr(call("strLength", { M(S("ab"), "length") })), ERR_SEM_CALL);
+}
+
+// def f(d: Double): Unit = {}; f("ab".length)   -> an Int member result is converted as an argument
+TEST_F(SemanticPass2Test, IntMemberArgumentForDoubleParamIsConverted)
+{
+    func("f", TYPE_UNIT, { { "d", TYPE_DOUBLE } }, {});
+    ast_node_t* c = call("f", { M(S("ab"), "length") });
+    main_({ expr(c) });
+
+    ASSERT_EQ(analyze(), ERR_OK);
+    EXPECT_TRUE(is_convert_of(arg_at(c, 0), AST_MEMBER));
+}
+
+// val d: Double = "ab".length   -> the init gets converted
+TEST_F(SemanticPass2Test, IntMemberInitOfDoubleVariableIsConverted)
+{
+    ast_node_t* def = val("d", M(S("ab"), "length"), TYPE_DOUBLE);
+    main_({ def });
+
+    ASSERT_EQ(analyze(), ERR_OK);
+    EXPECT_TRUE(is_convert_of(def->var_def.init, AST_MEMBER));
+}
+
+// val n: Int = 2.5.floor   -> Double into Int is 6
+TEST_F(SemanticPass2Test, DoubleMemberInitOfIntVariableIsTypeError)
+{
+    main_({ val("n", M(D(2.5), "floor"), TYPE_INT) });
+    EXPECT_EQ(analyze(), ERR_SEM_TYPE);
+}
+
+// var s = ""; s = 1.toString
+TEST_F(SemanticPass2Test, AssignMemberResultIsOk)
+{
+    main_({ var("s", S("")), assign("s", M(I(1), "toString")) });
+    EXPECT_EQ(analyze(), ERR_OK);
+}
+
+// def f(s: String): Int = { return s.length }
+TEST_F(SemanticPass2Test, ReturnMemberResultIsOk)
+{
+    func("f", TYPE_INT, { { "s", TYPE_STRING } }, { ret(M(V("s"), "length")) });
+    main_({});
+    EXPECT_EQ(analyze(), ERR_OK);
+}
+
+// def f(s: String): Double = { s.length }   -> the last expression is converted
+TEST_F(SemanticPass2Test, IntMemberBodyOfDoubleFunctionIsConverted)
+{
+    ast_node_t* f = func("f", TYPE_DOUBLE, { { "s", TYPE_STRING } }, { expr(M(V("s"), "length")) });
+    main_({});
+
+    ASSERT_EQ(analyze(), ERR_OK);
+    EXPECT_TRUE(is_convert_of(stmt_at(f, 0)->expr_stmt.expr, AST_MEMBER));
+}
+
+// ========================================
 //  Open questions (forum) - current behaviour, change if the answer differs
 // ========================================
+
+// 5.toInt: the spec's table says the receiver of toInt is a Double. The receiver is not
+// converted -> 6. If the forum says Int -> Double applies here, it would be OK
+TEST_F(SemanticPass2Test, OpenQuestion_IntReceiverOfToIntIsTypeError)
+{
+    EXPECT_EQ(analyze_expr(M(I(5), "toInt")), ERR_SEM_TYPE);
+}
 
 // x = 1 with no x at all: 3 (undefined) or 7 ("must be a defined modifiable variable, otherwise 7")?
 TEST_F(SemanticPass2Test, OpenQuestion_AssignToUndefinedVariableIsUndefined)

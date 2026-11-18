@@ -13,6 +13,7 @@
 #include "comp_error.h"
 #include "dynamic_array.h"
 #include "symtable.h"
+#include <string.h>
 
 #define TRY(call)                       \
     do {                                \
@@ -45,6 +46,8 @@ static error_code_t check_while(sema_ctx_t* semantic_ctx, ast_node_t* ast_statem
 
 static error_code_t check_unary(sema_ctx_t* semantic_ctx, ast_node_t* ast_expression);
 static error_code_t check_binary(sema_ctx_t* semantic_ctx, ast_node_t* ast_expression);
+
+static error_code_t check_member(sema_ctx_t* semantic_ctx, ast_node_t* ast_member);
 
 // ========================================
 //  Helpers
@@ -804,6 +807,10 @@ static error_code_t check_expression(sema_ctx_t* semantic_ctx, ast_node_t* ast_e
         TRY(check_call(semantic_ctx, ast_expression));
         break;
 
+    case AST_MEMBER:
+        TRY(check_member(semantic_ctx, ast_expression));
+        break;
+
     default:
         return ERR_INTERNAL;
     }
@@ -984,6 +991,51 @@ static error_code_t check_call(sema_ctx_t* semantic_ctx, ast_node_t* ast_call)
 
     // Calls return type is the same as the functions return type
     ast_call->type = func_sym->type;
+    return ERR_OK;
+}
+
+// -----------------------------------------------------------
+//  VALMEM extension
+// -----------------------------------------------------------
+
+typedef struct {
+    const char* name;
+    type_kind_t receiver;
+    type_t* result;
+} member_decl_t;
+
+static error_code_t check_member(sema_ctx_t* semantic_ctx, ast_node_t* ast_member)
+{
+    // Local, because TYPE_* cannot be used in a static initializer
+    const member_decl_t MEMBERS[] = {
+        { "toString", T_ANY, TYPE_STRING },
+        { "toInt", T_DOUBLE, TYPE_INT },
+        { "floor", T_DOUBLE, TYPE_DOUBLE },
+        { "length", T_STRING, TYPE_INT },
+    };
+    const size_t member_cnt = sizeof(MEMBERS) / sizeof(MEMBERS[0]);
+
+    TRY(check_expression(semantic_ctx, ast_member->member.receiver));
+    // Now we know ast_member->member.receiver->type
+
+    // Find the member
+    const member_decl_t* found = NULL;
+
+    for (size_t i = 0; i < member_cnt; i++) {
+        if (strcmp(MEMBERS[i].name, ast_member->member.name) == 0) {
+            found = &MEMBERS[i];
+            break;
+        }
+    }
+
+    if (found == NULL)
+        return ERR_SEM_UNDEF; // Might be different error
+
+    // Check types
+    if (found->receiver != T_ANY && ast_member->member.receiver->type->kind != found->receiver)
+        return ERR_SEM_TYPE;
+
+    ast_member->type = found->result;
     return ERR_OK;
 }
 
