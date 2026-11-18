@@ -1,0 +1,22 @@
+// AI-generated using: Claude Code (model: Claude Opus 5.5), prompt in tests/e2e/run.sh
+import ifj26.*
+
+def loud(): Boolean =
+    print("called ")
+    true
+
+@main def run(): Unit =
+    val a = false && loud()
+    print(a)
+    print("\n")
+    val b = true || loud()
+    print(b)
+    print("\n")
+    val c = true && loud()
+    print(c)
+    print("\n")
+    val x = 0
+    if x != 0 && 10 / x > 1 then
+        print("big\n")
+    else
+        print("safe\n")

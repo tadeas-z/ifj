@@ -1,0 +1,18 @@
+// AI-generated using: Claude Code (model: Claude Opus 5.5), prompt in tests/e2e/run.sh
+import ifj26.*
+
+def fib(n: Int): Int =
+    if n < 2 then
+        return n
+    else
+        val a = n - 1
+        val b = n - 2
+        val fa = fib(a)
+        val fb = fib(b)
+        return fa + fb
+
+@main def run(): Unit =
+    val n = 10
+    val r = fib(n)
+    print(r)
+    print("\n")

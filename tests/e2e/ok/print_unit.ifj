@@ -1,0 +1,10 @@
+// AI-generated using: Claude Code (model: Claude Opus 5.5), prompt in tests/e2e/run.sh
+import ifj26.*
+
+def nothing(): Unit =
+    val x = 1
+
+@main def run(): Unit =
+    val u = nothing()
+    print(u)
+    print("\n")

@@ -1,0 +1,16 @@
+// AI-generated using: Claude Code (model: Claude Opus 5.5), prompt in tests/e2e/run.sh
+import ifj26.*
+
+def twice(x: Int) = x * 2
+
+def hello(name: String) = "Hi " + name
+
+@main def run(): Unit =
+    val a = 21
+    val b = twice(a)
+    print(b)
+    print("\n")
+    val n = "Bob"
+    val h = hello(n)
+    print(h)
+    print("\n")

@@ -1,0 +1,13 @@
+// AI-generated using: Claude Code (model: Claude Opus 5.5), prompt in tests/e2e/run.sh
+import ifj26.*
+
+def maybe(x: Int) =
+    if x > 0 then
+        print("pos\n")
+
+@main def run(): Unit =
+    val x = 1
+    if x > 5 then
+        print("never\n")
+    maybe(x)
+    print("end\n")

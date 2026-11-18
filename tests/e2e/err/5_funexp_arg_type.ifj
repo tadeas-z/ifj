@@ -1,0 +1,7 @@
+// AI-generated using: Claude Code (model: Claude Opus 5.5), prompt in tests/e2e/run.sh
+import ifj26.*
+
+def add(a: Int, b: Int): Int = a + b
+
+@main def run(): Unit =
+    val r = add(1, "a" + "b")

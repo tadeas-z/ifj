@@ -1,0 +1,27 @@
+// AI-generated using: Claude Code (model: Claude Opus 5.5), prompt in tests/e2e/run.sh
+import ifj26.*
+
+def check(a: Int, b: Int): Unit =
+    if a <= b then
+        print("le ")
+    else
+        print("gt ")
+    if a >= b then
+        print("ge ")
+    else
+        print("lt ")
+    if a != b then
+        print("ne\n")
+    else
+        print("eq\n")
+
+@main def run(): Unit =
+    val x = 1
+    val y = 2
+    check(x, y)
+    check(y, y)
+    val d = 1.5
+    if x < d then
+        print("int < double\n")
+    else
+        print("wrong\n")
