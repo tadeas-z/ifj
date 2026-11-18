@@ -50,9 +50,36 @@ static void generate_concat(codegen_t* codegen)
     codegen_pushs(codegen, sa);
 }
 
+// && and ||, can skip right side
+static void generate_and_or(codegen_t* codegen, ast_node_t* expr)
+{
+    int num = codegen_new_label(codegen);
+    symb_t skip = { 0 };
+    skip.type = S_BOOL;
+    // false for &&, true for ||
+    if (expr->binary.op == AST_OP_AND)
+        skip.bool_val = false;
+    else
+        skip.bool_val = true;
+
+    codegen_expr(codegen, expr->binary.left);
+    codegen_pushs(codegen, skip);
+    codegen_jumpifeqs(codegen, num, "skip");
+    codegen_expr(codegen, expr->binary.right);
+    codegen_jump(codegen, num, "end");
+    codegen_label(codegen, num, "skip");
+    codegen_pushs(codegen, skip);
+    codegen_label(codegen, num, "end");
+}
+
 // both sides, then operator
 static void generate_binary(codegen_t* codegen, ast_node_t* expr)
 {
+    if (expr->binary.op == AST_OP_AND || expr->binary.op == AST_OP_OR) {
+        generate_and_or(codegen, expr);
+        return;
+    }
+
     codegen_expr(codegen, expr->binary.left);
     codegen_expr(codegen, expr->binary.right);
 
@@ -92,6 +119,8 @@ static void generate_binary(codegen_t* codegen, ast_node_t* expr)
         break;
     case AST_OP_NE:
         generate_not(codegen, OP_EQS);
+        break;
+    default:
         break;
     }
 }
@@ -198,6 +227,11 @@ void codegen_expr(codegen_t* codegen, ast_node_t* expr)
         symb.type = S_NIL;
         codegen_pushs(codegen, symb);
         break;
+    case AST_BOOL_LIT:
+        symb.type = S_BOOL;
+        symb.bool_val = expr->bool_lit.value;
+        codegen_pushs(codegen, symb);
+        break;
     case AST_VAR_REF:
         symb.type = S_VAR;
         symb.var.frame = FRAME_LF;
@@ -206,7 +240,12 @@ void codegen_expr(codegen_t* codegen, ast_node_t* expr)
         codegen_pushs(codegen, symb);
         break;
     case AST_UNARY:
-        generate_neg(codegen, expr);
+        if (expr->unary.op == AST_OP_NOT) {
+            codegen_expr(codegen, expr->unary.operand);
+            codegen_stack_op(codegen, OP_NOTS);
+        } else {
+            generate_neg(codegen, expr);
+        }
         break;
     case AST_BINARY:
         generate_binary(codegen, expr);
@@ -252,7 +291,9 @@ static void generate_if(codegen_t* codegen, ast_node_t* stmt)
     codegen_stmt(codegen, stmt->if_stmt.then_block);
     codegen_jump(codegen, num, "end");
     codegen_label(codegen, num, "else");
-    codegen_stmt(codegen, stmt->if_stmt.else_block);
+    // if without else
+    if (stmt->if_stmt.else_block != NULL)
+        codegen_stmt(codegen, stmt->if_stmt.else_block);
     codegen_label(codegen, num, "end");
 }
 

@@ -12,14 +12,16 @@
 //              model: Claude Opus 5.5
 // Prompt: "Write the Doxygen description of the expression codegen
 //          function in this header."
+// Prompt: "Update the description for BOOLTHEN (true, false, !, && and ||)"
 // Scope: doc comment of codegen_expr only
 
 /**
  * @brief Writes the code of an expression, its value is left on the data stack.
  *
- * Works for literals, variables, unary minus, binary operators and the
- * Int -> Double conversion. Needs the types filled in by semantics
- * (expr->type) for unary minus and binary operators.
+ * Works for literals (also true and false), variables, unary minus, !,
+ * binary operators and the Int -> Double conversion. && and || are short
+ * circuit, the right side runs only when it is needed. Needs the types
+ * filled in by semantics (expr->type) for unary minus and binary operators.
  *
  * @param codegen Generator created by codegen_init.
  * @param expr Expression node from the AST.
@@ -32,12 +34,14 @@ void codegen_expr(codegen_t* codegen, ast_node_t* expr);
 //              model: Claude Opus 5.5
 // Prompt: "Write the Doxygen description of the statement codegen
 //          function in this header."
+// Prompt: "Update the description for if without else (BOOLTHEN)"
 // Scope: doc comment of codegen_stmt only
 
 /**
  * @brief Writes the code of a statement.
  *
- * Works for blocks, variable definitions, assignments, if and while.
+ * Works for blocks, variable definitions, assignments, if (else can be
+ * missing) and while.
  * Values are stored with POPS into LF@name$id.
  *
  * @param codegen Generator created by codegen_init.

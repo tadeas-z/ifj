@@ -78,6 +78,18 @@ static const char* builtins =
     "POPFRAME\n"
     "RETURN\n"
 
+    // readBoolean()
+    "LABEL readBoolean\n"
+    "PUSHFRAME\n"
+    "DEFVAR LF@r$0\n"
+    "READ LF@r$0 bool\n"
+    "JUMPIFNEQ $readBoolean$ok LF@r$0 nil@nil\n"
+    "MOVE LF@r$0 bool@false\n"
+    "LABEL $readBoolean$ok\n"
+    "PUSHS LF@r$0\n"
+    "POPFRAME\n"
+    "RETURN\n"
+
     // toStr(value)
     "LABEL toStr\n"
     "PUSHFRAME\n"
@@ -86,6 +98,7 @@ static const char* builtins =
     "JUMPIFEQ $toStr$int LF@r$0 string@int\n"
     "JUMPIFEQ $toStr$float LF@r$0 string@float\n"
     "JUMPIFEQ $toStr$nil LF@r$0 string@nil\n"
+    "JUMPIFEQ $toStr$bool LF@r$0 string@bool\n"
     "MOVE LF@r$0 LF@value$0\n"
     "JUMP $toStr$end\n"
     "LABEL $toStr$int\n"
@@ -96,6 +109,11 @@ static const char* builtins =
     "JUMP $toStr$end\n"
     "LABEL $toStr$nil\n"
     "MOVE LF@r$0 string@()\n"
+    "JUMP $toStr$end\n"
+    "LABEL $toStr$bool\n"
+    "MOVE LF@r$0 string@false\n"
+    "JUMPIFEQ $toStr$end LF@value$0 bool@false\n"
+    "MOVE LF@r$0 string@true\n"
     "LABEL $toStr$end\n"
     "PUSHS LF@r$0\n"
     "POPFRAME\n"

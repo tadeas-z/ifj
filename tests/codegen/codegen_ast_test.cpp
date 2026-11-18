@@ -15,6 +15,8 @@
 // Prompt: "Create tests using google-tests for codegen_func"
 // Prompt: "Create tests using google-tests for codegen_program"
 // Prompt: "Create tests using google-tests for calls inside expressions (FUNEXP)"
+// Prompt: "Create tests using google-tests for BOOLTHEN (true, false, !, && and ||,
+//          if without else, else if)"
 // Scope: whole file
 
 extern "C" {
@@ -482,4 +484,122 @@ TEST_F(CodegenFunexpTest, UserCallWithExprArgs)
     EXPECT_EQ(output(),
         "PUSHS int@1\nCREATEFRAME\nCALL foo\nPUSHS int@2\nADDS\n"
         "PUSHS LF@x$1\nCREATEFRAME\nCALL bar\n");
+}
+
+// Same setup for the BOOLTHEN tests
+class CodegenBoolthenTest : public CodegenExprTest {
+};
+
+static ast_node_t* bool_lit(bool value)
+{
+    ast_node_t* node = ast_new_bool_lit(value, 1, 1);
+    node->type = TYPE_BOOL;
+    return node;
+}
+
+static ast_node_t* not_op(ast_node_t* operand)
+{
+    ast_node_t* node = ast_new_unary(AST_OP_NOT, operand, 1, 1);
+    node->type = TYPE_BOOL;
+    return node;
+}
+
+// true and false are pushed as bool@
+TEST_F(CodegenBoolthenTest, BoolLiterals)
+{
+    ast_node_t* f = bool_lit(false);
+    tree = bool_lit(true);
+
+    codegen_expr(codegen, tree);
+    codegen_expr(codegen, f);
+    EXPECT_EQ(output(), "PUSHS bool@true\nPUSHS bool@false\n");
+
+    ast_free(f);
+}
+
+// !b is the operand and NOTS
+TEST_F(CodegenBoolthenTest, Not)
+{
+    tree = not_op(var_ref("b", 1, TYPE_BOOL));
+
+    codegen_expr(codegen, tree);
+    EXPECT_EQ(output(), "PUSHS LF@b$1\nNOTS\n");
+}
+
+// a && b, b is skipped when a is false
+TEST_F(CodegenBoolthenTest, AndShortCircuit)
+{
+    tree = binary(AST_OP_AND, var_ref("a", 1, TYPE_BOOL), var_ref("b", 2, TYPE_BOOL), TYPE_BOOL);
+
+    codegen_expr(codegen, tree);
+    EXPECT_EQ(output(),
+        "PUSHS LF@a$1\nPUSHS bool@false\nJUMPIFEQS $1$skip\n"
+        "PUSHS LF@b$2\nJUMP $1$end\n"
+        "LABEL $1$skip\nPUSHS bool@false\n"
+        "LABEL $1$end\n");
+}
+
+// a || b, b is skipped when a is true
+TEST_F(CodegenBoolthenTest, OrShortCircuit)
+{
+    tree = binary(AST_OP_OR, var_ref("a", 1, TYPE_BOOL), var_ref("b", 2, TYPE_BOOL), TYPE_BOOL);
+
+    codegen_expr(codegen, tree);
+    EXPECT_EQ(output(),
+        "PUSHS LF@a$1\nPUSHS bool@true\nJUMPIFEQS $1$skip\n"
+        "PUSHS LF@b$2\nJUMP $1$end\n"
+        "LABEL $1$skip\nPUSHS bool@true\n"
+        "LABEL $1$end\n");
+}
+
+// a || b && c, inner && gets its own labels
+TEST_F(CodegenBoolthenTest, NestedAndOr)
+{
+    ast_node_t* inner = binary(AST_OP_AND, var_ref("b", 2, TYPE_BOOL), var_ref("c", 3, TYPE_BOOL), TYPE_BOOL);
+    tree = binary(AST_OP_OR, var_ref("a", 1, TYPE_BOOL), inner, TYPE_BOOL);
+
+    codegen_expr(codegen, tree);
+    EXPECT_EQ(output(),
+        "PUSHS LF@a$1\nPUSHS bool@true\nJUMPIFEQS $1$skip\n"
+        "PUSHS LF@b$2\nPUSHS bool@false\nJUMPIFEQS $2$skip\n"
+        "PUSHS LF@c$3\nJUMP $2$end\n"
+        "LABEL $2$skip\nPUSHS bool@false\n"
+        "LABEL $2$end\n"
+        "JUMP $1$end\n"
+        "LABEL $1$skip\nPUSHS bool@true\n"
+        "LABEL $1$end\n");
+}
+
+// if without else, nothing is written after the else label
+TEST_F(CodegenBoolthenTest, IfWithoutElse)
+{
+    tree = ast_new_if(var_ref("b", 1, TYPE_BOOL), block(assign("a", 2, int_lit(1))), nullptr, 1, 1);
+
+    codegen_stmt(codegen, tree);
+    EXPECT_EQ(output(),
+        "PUSHS LF@b$1\n"
+        "PUSHS bool@false\nJUMPIFEQS $1$else\n"
+        "PUSHS int@1\nPOPS LF@a$2\nJUMP $1$end\n"
+        "LABEL $1$else\n"
+        "LABEL $1$end\n");
+}
+
+// else if is an if inside the else block
+TEST_F(CodegenBoolthenTest, ElseIf)
+{
+    ast_node_t* inner = ast_new_if(var_ref("c", 2, TYPE_BOOL), block(assign("a", 3, int_lit(2))), nullptr, 1, 1);
+    tree = ast_new_if(var_ref("b", 1, TYPE_BOOL), block(assign("a", 3, int_lit(1))), block(inner), 1, 1);
+
+    codegen_stmt(codegen, tree);
+    EXPECT_EQ(output(),
+        "PUSHS LF@b$1\n"
+        "PUSHS bool@false\nJUMPIFEQS $1$else\n"
+        "PUSHS int@1\nPOPS LF@a$3\nJUMP $1$end\n"
+        "LABEL $1$else\n"
+        "PUSHS LF@c$2\n"
+        "PUSHS bool@false\nJUMPIFEQS $2$else\n"
+        "PUSHS int@2\nPOPS LF@a$3\nJUMP $2$end\n"
+        "LABEL $2$else\n"
+        "LABEL $2$end\n"
+        "LABEL $1$end\n");
 }

@@ -360,6 +360,7 @@ TEST_F(CodegenStringTest, ReadWritesType)
 //              model: Claude Opus 5.5
 // Prompt: "Add tests for codegen_builtins: every built-in has its label
 //          and PUSHFRAME and every built-in ends with RETURN"
+// Prompt: "Add tests for readBoolean and toStr of a Boolean (BOOLTHEN)"
 // Scope: CodegenBuiltinTest and all tests below
 
 // Same fixture, separate suite name for the built-in tests
@@ -371,7 +372,7 @@ TEST_F(CodegenBuiltinTest, AllBuiltinsHaveLabel)
     codegen_builtins(codegen);
     std::string text = output();
 
-    const char* names[] = { "readLine", "readInt", "readDouble", "toStr", "toInt",
+    const char* names[] = { "readLine", "readInt", "readDouble", "readBoolean", "toStr", "toInt",
         "strLength", "subStr", "ord", "chr" };
     for (const char* name : names) {
         std::string label = std::string("LABEL ") + name + "\nPUSHFRAME\n";
@@ -388,4 +389,25 @@ TEST_F(CodegenBuiltinTest, EndsWithReturn)
 
     ASSERT_GE(text.size(), end.size());
     EXPECT_EQ(text.substr(text.size() - end.size()), end);
+}
+
+// readBoolean reads bool, EOF gives false
+TEST_F(CodegenBuiltinTest, ReadBoolean)
+{
+    codegen_builtins(codegen);
+    std::string text = output();
+
+    EXPECT_NE(text.find("READ LF@r$0 bool\n"), std::string::npos);
+    EXPECT_NE(text.find("MOVE LF@r$0 bool@false\n"), std::string::npos);
+}
+
+// toStr turns a Boolean into "true" or "false"
+TEST_F(CodegenBuiltinTest, ToStrBool)
+{
+    codegen_builtins(codegen);
+    std::string text = output();
+
+    EXPECT_NE(text.find("JUMPIFEQ $toStr$bool LF@r$0 string@bool\n"), std::string::npos);
+    EXPECT_NE(text.find("MOVE LF@r$0 string@true\n"), std::string::npos);
+    EXPECT_NE(text.find("MOVE LF@r$0 string@false\n"), std::string::npos);
 }

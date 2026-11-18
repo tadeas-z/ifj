@@ -299,11 +299,12 @@ void codegen_read(codegen_t* codegen, var_t var, const char* type);
 //              model: Claude Opus 5.5
 // Prompt: "Write the Doxygen description of the new built-in functions
 //          codegen function in this header."
+// Prompt: "Add readBoolean to the description (BOOLTHEN)"
 // Scope: doc comment of codegen_builtins only
 
 /**
  * @brief Writes the code of all built-in functions (readLine, readInt,
- *        readDouble, toStr, toInt, strLength, subStr, ord, chr).
+ *        readDouble, readBoolean, toStr, toInt, strLength, subStr, ord, chr).
  *
  * Every built-in is called like a normal function: CREATEFRAME, DEFVAR and
  * MOVE of the arguments into TF and CALL with its name. The arguments are
