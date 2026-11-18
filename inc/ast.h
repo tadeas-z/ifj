@@ -2,6 +2,9 @@
 // ast.h
 // Author(s): Adam Zatloukal (xzatloa01)
 
+// Contains every AST node declaration
+// and constructor declarations
+
 #ifndef ASTREE_H
 #define ASTREE_H
 
@@ -9,7 +12,6 @@
 #include "types.h"
 #include <stdint.h>
 #include <stdio.h>
-#include <string.h>
 
 // ----------------------------------------
 //  AST node types(kinds)
@@ -29,6 +31,7 @@ typedef enum {
     AST_RETURN, // return [value]
     AST_IF, // if cond then ... else ...
     AST_WHILE, // while cond do ...
+    AST_FOR, // for i <- 1 <to/until> 10 <by> 2 <guards> do ...
     AST_EXPR_STMT, // Expression or call used as a statement
 
     // Expressions
@@ -85,7 +88,7 @@ typedef struct
     dyn_arr_t params; // (P) array of ast_param_t* - also hold the count
     type_t* return_type; // (P, then S) NULL when not written. Semantics replaces it with the inferred type
     ast_node_t* body; // (P) AST_BLOCK node.
-    dyn_arr_t locals; // (S) every VAR_DEF in the body - pointers are borrowed
+    dyn_arr_t locals; // (S) every (VAR_DEF or AST_FOR) in the body - pointers are borrowed
 } ast_func_def_t;
 
 // ast_node_t
@@ -126,7 +129,7 @@ typedef struct
 
 typedef struct
 {
-    ast_node_t* cond; // (P) the condition - a relational expression
+    ast_node_t* cond; // (P) the condition - any boolean
     ast_node_t* then_block; // (P) AST_BLOCK run when cond is true
     ast_node_t* else_block; // (P) AST_BLOCK run otherwise
 } ast_if_t;
@@ -136,6 +139,20 @@ typedef struct
     ast_node_t* cond; // (P) loop condition (relational expression)
     ast_node_t* body; // (P) AST_BLOCK run while cond is true
 } ast_while_t;
+
+typedef struct
+{
+    char* var_name; // (P) loop variable, copied to the heap
+    int var_id; // (S) filled by semantics (-1 when constructed)
+    int end_id; // (S) evaluated end value id - used by codegen
+    int step_id; // (S) evaluated step value id - used by codegen
+    ast_node_t* from; // (P) start expression
+    ast_node_t* to; // (P) end expression
+    ast_node_t* step; // (P) NULL when there is no by
+    bool inclusive; // (P) to = true, until = false
+    dyn_arr_t guards; // (P) arr of ast_node_t* (array of conditions in source order)
+    ast_node_t* body; // (P) Always AST_BLOCK node
+} ast_for_t;
 
 typedef struct
 {
@@ -218,6 +235,7 @@ struct ast_node {
         ast_return_t return_stmt;
         ast_if_t if_stmt;
         ast_while_t while_stmt;
+        ast_for_t for_stmt;
         ast_expr_stmt_t expr_stmt;
         ast_int_lit_t int_lit;
         ast_double_lit_t double_lit;
@@ -343,6 +361,29 @@ ast_node_t* ast_new_if(ast_node_t* cond, ast_node_t* then_block, ast_node_t* els
  * @return NULL on memory allocation failure, else node
  */
 ast_node_t* ast_new_while(ast_node_t* cond, ast_node_t* body, size_t line, size_t column);
+
+// AI-generated using: Claude Code
+//              model: Claude Opus 5.5
+// Prompt: "add docs to ast new for and check the consturctor"
+// Scope: declaration and doc comment of ast_new_for only
+
+/**
+ * @brief Constructs a for loop node (CONTROL extension) - for name <- from to/until to [by step]
+ * @param name name of the loop variable - REQUIRED. Copied to the heap (freed by ast_free)
+ * @param from start of the range - REQUIRED
+ * @param to end of the range - REQUIRED
+ * @param step step expression after the by keyword, NULL when by is omitted (step 1)
+ * @param inclusive true for "to" (end included), false for "until" (end excluded)
+ * @param line line of the for keyword
+ * @param column column of the for keyword
+ * @return NULL on invalid params or memory allocation failure, else new node
+ * @note on failure the caller still owns from, to and step.
+ *       Guards are added in order with dyn_arr_append(&node->for_stmt.guards, cond),
+ *       body (AST_BLOCK) is set directly by the parser.
+ *       var_id, end_id and step_id are set to -1, semantics fills them
+ */
+ast_node_t* ast_new_for(const char* name, ast_node_t* from, ast_node_t* to,
+    ast_node_t* step, bool inclusive, size_t line, size_t column);
 
 /**
  * @brief Constructs an expression statement node - wraps an expression or call

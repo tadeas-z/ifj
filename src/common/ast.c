@@ -2,6 +2,10 @@
 // ast.c
 // Author(s): Adam Zatloukal (xzatloa01)
 
+// Constructors for every kind of AST node
+// Also includes AI generated ast print function
+// used for debugging
+
 #include "ast.h"
 #include "dynamic_array.h"
 #include "utils.h"
@@ -216,6 +220,32 @@ ast_node_t* ast_new_while(ast_node_t* cond, ast_node_t* body, size_t line, size_
     return node;
 }
 
+ast_node_t* ast_new_for(const char* name, ast_node_t* from, ast_node_t* to,
+    ast_node_t* step, bool inclusive, size_t line, size_t column)
+{
+    if (name == NULL || from == NULL || to == NULL)
+        return NULL;
+
+    ast_node_t* node = new_node(AST_FOR, line, column);
+    if (node == NULL)
+        return NULL;
+
+    COPY_STR_OR_FAIL(node, node->for_stmt.var_name, name);
+    INIT_ARR_OR_FAIL(node, &node->for_stmt.guards);
+
+    node->for_stmt.var_id = -1;
+    node->for_stmt.end_id = -1;
+    node->for_stmt.step_id = -1;
+
+    node->for_stmt.from = from;
+    node->for_stmt.to = to;
+    node->for_stmt.step = step;
+    node->for_stmt.inclusive = inclusive;
+
+    node->for_stmt.body = NULL;
+    return node;
+}
+
 ast_node_t* ast_new_expr_stmt(ast_node_t* expr, size_t line, size_t column)
 {
     if (expr == NULL)
@@ -387,7 +417,7 @@ static void free_param(void* ptr)
 }
 
 // Internal helper needed only becacuse dyn_arr_free
-// accepts function points only with this signature
+// accepts function pointers only with this signature
 static void free_node(void* ptr)
 {
     ast_free(ptr);
@@ -450,6 +480,15 @@ void ast_free(ast_node_t* node)
         ast_free(node->while_stmt.body);
         break;
 
+    case AST_FOR:
+        ast_free(node->for_stmt.from);
+        ast_free(node->for_stmt.to);
+        ast_free(node->for_stmt.step);
+        ast_free(node->for_stmt.body);
+        dyn_arr_free(&node->for_stmt.guards, free_node);
+        free(node->for_stmt.var_name);
+        break;
+
     case AST_EXPR_STMT:
         ast_free(node->expr_stmt.expr);
         break;
@@ -505,30 +544,20 @@ void ast_free(ast_node_t* node)
 //  Debug
 // ----------------------------------------
 
-// AI-generated using: Claude Code
-//              model: Claude Opus 5.5
-// Prompt: "Implement the debug print function. Use a lookup table that you can
-//          search in based on the node type and print the result - make it a little verbose
-//          but not too much"
-// Scope: KIND_NAMES, BINARY_OP_NAMES, print_list, print_node and ast_print
-
-// AI-generated using: Claude Code
-//              model: Claude Fable 5.2
-// Prompt: "update ast_print so that it works with boolthen" + "Dont make the debug
-//          print function too complicated make it print the same info as before"
-// Scope: the BOOL_LIT, && and || entries of the tables below, UNARY_OP_NAMES and the
-//        AST_BOOL_LIT and AST_UNARY cases in print_header
-//
-// AI-generated using: Claude Code
-//              model: Claude Opus 5.5
-// Prompt: "update ast_print for MEMBER"
-// Scope: the MEMBER entry of KIND_NAMES and the AST_MEMBER cases in print_header
-//        and print_children
+// AI-generated using: Claude Code, model Claude Opus 5.5 (BOOLTHEN part: Claude Fable 5.2)
+// Prompts: "Implement the debug print function. Use a lookup table that you can search in
+//           based on the node type and print the result - make it a little verbose but not too much"
+//          "update ast_print so that it works with boolthen" + "Dont make the debug print
+//           function too complicated make it print the same info as before"
+//          "update ast_print for MEMBER"
+//          "can you modfiy ast_print to support for"
+// Scope: the name tables below, print_list, print_node, ast_print and the
+//        BOOL_LIT/UNARY/MEMBER/FOR cases in print_header and print_children
 
 // Same order as ast_node_kind_t, ast_unary_op_t and ast_binary_op_t
 static const char* KIND_NAMES[] = {
     "PROGRAM", "FUNC_DEF", "BLOCK",
-    "VAR_DEF", "ASSIGN", "RETURN", "IF", "WHILE", "EXPR_STMT",
+    "VAR_DEF", "ASSIGN", "RETURN", "IF", "WHILE", "FOR", "EXPR_STMT",
     "INT_LIT", "DOUBLE_LIT", "STRING_LIT", "UNIT_LIT", "BOOL_LIT", "VAR_REF", "UNARY", "BINARY", "CALL", "CONVERT",
     "MEMBER"
 };
@@ -616,6 +645,16 @@ static void print_header(const ast_node_t* node, FILE* out)
         fprintf(out, " %s", node->assign.name);
         print_id(node->assign.id, out);
         break;
+    case AST_FOR:
+        // children: from, to, [step], guards..., body
+        fprintf(out, " %s", node->for_stmt.var_name);
+        print_id(node->for_stmt.var_id, out);
+        fprintf(out, " %s", node->for_stmt.inclusive ? "to" : "until");
+        if (node->for_stmt.step != NULL)
+            fprintf(out, " by");
+        if (node->for_stmt.guards.count > 0)
+            fprintf(out, " guards=%zu", node->for_stmt.guards.count);
+        break;
     case AST_INT_LIT:
         fprintf(out, " %lld", (long long)node->int_lit.value);
         break;
@@ -679,6 +718,14 @@ static void print_children(const ast_node_t* node, FILE* out, int depth)
     case AST_WHILE:
         print_node(node->while_stmt.cond, out, depth);
         print_node(node->while_stmt.body, out, depth);
+        break;
+    case AST_FOR:
+        print_node(node->for_stmt.from, out, depth);
+        print_node(node->for_stmt.to, out, depth);
+        if (node->for_stmt.step != NULL)
+            print_node(node->for_stmt.step, out, depth);
+        print_list(&node->for_stmt.guards, out, depth);
+        print_node(node->for_stmt.body, out, depth);
         break;
     case AST_EXPR_STMT:
         print_node(node->expr_stmt.expr, out, depth);

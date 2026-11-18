@@ -15,6 +15,11 @@
 //          allocation failures)
 // Scope: the whole file
 //
+// AI-generated using: Claude Code, model Claude Opus 5.5
+// Prompt: "Update the tests and write tests for the control"
+// Scope: ExplicitIntWithReturnAndValueBranchIsOk, ExplicitIntWithValueBranchesIsOk and
+//        InferredWithValueBranchesIsInt (rule 3 expectations changed by CONTROL)
+//
 // Every test builds a program by hand with the builders from semantic_builders.hpp,
 // so a test reads like the IFJ26 source it represents (written in the comment above it).
 
@@ -1231,19 +1236,24 @@ TEST_F(SemanticPass2Test, NestedIfWithReturnOnEveryPathIsOk)
 }
 
 // def f(): Int = { if (..) { return 1 } else { 2 } }
-TEST_F(SemanticPass2Test, ExplicitIntWithBranchWithoutReturnIsTypeError)
+//   -> CONTROL: the if is the body's value, the return branch is skipped (like Scala)
+TEST_F(SemanticPass2Test, ExplicitIntWithReturnAndValueBranchIsOk)
 {
-    func("f", TYPE_INT, {}, { if_else(cond(), { ret(I(1)) }, { expr(I(2)) }) });
+    ast_node_t* f = func("f", TYPE_INT, {}, { if_else(cond(), { ret(I(1)) }, { expr(I(2)) }) });
     main_({});
-    EXPECT_EQ(analyze(), ERR_SEM_TYPE);
+
+    ASSERT_EQ(analyze(), ERR_OK);
+    EXPECT_EQ(type_name(f->func_def.body->type), "Int");
 }
 
-// def f(): Int = { if (..) { 1 } else { 2 } }   -> values without return are not enough
-TEST_F(SemanticPass2Test, ExplicitIntWithValueBranchesIsTypeError)
+// def f(): Int = { if (..) { 1 } else { 2 } }   -> CONTROL: the if is an expression with the value Int
+TEST_F(SemanticPass2Test, ExplicitIntWithValueBranchesIsOk)
 {
-    func("f", TYPE_INT, {}, { if_else(cond(), { expr(I(1)) }, { expr(I(2)) }) });
+    ast_node_t* f = func("f", TYPE_INT, {}, { if_else(cond(), { expr(I(1)) }, { expr(I(2)) }) });
     main_({});
-    EXPECT_EQ(analyze(), ERR_SEM_TYPE);
+
+    ASSERT_EQ(analyze(), ERR_OK);
+    EXPECT_EQ(type_name(f->func_def.body->type), "Int");
 }
 
 // def f(): Int = { if (..) { return 1 } }   -> the missing else is a path without return
@@ -1292,12 +1302,14 @@ TEST_F(SemanticPass2Test, InferredWithIfWithoutElseIsUnit)
     EXPECT_EQ(type_name(f->func_def.return_type), "Unit");
 }
 
-// def f() = { if (..) { 1 } else { 2 } }   -> an if is not an expression, the type cannot be inferred
-TEST_F(SemanticPass2Test, InferredWithValueBranchesIsTypeError)
+// def f() = { if (..) { 1 } else { 2 } }   -> CONTROL: the if is an expression, Int is inferred
+TEST_F(SemanticPass2Test, InferredWithValueBranchesIsInt)
 {
-    func("f", nullptr, {}, { if_else(cond(), { expr(I(1)) }, { expr(I(2)) }) });
+    ast_node_t* f = func("f", nullptr, {}, { if_else(cond(), { expr(I(1)) }, { expr(I(2)) }) });
     main_({});
-    EXPECT_EQ(analyze(), ERR_SEM_TYPE);
+
+    ASSERT_EQ(analyze(), ERR_OK);
+    EXPECT_EQ(type_name(f->func_def.return_type), "Int");
 }
 
 // def f() = { if (..) { print(1) } else { 2 } }

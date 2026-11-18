@@ -43,6 +43,7 @@ static error_code_t check_assign(sema_ctx_t* semantic_ctx, ast_node_t* ast_state
 static error_code_t check_return(sema_ctx_t* semantic_ctx, ast_node_t* ast_statement);
 static error_code_t check_if(sema_ctx_t* semantic_ctx, ast_node_t* ast_statement);
 static error_code_t check_while(sema_ctx_t* semantic_ctx, ast_node_t* ast_statement);
+static error_code_t check_for(sema_ctx_t* semantic_ctx, ast_node_t* ast_statement);
 
 static error_code_t check_unary(sema_ctx_t* semantic_ctx, ast_node_t* ast_expression);
 static error_code_t check_binary(sema_ctx_t* semantic_ctx, ast_node_t* ast_expression);
@@ -180,6 +181,42 @@ static error_code_t coerce(ast_node_t** slot, type_t* target, error_code_t misma
     return ERR_OK;
 }
 
+static error_code_t coerce_block_result(ast_node_t* block, type_t* target)
+{
+    ast_node_t* last_stmt = last_statement(block);
+
+    // Empty block returns Unit
+    if (last_stmt == NULL)
+        return target->kind == T_UNIT ? ERR_OK : ERR_SEM_TYPE;
+
+    switch (last_stmt->kind) {
+    case AST_EXPR_STMT:
+        TRY(coerce(&last_stmt->expr_stmt.expr, target, ERR_SEM_TYPE));
+        last_stmt->type = target;
+        block->type = target;
+        break;
+
+    case AST_IF:
+        TRY(coerce_block_result(last_stmt->if_stmt.then_block, target));
+        TRY(coerce_block_result(last_stmt->if_stmt.else_block, target));
+        // Both branches now produce target
+        last_stmt->type = target;
+        block->type = target;
+        break;
+
+    // Branch is skipped - check_return already checked the types
+    case AST_RETURN:
+        return ERR_OK;
+
+    // var def, assign, while, for
+    default:
+        if (!type_equal(last_stmt->type, target))
+            return ERR_SEM_TYPE;
+        break;
+    }
+    return ERR_OK;
+}
+
 static bool is_numeric(type_t* ast_operand_type)
 {
     if (ast_operand_type == NULL)
@@ -201,6 +238,80 @@ static error_code_t unify_numeric(ast_node_t* ast_binary)
         TRY(coerce(&ast_binary->binary.right, TYPE_DOUBLE, ERR_SEM_TYPE));
     }
     return ERR_OK;
+}
+
+// Checks if provided literal is 0 or -0
+static bool is_zero_literal(ast_node_t* node)
+{
+    if (node->kind == AST_INT_LIT && node->int_lit.value == 0)
+        return true;
+
+    else if (node->kind == AST_UNARY && node->unary.op == AST_OP_NEG)
+        return is_zero_literal(node->unary.operand);
+
+    else
+        return false;
+}
+
+// Needed for recursion
+static type_t* branch_type(ast_node_t* block);
+
+static type_t* if_value_type(ast_node_t* if_node)
+{
+    // else is mandatory if the if is an expression (CONTROL)
+    if (if_node->if_stmt.else_block == NULL)
+        return NULL;
+
+    // Get the result type of each branch
+    // When both branches contain return nothing is set as the result
+    bool then_skip = block_ends_with_return(if_node->if_stmt.then_block);
+    bool else_skip = block_ends_with_return(if_node->if_stmt.else_block);
+
+    // Both branches are skipped -> if never produces a value
+    if (then_skip && else_skip)
+        return NULL;
+
+    // Get the type of each branch that isnt skipped
+    type_t* then_type = NULL;
+    type_t* else_type = NULL;
+
+    if (then_skip == false)
+        // Indirectly recursive
+        then_type = branch_type(if_node->if_stmt.then_block);
+
+    if (else_skip == false)
+        else_type = branch_type(if_node->if_stmt.else_block);
+
+    // NULL from recursion (branch_type) ->
+    // a branch has no value (missing else, mismatched types or all paths return)
+    if ((!then_skip && then_type == NULL) || (!else_skip && else_type == NULL))
+        return NULL;
+
+    // Return the type based on what branch was skipped (if any)
+    if (then_skip)
+        return else_type;
+    else if (else_skip)
+        return then_type;
+    else if (type_equal(else_type, then_type))
+        return then_type;
+    // Both types are numeric but atleast one isnt INT -> must be DOUBLE
+    else if (is_numeric(then_type) && is_numeric(else_type))
+        return TYPE_DOUBLE;
+    // String+Int, ...
+    else
+        return NULL;
+}
+
+static type_t* branch_type(ast_node_t* block)
+{
+    ast_node_t* last_stmt = last_statement(block);
+
+    if (last_stmt == NULL)
+        return TYPE_UNIT;
+    else if (last_stmt->kind == AST_IF)
+        return if_value_type(last_stmt);
+    else
+        return last_stmt->type;
 }
 
 // ========================================
@@ -438,6 +549,7 @@ static error_code_t check_function(sema_ctx_t* semantic_ctx, ast_node_t* ast_fun
     // Section 2.3 (rule 3)
     // check_statement always sets an if to unit, here we check whats inside each branch
     ast_node_t* last_stmt = last_statement(ast_func_def_data->body);
+    type_t* type;
     if (last_stmt != NULL) {
         if (last_stmt->kind == AST_IF) {
 
@@ -451,7 +563,20 @@ static error_code_t check_function(sema_ctx_t* semantic_ctx, ast_node_t* ast_fun
             else if (block_ends_with_return(ast_func_def_data->body))
                 ast_func_def_data->body->type = ast_func_def_data->return_type;
 
-            // If function return type was not specified and every path in the if reutrns Unit
+            else if ((type = if_value_type(last_stmt)) != NULL) {
+                // ret_inferred -> ifs type becomes the funcions type
+                // Explicit return type -> every branch must fit the type
+                type_t* target = func_sym->ret_inferred ? type : ast_func_def_data->return_type;
+
+                // Last stmt of the body is the if stmt -> this checks the block
+                // compatibility with the func ret type or throws an error
+                TRY(coerce_block_result(ast_func_def_data->body, target));
+
+                // If coerce didnt thrown an error it means types are good -> set the type of the func body
+                ast_func_def_data->body->type = target;
+            }
+
+            // If function return type was not specified and every path in the if returns Unit
             // infer the type as Unit
             else if (func_sym->ret_inferred && block_ends_with_unit(ast_func_def_data->body))
                 ast_func_def_data->body->type = TYPE_UNIT;
@@ -572,6 +697,11 @@ static error_code_t check_statement(sema_ctx_t* semantic_ctx, ast_node_t* ast_st
         ast_statement->type = TYPE_UNIT;
         break;
 
+    case AST_FOR:
+        TRY(check_for(semantic_ctx, ast_statement));
+        ast_statement->type = TYPE_UNIT;
+        break;
+
     case AST_EXPR_STMT:
         TRY(check_expression(semantic_ctx, ast_statement->expr_stmt.expr));
         ast_statement->type = ast_statement->expr_stmt.expr->type;
@@ -688,6 +818,77 @@ static error_code_t check_while(sema_ctx_t* semantic_ctx, ast_node_t* ast_statem
     return ERR_OK;
 }
 
+static error_code_t check_for(sema_ctx_t* semantic_ctx, ast_node_t* ast_statement)
+{
+    // Helpers
+    ast_for_t* for_stmt = &ast_statement->for_stmt;
+    bool is_step = false;
+
+    // Check loop variables
+    TRY(check_expression(semantic_ctx, for_stmt->from));
+    TRY(check_expression(semantic_ctx, for_stmt->to));
+
+    // From and to must be T_INT
+    if ((for_stmt->from->type->kind != T_INT) || (for_stmt->to->type->kind != T_INT))
+        return ERR_SEM_TYPE;
+
+    // step can be omitted
+    if (for_stmt->step != NULL) {
+        is_step = true;
+
+        TRY(check_expression(semantic_ctx, for_stmt->step));
+        // Must be INT
+        if (for_stmt->step->type->kind != T_INT)
+            return ERR_SEM_TYPE;
+
+        // step cant be 0 -> other checks are done during runtime
+        if (is_zero_literal(for_stmt->step))
+            return ERR_SEM_OTHER; // Might be a different error
+    }
+
+    // Insert the loop vat, $end and $step into the symbol table
+    TRY_ST(symtable_push_scope(semantic_ctx->symbol_table));
+
+    symbol_t* var_sym;
+    symbol_t* end_sym;
+    symbol_t* step_sym;
+
+    // You cannot assign to loop variables -> ERR_SEM_ASSIGN
+    TRY_ST(symtable_insert_var(semantic_ctx->symbol_table, for_stmt->var_name, TYPE_INT, true, &var_sym));
+    TRY_ST(symtable_insert_var(semantic_ctx->symbol_table, "$end", TYPE_INT, true, &end_sym));
+    if (is_step) {
+        TRY_ST(symtable_insert_var(semantic_ctx->symbol_table, "$step", TYPE_INT, true, &step_sym));
+        for_stmt->step_id = step_sym->id;
+    }
+
+    for_stmt->var_id = var_sym->id;
+    for_stmt->end_id = end_sym->id;
+
+    // Append for node into func_def.locals
+    bool res = dyn_arr_append(&semantic_ctx->current_func->func_def.locals, ast_statement);
+    if (res == false)
+        return ERR_INTERNAL;
+
+    // Check each guard
+    dyn_arr_t* guards = &for_stmt->guards;
+
+    for (size_t guard_i = 0; guard_i < guards->count; guard_i++) {
+        ast_node_t* guard = dyn_arr_get(guards, guard_i);
+        TRY(check_expression(semantic_ctx, guard));
+        // Each guard must be T_BOOL
+        if (guard->type->kind != T_BOOL)
+            return ERR_SEM_TYPE;
+    }
+
+    // Check the body of the for loop
+    TRY(check_block(semantic_ctx, for_stmt->body));
+
+    // Pop the for loop var symtable scope
+    TRY_ST(symtable_pop_scope(semantic_ctx->symbol_table));
+
+    return ERR_OK;
+}
+
 /**
  * @paragraph Does the following checks:
  *  Type of the condition must be T_BOOL
@@ -794,7 +995,6 @@ static error_code_t check_expression(sema_ctx_t* semantic_ctx, ast_node_t* ast_e
         break;
     }
 
-    // TODO add the rest of expression types
     case AST_UNARY:
         TRY(check_unary(semantic_ctx, ast_expression));
         break;
@@ -810,6 +1010,21 @@ static error_code_t check_expression(sema_ctx_t* semantic_ctx, ast_node_t* ast_e
     case AST_MEMBER:
         TRY(check_member(semantic_ctx, ast_expression));
         break;
+
+    // if expressions - CONTROL
+    case AST_IF: {
+        TRY(check_if(semantic_ctx, ast_expression)); // Checks the condition and each branch
+        type_t* type = if_value_type(ast_expression);
+        if (type == NULL)
+            return ERR_SEM_TYPE;
+
+        // Look at the last stmt of each block and check types
+        TRY(coerce_block_result(ast_expression->if_stmt.then_block, type));
+        TRY(coerce_block_result(ast_expression->if_stmt.else_block, type));
+
+        ast_expression->type = type;
+        break;
+    }
 
     default:
         return ERR_INTERNAL;
