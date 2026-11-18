@@ -14,6 +14,7 @@
 //          function in this header."
 // Prompt: "Update the description for BOOLTHEN (true, false, !, && and ||)"
 // Prompt: "Add a note that an unknown node ends with exit code 99"
+// Prompt: "Update the description for VALMEM members"
 // Scope: doc comment of codegen_expr only
 
 /**
@@ -21,8 +22,10 @@
  *
  * Works for literals (also true and false), variables, unary minus, !,
  * binary operators and the Int -> Double conversion. && and || are short
- * circuit, the right side runs only when it is needed. Needs the types
- * filled in by semantics (expr->type) for unary minus and binary operators.
+ * circuit, the right side runs only when it is needed. A member (x.length,
+ * x.toString, x.toInt, x.floor) is a call of a built-in with x as the
+ * argument. Needs the types filled in by semantics (expr->type) for unary
+ * minus and binary operators.
  *
  * @param codegen Generator created by codegen_init.
  * @param expr Expression node from the AST.

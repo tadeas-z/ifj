@@ -361,6 +361,7 @@ TEST_F(CodegenStringTest, ReadWritesType)
 // Prompt: "Add tests for codegen_builtins: every built-in has its label
 //          and PUSHFRAME and every built-in ends with RETURN"
 // Prompt: "Add tests for readBoolean and toStr of a Boolean (BOOLTHEN)"
+// Prompt: "Add $floor to the label test (VALMEM)"
 // Scope: CodegenBuiltinTest and all tests below
 
 // Same fixture, separate suite name for the built-in tests
@@ -372,7 +373,7 @@ TEST_F(CodegenBuiltinTest, AllBuiltinsHaveLabel)
     codegen_builtins(codegen);
     std::string text = output();
 
-    const char* names[] = { "readLine", "readInt", "readDouble", "readBoolean", "toStr", "toInt",
+    const char* names[] = { "readLine", "readInt", "readDouble", "readBoolean", "toStr", "toInt", "$floor",
         "strLength", "subStr", "ord", "chr" };
     for (const char* name : names) {
         std::string label = std::string("LABEL ") + name + "\nPUSHFRAME\n";

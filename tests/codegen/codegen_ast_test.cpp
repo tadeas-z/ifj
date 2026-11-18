@@ -18,6 +18,8 @@
 // Prompt: "Create tests using google-tests for BOOLTHEN (true, false, !, && and ||,
 //          if without else, else if)"
 // Prompt: "Create tests using google-tests for unknown nodes (exit code 99)"
+// Prompt: "Create tests using google-tests for VALMEM members (length, toString,
+//          toInt, floor and chains)"
 // Scope: whole file
 
 extern "C" {
@@ -623,4 +625,62 @@ TEST_F(CodegenUnknownTest, UnknownStatementExits)
     tree = int_lit(1);
 
     EXPECT_EXIT(codegen_stmt(codegen, tree), ::testing::ExitedWithCode(99), "unknown statement");
+}
+
+// Same setup for the VALMEM tests
+class CodegenValmemTest : public CodegenExprTest {
+};
+
+static ast_node_t* member(const char* name, ast_node_t* receiver, type_t* type)
+{
+    ast_node_t* node = ast_new_member(name, receiver, 1, 1);
+    node->type = type;
+    return node;
+}
+
+// s.length is strLength(s)
+TEST_F(CodegenValmemTest, Length)
+{
+    tree = member("length", var_ref("s", 1, TYPE_STRING), TYPE_INT);
+
+    codegen_expr(codegen, tree);
+    EXPECT_EQ(output(), "PUSHS LF@s$1\nCREATEFRAME\nDEFVAR TF@value$0\nPOPS TF@value$0\nCALL strLength\n");
+}
+
+// x.toString is toStr(x)
+TEST_F(CodegenValmemTest, ToString)
+{
+    tree = member("toString", var_ref("x", 1, TYPE_INT), TYPE_STRING);
+
+    codegen_expr(codegen, tree);
+    EXPECT_EQ(output(), "PUSHS LF@x$1\nCREATEFRAME\nDEFVAR TF@value$0\nPOPS TF@value$0\nCALL toStr\n");
+}
+
+// d.toInt is toInt(d)
+TEST_F(CodegenValmemTest, ToInt)
+{
+    tree = member("toInt", var_ref("d", 1, TYPE_DOUBLE), TYPE_INT);
+
+    codegen_expr(codegen, tree);
+    EXPECT_EQ(output(), "PUSHS LF@d$1\nCREATEFRAME\nDEFVAR TF@value$0\nPOPS TF@value$0\nCALL toInt\n");
+}
+
+// d.floor calls $floor, so a user function floor is not hit
+TEST_F(CodegenValmemTest, Floor)
+{
+    tree = member("floor", var_ref("d", 1, TYPE_DOUBLE), TYPE_DOUBLE);
+
+    codegen_expr(codegen, tree);
+    EXPECT_EQ(output(), "PUSHS LF@d$1\nCREATEFRAME\nDEFVAR TF@value$0\nPOPS TF@value$0\nCALL $floor\n");
+}
+
+// d.floor.toInt, inner member is done first
+TEST_F(CodegenValmemTest, Chain)
+{
+    tree = member("toInt", member("floor", var_ref("d", 1, TYPE_DOUBLE), TYPE_DOUBLE), TYPE_INT);
+
+    codegen_expr(codegen, tree);
+    EXPECT_EQ(output(),
+        "PUSHS LF@d$1\nCREATEFRAME\nDEFVAR TF@value$0\nPOPS TF@value$0\nCALL $floor\n"
+        "CREATEFRAME\nDEFVAR TF@value$0\nPOPS TF@value$0\nCALL toInt\n");
 }
