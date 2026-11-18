@@ -13,7 +13,7 @@
 int main(void)
 {
     lexer_t lexer;
-    int err = lexer_init(&lexer, stdin);
+    error_code_t err = lexer_init(&lexer, stdin);
     if (err != ERR_OK)
         return err;
 

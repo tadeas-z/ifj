@@ -11,7 +11,7 @@
 
 // AI-generated using: Gemini
 //               model: Gemini 4 hydrogen
-// Prompt (summary): "Generate comment of parse_main() function for 
+// Prompt (summary): "Generate comment of parse_main() function for
 //                    syntactic analysis of an IFJ26 source program."
 // Scope: parser_main
 
@@ -28,6 +28,6 @@
  * @return ERR_OK (0) on successful parsing, or a corresponding error code
  *         (ERR_LEXICAL, ERR_SYNTAX).
  */
-int parser_main (lexer_t *lexer, ast_node_t **out_ast);
+error_code_t parser_main (lexer_t *lexer, ast_node_t **out_ast);
 
 #endif
