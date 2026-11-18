@@ -13,6 +13,7 @@
 // Prompt: "Write the Doxygen description of the expression codegen
 //          function in this header."
 // Prompt: "Update the description for BOOLTHEN (true, false, !, && and ||)"
+// Prompt: "Add a note that an unknown node ends with exit code 99"
 // Scope: doc comment of codegen_expr only
 
 /**
@@ -27,6 +28,7 @@
  * @param expr Expression node from the AST.
  * @note String + uses the temp variables GF@tmp$1 and GF@tmp$2, they are
  *       defined in codegen_program_begin.
+ * @note Unknown node kind is an internal error, the program ends with 99.
  */
 void codegen_expr(codegen_t* codegen, ast_node_t* expr);
 
@@ -35,6 +37,7 @@ void codegen_expr(codegen_t* codegen, ast_node_t* expr);
 // Prompt: "Write the Doxygen description of the statement codegen
 //          function in this header."
 // Prompt: "Update the description for if without else (BOOLTHEN)"
+// Prompt: "Add a note that an unknown node ends with exit code 99"
 // Scope: doc comment of codegen_stmt only
 
 /**
@@ -49,6 +52,7 @@ void codegen_expr(codegen_t* codegen, ast_node_t* expr);
  * @note The variables are not defined here, DEFVAR of all locals must be
  *       written at the start of the function (so while does not define
  *       them again).
+ * @note Unknown node kind is an internal error, the program ends with 99.
  */
 void codegen_stmt(codegen_t* codegen, ast_node_t* stmt);
 

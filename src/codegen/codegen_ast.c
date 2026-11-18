@@ -3,6 +3,9 @@
 // Author(s): Marek Zachensky (xzachem00)
 
 #include "codegen_ast.h"
+#include "comp_error.h"
+#include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 
 // true when the current function returns Unit
@@ -257,7 +260,8 @@ void codegen_expr(codegen_t* codegen, ast_node_t* expr)
         generate_call(codegen, expr);
         break;
     default:
-        break;
+        fprintf(stderr, "codegen: unknown expression\n");
+        exit(ERR_INTERNAL);
     }
 }
 
@@ -371,7 +375,8 @@ void codegen_stmt(codegen_t* codegen, ast_node_t* stmt)
         generate_expr_stmt(codegen, stmt);
         break;
     default:
-        break;
+        fprintf(stderr, "codegen: unknown statement\n");
+        exit(ERR_INTERNAL);
     }
 }
 

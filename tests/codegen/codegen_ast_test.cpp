@@ -17,6 +17,7 @@
 // Prompt: "Create tests using google-tests for calls inside expressions (FUNEXP)"
 // Prompt: "Create tests using google-tests for BOOLTHEN (true, false, !, && and ||,
 //          if without else, else if)"
+// Prompt: "Create tests using google-tests for unknown nodes (exit code 99)"
 // Scope: whole file
 
 extern "C" {
@@ -602,4 +603,24 @@ TEST_F(CodegenBoolthenTest, ElseIf)
         "LABEL $2$else\n"
         "LABEL $2$end\n"
         "LABEL $1$end\n");
+}
+
+// Same setup for the unknown node tests
+class CodegenUnknownTest : public CodegenExprTest {
+};
+
+// block is not an expression, codegen ends with 99
+TEST_F(CodegenUnknownTest, UnknownExpressionExits)
+{
+    tree = ast_new_block(1, 1);
+
+    EXPECT_EXIT(codegen_expr(codegen, tree), ::testing::ExitedWithCode(99), "unknown expression");
+}
+
+// literal is not a statement, codegen ends with 99
+TEST_F(CodegenUnknownTest, UnknownStatementExits)
+{
+    tree = int_lit(1);
+
+    EXPECT_EXIT(codegen_stmt(codegen, tree), ::testing::ExitedWithCode(99), "unknown statement");
 }
