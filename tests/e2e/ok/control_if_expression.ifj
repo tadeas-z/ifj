@@ -1,0 +1,22 @@
+// AI-generated using: Claude Code (model: Claude Opus 5.5), prompt in tests/e2e/run.sh
+import ifj26.*
+
+@main def run(): Unit =
+    var x = -5
+    val absolute = if x < 0 then 0 - x else x
+    print(absolute)
+    print("\n")
+    val abs2 = if x < 0 then
+        0-x
+    else
+        x
+    print(abs2)
+    print("\n")
+    val abs3 = if x < 0 then 0 - x else
+            x
+    print(abs3)
+    print("\n")
+    x = 3
+    val y = if x < 0 then 0 - x else x
+    print(y)
+    print("\n")

@@ -1,0 +1,16 @@
+// AI-generated using: Claude Code (model: Claude Opus 5.5), prompt in tests/e2e/run.sh
+import ifj26.*
+
+@main def run(): Unit =
+    val a = true || false && false
+    print(a)
+    print("\n")
+    val b = !false && false
+    print(b)
+    print("\n")
+    val c = 1 < 2 && 3 < 4
+    print(c)
+    print("\n")
+    val d = !(1 < 2) || 2 == 2
+    print(d)
+    print("\n")

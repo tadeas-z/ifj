@@ -1,0 +1,13 @@
+// AI-generated using: Claude Code (model: Claude Opus 5.5), prompt in tests/e2e/run.sh
+import ifj26.*
+
+def factorial(n: Int): Int =
+    if n < 2 then
+        return 1
+    else
+        return n * factorial(n - 1)
+
+@main def run(): Unit =
+    val result = 2 * factorial(readInt() + 1)
+    print(toStr(result + strLength(subStr("abcd", 1, 3))))
+    print("\n")

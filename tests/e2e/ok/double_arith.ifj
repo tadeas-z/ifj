@@ -1,0 +1,15 @@
+// AI-generated using: Claude Code (model: Claude Opus 5.5), prompt in tests/e2e/run.sh
+import ifj26.*
+
+@main def run(): Unit =
+    val nl = "\n"
+    val x = 1.5
+    val y = x * 2
+    print(y)
+    print(nl)
+    val z: Double = 1
+    print(z)
+    print(nl)
+    val h = 1 / 2.0
+    print(h)
+    print(nl)

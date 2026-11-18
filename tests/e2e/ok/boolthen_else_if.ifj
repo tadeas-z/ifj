@@ -1,0 +1,23 @@
+// AI-generated using: Claude Code (model: Claude Opus 5.5), prompt in tests/e2e/run.sh
+import ifj26.*
+
+def show(x: Int): Unit =
+    if x < 0 then
+        print("negative\n")
+    else if x == 0 then
+        print("zero\n")
+    else
+        print("positive\n")
+
+def onlyNegative(x: Int): Unit =
+    if x < 0 then
+        print("negative\n")
+    else if x == 0 then
+        print("zero\n")
+
+@main def run(): Unit =
+    show(-1)
+    show(0)
+    show(1)
+    onlyNegative(5)
+    onlyNegative(0)

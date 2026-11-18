@@ -1,0 +1,16 @@
+// AI-generated using: Claude Code (model: Claude Opus 5.5), prompt in tests/e2e/run.sh
+import ifj26.*
+
+def show(x: Int): Unit =
+    if x > 2 then
+        print("big\n")
+        return
+    else
+        ()
+    print("small\n")
+
+@main def run(): Unit =
+    val a = 5
+    val b = 1
+    show(a)
+    show(b)

@@ -1,0 +1,23 @@
+// AI-generated using: Claude Code (model: Claude Opus 5.5), prompt in tests/e2e/run.sh
+import ifj26.*
+
+@main def run(): Unit =
+    val a = 7
+    val b = 2
+    val nl = "\n"
+    val s = a + b * 3
+    print(s)
+    print(nl)
+    val d = a - b - 1
+    print(d)
+    print(nl)
+    val q = a / b
+    print(q)
+    print(nl)
+    val n = -7
+    val q2 = n / b
+    print(q2)
+    print(nl)
+    val p = (a + b) * (a - b)
+    print(p)
+    print(nl)

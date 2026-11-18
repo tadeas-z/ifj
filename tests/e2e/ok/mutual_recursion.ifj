@@ -1,0 +1,22 @@
+// AI-generated using: Claude Code (model: Claude Opus 5.5), prompt in tests/e2e/run.sh
+import ifj26.*
+
+@main def run(): Unit =
+    val n = 7
+    val r = isEven(n)
+    print(r)
+    print("\n")
+
+def isEven(n: Int): String =
+    if n == 0 then
+        return "even"
+    else
+        val m = n - 1
+        return isOdd(m)
+
+def isOdd(n: Int): String =
+    if n == 0 then
+        return "odd"
+    else
+        val m = n - 1
+        return isEven(m)

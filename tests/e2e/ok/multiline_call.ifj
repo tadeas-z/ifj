@@ -1,0 +1,18 @@
+// AI-generated using: Claude Code (model: Claude Opus 5.5), prompt in tests/e2e/run.sh
+import ifj26.*
+
+def add3(
+    a: Int,
+    b: Int,
+    c: Int,
+    ): Int = a + b + c
+
+@main def run(): Unit =
+    val x = 1
+    val r = add3(
+        x,
+        x,
+        x,
+        )
+    print(r)
+    print("\n")

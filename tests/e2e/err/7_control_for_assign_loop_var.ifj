@@ -1,0 +1,6 @@
+// AI-generated using: Claude Code (model: Claude Opus 5.5), prompt in tests/e2e/run.sh
+import ifj26.*
+
+@main def run(): Unit =
+    for i <- 1 to 3 do
+        i = 5

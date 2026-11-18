@@ -1,0 +1,15 @@
+// AI-generated using: Claude Code (model: Claude Opus 5.5), prompt in tests/e2e/run.sh
+import ifj26.*
+
+@main def run(): Unit =
+    var go = true
+    var i = 0
+    while go do
+        i = i + 1
+        if i == 3 then
+            go = false
+    print(i)
+    print("\n")
+    val ok = i == 3
+    if ok then
+        print("ok\n")

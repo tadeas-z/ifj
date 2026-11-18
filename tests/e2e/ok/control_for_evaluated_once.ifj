@@ -1,0 +1,16 @@
+// AI-generated using: Claude Code (model: Claude Opus 5.5), prompt in tests/e2e/run.sh
+import ifj26.*
+
+def loud(x: Int): Int =
+    print("eval ")
+    x
+
+@main def run(): Unit =
+    var n = 3
+    for i <- 1 to n do
+        n = n + 1
+        print(i)
+    print("\n")
+    for i <- 1 to loud(2) by loud(1) do
+        print(i)
+    print("\n")

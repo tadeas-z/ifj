@@ -1,0 +1,20 @@
+// AI-generated using: Claude Code (model: Claude Opus 5.5), prompt in tests/e2e/run.sh
+import ifj26.*
+
+def flip(b: Boolean): Boolean = !b
+
+def isPositive(x: Int): Boolean =
+    return x > 0
+
+@main def run(): Unit =
+    var b: Boolean = true
+    b = flip(b)
+    print(b)
+    print("\n")
+    val p = isPositive(5)
+    print(p)
+    print("\n")
+    if p == true then
+        print("eq\n")
+    if p != b then
+        print("ne\n")

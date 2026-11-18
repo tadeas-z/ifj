@@ -1,0 +1,36 @@
+// AI-generated using: Claude Code (model: Claude Opus 5.5), prompt in tests/e2e/run.sh
+import ifj26.*
+
+@main def run(): Unit =
+    val nl = "\n"
+    val s = "Hello"
+    val len = strLength(s)
+    print(len)
+    print(nl)
+    val a = 1
+    val b = 4
+    val sub = subStr(s, a, b)
+    print(sub)
+    print(nl)
+    val i = 0
+    val o = ord(s, i)
+    print(o)
+    print(nl)
+    val bad = 10
+    val o2 = ord(s, bad)
+    print(o2)
+    print(nl)
+    val code = 65
+    val c = chr(code)
+    print(c)
+    print(nl)
+    val d = 2.75
+    val t = toInt(d)
+    print(t)
+    print(nl)
+    val ts = toStr(d)
+    print(ts)
+    print(nl)
+    val ti = toStr(len)
+    print(ti)
+    print(nl)

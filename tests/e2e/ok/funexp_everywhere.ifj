@@ -1,0 +1,23 @@
+// AI-generated using: Claude Code (model: Claude Opus 5.5), prompt in tests/e2e/run.sh
+import ifj26.*
+
+def add(a: Int, b: Int): Int = a + b
+
+def twice(x: Int): Int =
+    return add(x, x) * 1
+
+@main def run(): Unit =
+    var i = 0
+    while i < add(1, 2) do
+        i = add(i, 1)
+    print(i)
+    print("\n")
+    if twice(i) > add(i, 2) then
+        print("yes\n")
+    else
+        print("no\n")
+    print(add(add(1, 2), add(3, 4)) - twice(2))
+    print("\n")
+    val s = "x" + toStr(add(4, 5)) + "y"
+    print(s)
+    print("\n")

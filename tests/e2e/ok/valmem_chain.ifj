@@ -1,0 +1,14 @@
+// AI-generated using: Claude Code (model: Claude Opus 5.5), prompt in tests/e2e/run.sh
+import ifj26.*
+
+@main def run(): Unit =
+    val number = 3.7
+    print(number.floor.toInt)
+    print("\n")
+    val neg = -1.5
+    print(neg.floor)
+    print("\n")
+    print(neg.floor.toInt)
+    print("\n")
+    print(number.toInt.toString.length)
+    print("\n")

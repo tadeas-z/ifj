@@ -856,7 +856,7 @@ static int parser_return(parser_t* parser, ast_node_t** out_node)
 ---------------------------------------------------------------------------------
 */
 
-int parser_main(lexer_t* lexer, ast_node_t** out_ast)
+error_code_t parser_main(lexer_t* lexer, ast_node_t** out_ast)
 {
     if (lexer == NULL || out_ast == NULL)
         return ERR_INTERNAL;

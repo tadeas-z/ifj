@@ -1,0 +1,14 @@
+// AI-generated using: Claude Code (model: Claude Opus 5.5), prompt in tests/e2e/run.sh
+import ifj26.*
+
+@main def run(): Unit =
+    val a = "abc"
+    val b = "abd"
+    if a < b then
+        print("less\n")
+    else
+        print("not less\n")
+    if a == "abc" then
+        print("equal\n")
+    else
+        print("not equal\n")

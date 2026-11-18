@@ -1,0 +1,24 @@
+// AI-generated using: Claude Code (model: Claude Opus 5.5), prompt in tests/e2e/run.sh
+import ifj26.*
+
+/* block comment /* nested */ still comment */
+@main def run(): Unit =
+    val big = 1_000_000 // line comment
+    print(big)
+    print("\n")
+    val e = 1e2
+    print(e)
+    print("\n")
+    val h = .5
+    print(h)
+    print("\n")
+    val dd = 2.5d
+    print(dd)
+    print("\n")
+    print("tab:\tquote:\" backslash:\\\n")
+    val m = """a\nb"""
+    print(m)
+    print("\n")
+    val a = 1; val b = 2
+    print(a); print(b)
+    print("\n")
