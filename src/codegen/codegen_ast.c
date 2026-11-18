@@ -3,6 +3,9 @@
 // Author(s): Marek Zachensky (xzachem00)
 
 #include "codegen_ast.h"
+#include "comp_error.h"
+#include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 
 // true when the current function returns Unit
@@ -202,6 +205,29 @@ static void generate_call(codegen_t* codegen, ast_node_t* expr)
     codegen_call(codegen, expr->call.name);
 }
 
+// x.member, call built in with x
+static void generate_member(codegen_t* codegen, ast_node_t* expr)
+{
+    const char* name = expr->member.name;
+    const char* func;
+    if (strcmp(name, "toString") == 0)
+        func = "toStr";
+    else if (strcmp(name, "length") == 0)
+        func = "strLength";
+    else if (strcmp(name, "floor") == 0)
+        func = "$floor";
+    else
+        func = "toInt";
+
+    var_t param = { FRAME_TF, "value", 0 };
+
+    codegen_expr(codegen, expr->member.receiver);
+    codegen_createframe(codegen);
+    codegen_defvar(codegen, param);
+    codegen_pops(codegen, param);
+    codegen_call(codegen, func);
+}
+
 // push expression on the stack
 void codegen_expr(codegen_t* codegen, ast_node_t* expr)
 {
@@ -253,11 +279,15 @@ void codegen_expr(codegen_t* codegen, ast_node_t* expr)
     case AST_CONVERT:
         generate_convert(codegen, expr);
         break;
+    case AST_MEMBER:
+        generate_member(codegen, expr);
+        break;
     case AST_CALL:
         generate_call(codegen, expr);
         break;
     default:
-        break;
+        fprintf(stderr, "codegen: unknown expression\n");
+        exit(ERR_INTERNAL);
     }
 }
 
@@ -371,7 +401,8 @@ void codegen_stmt(codegen_t* codegen, ast_node_t* stmt)
         generate_expr_stmt(codegen, stmt);
         break;
     default:
-        break;
+        fprintf(stderr, "codegen: unknown statement\n");
+        exit(ERR_INTERNAL);
     }
 }
 

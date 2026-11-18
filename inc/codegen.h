@@ -300,11 +300,13 @@ void codegen_read(codegen_t* codegen, var_t var, const char* type);
 // Prompt: "Write the Doxygen description of the new built-in functions
 //          codegen function in this header."
 // Prompt: "Add readBoolean to the description (BOOLTHEN)"
+// Prompt: "Add $floor to the description (VALMEM)"
 // Scope: doc comment of codegen_builtins only
 
 /**
  * @brief Writes the code of all built-in functions (readLine, readInt,
- *        readDouble, readBoolean, toStr, toInt, strLength, subStr, ord, chr).
+ *        readDouble, readBoolean, toStr, toInt, strLength, subStr, ord, chr)
+ *        and $floor for the VALMEM member x.floor.
  *
  * Every built-in is called like a normal function: CREATEFRAME, DEFVAR and
  * MOVE of the arguments into TF and CALL with its name. The arguments are

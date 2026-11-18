@@ -128,6 +128,22 @@ static const char* builtins =
     "POPFRAME\n"
     "RETURN\n"
 
+    // floor(value)
+    "LABEL $floor\n"
+    "PUSHFRAME\n"
+    "DEFVAR LF@r$0\n"
+    "DEFVAR LF@c$0\n"
+    "FLOAT2INT LF@r$0 LF@value$0\n"
+    "INT2FLOAT LF@r$0 LF@r$0\n"
+    // -1.5 gives -1.0, so -1
+    "GT LF@c$0 LF@r$0 LF@value$0\n"
+    "JUMPIFEQ $floor$ok LF@c$0 bool@false\n"
+    "SUB LF@r$0 LF@r$0 float@0x1p+0\n"
+    "LABEL $floor$ok\n"
+    "PUSHS LF@r$0\n"
+    "POPFRAME\n"
+    "RETURN\n"
+
     // strLength(value)
     "LABEL strLength\n"
     "PUSHFRAME\n"
