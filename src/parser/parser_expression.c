@@ -23,14 +23,6 @@ bool stack_err_flag = false;
 static token_t pending_token;
 static bool has_pending = false;
 
-// Lookahead token to be consumed on the next expression token advance.
-void parser_expression_push_back(token_t* token)
-{
-    pending_token = *token;
-    memset(token, 0, sizeof(*token));
-    has_pending = true;
-}
-
 /*
 ---------------------------------------------------------------------------------
 |    Stack function definition                               				    |
@@ -103,6 +95,14 @@ static void stack_free(tstack_t* s)
     }
 }
 // end stack function definition
+
+// Lookahead token to be consumed on the next expression token advance.
+void parser_expression_push_back(token_t* token)
+{
+    pending_token = *token;
+    memset(token, 0, sizeof(*token));
+    has_pending = true;
+}
 
 // AI-generated using: Gemini
 //                model: Gemini 4 HYDROGEN
@@ -211,7 +211,7 @@ const char precedence_table[15][15] = {
     /*	-	*/ { '>', '>', '<', '<', '<', '>', '>', '<', '>', '<', '>', '<', '>', '>', '<' },
     /*	*	*/ { '>', '>', '>', '>', '<', '>', '>', '<', '>', '<', '>', '<', '>', '>', '<' },
     /*	/	*/ { '>', '>', '>', '>', '<', '>', '>', '<', '>', '<', '>', '<', '>', '>', '<' },
-    /*	(	*/ { '<', '<', '<', '<', '<', '=', R_ERR, '<', '<', '<', '<', '<', '<', '<', R_ERR },
+    /*	(	*/ { '<', '<', '<', '<', '<', '=', R_ERR, '<', '<', '<', '<', '<', '<', '<', '<' },
     /*	)	*/ { '>', '>', '>', '>', R_ERR, '>', '>', R_ERR, '>', R_ERR, '>', R_ERR, '>', '>', '>' },
     /*	$	*/ { '<', '<', '<', '<', '<', R_ERR, R_ERR, '<', '<', '<', '<', '<', '<', '<', '<' },
     /*	id	*/ { '>', '>', '>', '>', R_ERR, '>', '>', R_ERR, '>', R_ERR, '>', R_ERR, '>', '>', '>' },
@@ -311,7 +311,7 @@ static void free_control(tdata_t* control, int count)
 }
 
 // Pops symbols down to the shift mark and reduces them into a non-terminal AST node
-int reduce_rules(tstack_t* stack, size_t line, size_t col)
+static error_code_t reduce_rules(tstack_t* stack, size_t line, size_t col)
 {
     tdata_t control[5];
     int count_control = 0;
@@ -505,7 +505,7 @@ int reduce_rules(tstack_t* stack, size_t line, size_t col)
 // Scope: advance_shared_token
 
 // Advances the shared parser token from the pending buffer or directly from the lexer
-static int advance_shared_token(lexer_t* lexer, token_t* current_token)
+static error_code_t advance_shared_token(lexer_t* lexer, token_t* current_token)
 {
     token_dispose(current_token);
     if (has_pending) {
@@ -526,7 +526,7 @@ static int advance_shared_token(lexer_t* lexer, token_t* current_token)
 ---------------------------------------------------------------------------------
 */
 
-int parser_expression(lexer_t* lexer, token_t* current_token, ast_node_t** out_node)
+error_code_t parser_expression(lexer_t* lexer, token_t* current_token, ast_node_t** out_node)
 {
     if (lexer == NULL || current_token == NULL || out_node == NULL)
         return ERR_INTERNAL;
@@ -650,6 +650,7 @@ int parser_expression(lexer_t* lexer, token_t* current_token, ast_node_t** out_n
                         }
 
                         if (current_token->type == TOKEN_COMMA) {
+                            size_t comma_line = current_token->line;
                             adv_err = advance_shared_token(lexer, current_token);
                             if (adv_err != ERR_OK) {
                                 ast_free(operand_node);
@@ -657,9 +658,7 @@ int parser_expression(lexer_t* lexer, token_t* current_token, ast_node_t** out_n
                                 return adv_err;
                             }
 
-                            bool had_newline = false;
                             while (current_token->type == TOKEN_NEWLINE) {
-                                had_newline = true;
                                 adv_err = advance_shared_token(lexer, current_token);
                                 if (adv_err != ERR_OK) {
                                     ast_free(operand_node);
@@ -669,7 +668,7 @@ int parser_expression(lexer_t* lexer, token_t* current_token, ast_node_t** out_n
                             }
 
                             if (current_token->type == TOKEN_RPAREN) {
-                                if (!had_newline) {
+                                if (current_token->line <= comma_line) {
                                     ast_free(operand_node);
                                     stack_free(&stack);
                                     return ERR_SYNTAX;
