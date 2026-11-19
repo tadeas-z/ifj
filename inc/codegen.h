@@ -112,7 +112,7 @@ void codegen_program_end(codegen_t* codegen);
 // Prompt: "Write the Doxygen descriptions of the new public codegen
 //          functions in this header."
 // Prompt: "Remove the unused codegen_move and its description"
-// Scope: doc comments of codegen_defvar, codegen_move, codegen_write,
+// Scope: doc comments of codegen_defvar, codegen_write,
 //        codegen_func_begin, codegen_func_end, codegen_createframe
 //        and codegen_call only
 
@@ -261,8 +261,7 @@ void codegen_exit(codegen_t* codegen, int code);
 //          and read codegen functions in this header."
 // Prompt: "Remove the unused codegen_unary_op, unary_op_t and codegen_read
 //          and their descriptions"
-// Scope: doc comments of codegen_unary_op, codegen_binary_op
-//        and codegen_read only
+// Scope: doc comment of codegen_binary_op only
 
 /**
  * @brief Writes an instruction with a variable and two symbols
