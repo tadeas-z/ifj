@@ -27,7 +27,7 @@
  * @return ERR_OK (0) on successful parsing, or a corresponding error code
  *         (ERR_LEXICAL, ERR_SYNTAX, ERR_INTERNAL).
  */
-error_code_t parser_main(lexer_t *lexer, ast_node_t **out_ast);
+error_code_t parser_main(lexer_t* lexer, ast_node_t** out_ast);
 
 /**
  * @brief Parses an `if` expression (`if <cond> then <expr> else <expr>`) for CONTROL.
@@ -39,6 +39,6 @@ error_code_t parser_main(lexer_t *lexer, ast_node_t **out_ast);
  * @param out_node Output pointer where the resulting `AST_IF` node will be stored.
  * @return ERR_OK (0) on success, or an error code (ERR_LEXICAL, ERR_SYNTAX, ERR_INTERNAL).
  */
-int parser_if_expression(lexer_t *lexer, token_t *current_token, ast_node_t **out_node);
+error_code_t parser_if_expression(lexer_t* lexer, token_t* current_token, ast_node_t** out_node);
 
 #endif
