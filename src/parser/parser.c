@@ -65,8 +65,8 @@ static char* copy_lexeme(const char* src)
 
 // AI-generated using: Claude
 //                model: Claude Sonnet 5.5
-// Prompt (summary): "Align parser.c with parser_expression.c for the FUNEXP,
-//                    BOOLTHEN, CONTROL and VALMEM extensions."
+// Prompt (summary): "Generate functions used in
+//                    syntactic analysis."
 // Scope: is_ident_word, skip_newlines, consume, parser_type
 
 // True if the current token is an identifier with exactly this spelling.
