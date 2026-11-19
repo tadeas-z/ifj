@@ -416,7 +416,7 @@ int reduce_rules(tstack_t* stack, size_t line, size_t col)
                 return ERR_INTERNAL;
             }
             member_node->member.receiver = control[1].ast_node;
-            non_terminal.ast_ndoe = member_node;
+            non_terminal.ast_node = member_node;
             if (!push(stack, non_terminal)) {
                 ast_free(member_node);
                 return ERR_INTERNAL;
