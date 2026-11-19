@@ -26,7 +26,7 @@
  * @param out_node Pointer to an AST node pointer where the root of the generated tree will be stored.
  * @return ERR_OK (0) on success, or an error code (ERR_LEXICAL, ERR_SYNTAX, ERR_INTERNAL).
  */
-int parser_expression(lexer_t *lexer, token_t *current_token, ast_node_t **out_node);
+error_code_t parser_expression(lexer_t* lexer, token_t* current_token, ast_node_t** out_node);
 
 /**
  * @brief Stores a lookahead token to be consumed on the next expression token advance.
@@ -36,6 +36,6 @@ int parser_expression(lexer_t *lexer, token_t *current_token, ast_node_t **out_n
  *
  * @param token Pointer to the lookahead token to push back (ownership is transferred).
  */
-void parser_expression_push_back(token_t *token);
+void parser_expression_push_back(token_t* token);
 
 #endif
