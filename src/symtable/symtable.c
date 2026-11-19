@@ -2,12 +2,11 @@
 // symtable.c
 // Author(s): Adam Zatloukal (xzatloa01)
 
-
-#include <stdlib.h>
-#include <string.h>
 #include "symtable.h"
 #include "types.h"
 #include "utils.h"
+#include <stdlib.h>
+#include <string.h>
 
 typedef struct bst_node {
     char* key; // identifier name
@@ -41,17 +40,17 @@ struct symtable {
         .type = (t),              \
         .is_const = (c) })
 
-#define SYMBOL_INIT_FUNC(st)        \
-    ((symbol_t) {                   \
-        .id = (st)->next_id++,      \
-        .kind = (SYM_FUNC),         \
-        .type = NULL,               \
-        .is_const = true,           \
-        .ret_inferred = false,      \
-        .param_count = 0,           \
-        .param_types = NULL,        \
-        .param_names = NULL,        \
-        .sema_marker = SEMA_UNCHECKED,   \
+#define SYMBOL_INIT_FUNC(st)           \
+    ((symbol_t) {                      \
+        .id = (st)->next_id++,         \
+        .kind = (SYM_FUNC),            \
+        .type = NULL,                  \
+        .is_const = true,              \
+        .ret_inferred = false,         \
+        .param_count = 0,              \
+        .param_types = NULL,           \
+        .param_names = NULL,           \
+        .sema_marker = SEMA_UNCHECKED, \
         .decl = NULL })
 
 #define CHECK_MEM_ERR(ptr)   \

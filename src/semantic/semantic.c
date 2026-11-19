@@ -512,6 +512,7 @@ static error_code_t check_function(sema_ctx_t* semantic_ctx, ast_node_t* ast_fun
     //                                          |
     //                              [context]───
     sema_frame_t frame = { .func_sym = func_sym, .caller = semantic_ctx->call_chain };
+    // cppcheck-suppress autoVariables;
     semantic_ctx->call_chain = &frame; // Push to the call chain
 
     // Save callers state and update context

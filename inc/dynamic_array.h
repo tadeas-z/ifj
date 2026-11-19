@@ -7,12 +7,11 @@
 //              ▼      ▼      ▼
 //           node A  node B  node C        (allocated separately by the caller)
 
-
 #ifndef DYNAMIC_ARRAY_H
 #define DYNAMIC_ARRAY_H
 
-#include <stddef.h>
 #include <stdbool.h>
+#include <stddef.h>
 
 #define DEFAULT_CAPACITY 32
 
@@ -27,7 +26,7 @@ typedef struct {
  * @return false on invalid ptr or memory allocation failure
  *         else true
  */
-bool  dyn_arr_init(dyn_arr_t* ptr);
+bool dyn_arr_init(dyn_arr_t* ptr);
 
 /**
  * @brief appends item to the end of the dynamic array
@@ -37,7 +36,7 @@ bool  dyn_arr_init(dyn_arr_t* ptr);
  *          else true
  * @note the thing that ptr points to MUST live on the heap
  */
-bool  dyn_arr_append(dyn_arr_t* ptr, void* item);
+bool dyn_arr_append(dyn_arr_t* ptr, void* item);
 
 /**
  * @brief returns a pointer to an element inside of the dynamic array
@@ -54,6 +53,6 @@ void* dyn_arr_get(const dyn_arr_t* ptr, size_t i);
  *      elements inside the array. For example if the array stores int pointers normal free is passed
  *      if the array stores you own complex data type pointers pass the function that frees said datatype
  */
-void  dyn_arr_free(dyn_arr_t* ptr, void (*free_item)(void*));
+void dyn_arr_free(dyn_arr_t* ptr, void (*free_item)(void*));
 
 #endif

@@ -5,8 +5,8 @@
 #ifndef SYMTABLE_H
 #define SYMTABLE_H
 
-#include <stdbool.h>
 #include "types.h"
+#include <stdbool.h>
 
 struct ast_node;
 
@@ -42,7 +42,7 @@ typedef struct
     type_t** param_types; // Dynamic array of param types
     char** param_names; // Dynamic array of param names
     marker_t sema_marker;
-    struct ast_node* decl;         // Declaration of a function - used & set by semantics
+    struct ast_node* decl; // Declaration of a function - used & set by semantics
 } symbol_t;
 
 // implementation is private
