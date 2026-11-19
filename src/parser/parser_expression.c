@@ -13,6 +13,7 @@
 #include "lexer.h"
 #include "parser_expression.h"
 #include "parser_stack.h"
+#include "parser.h"
 
 // macro relation_error, syntactic error
 #define R_ERR ' '
@@ -205,22 +206,23 @@ static char* decode_string_literal(const char* lexeme)
     return out;
 }
 
-const char precedence_table[14][14] = {
-    /*	  	       +     -	     *	      /	     (       )	     $      id      rel      u-	    eq      !       &&      ||		*/
-    /*	+	*/ {  '>',  '>',    '<',    '<',    '<',    '>',    '>',    '<',    '>',    '<',    '>',    '<',    '>',    '>'     },
-    /*	-	*/ {  '>',  '>',    '<',    '<',    '<',    '>',    '>',    '<',    '>',    '<',    '>',    '<',    '>',    '>'     },
-    /*	*	*/ {  '>',  '>',    '>',    '>',    '<',    '>',    '>',    '<',    '>',    '<',    '>',    '<',    '>',    '>'     },
-    /*	/	*/ {  '>',  '>',    '>',    '>',    '<',    '>',    '>',    '<',    '>',    '<',    '>',    '<',    '>',    '>'     },
-    /*	(	*/ {  '<',  '<',    '<',    '<',    '<',    '=',    R_ERR,  '<',    '<',    '<',    '<',    '<',    '<',    '<'     },
-    /*	)	*/ {  '>',  '>',    '>',    '>',    R_ERR,  '>',    '>',    R_ERR,  '>',    R_ERR,  '>',    R_ERR,  '>',    '>'     },
-    /*	$	*/ {  '<',  '<',    '<',    '<',    '<',    R_ERR,  R_ERR,  '<',    '<',    '<',    '<',    '<',    '<',    '<'     },
-    /*	id	*/ {  '>',  '>',    '>',    '>',    R_ERR,  '>',    '>',    R_ERR,  '>',    R_ERR,  '>',    R_ERR,  '>',    '>'     },
-    /*	rel	*/ {  '<',  '<',    '<',    '<',    '<',    '>',    '>',    '<',    R_ERR,  '<',    '>',    '<',    '>',    '>'     },
-    /*	u-	*/ {  '>',  '>',    '>',    '>',    '<',    '>',    '>',    '<',    '>',    '<',    '>',    '<',    '>',    '>'     },
-    /*  eq */  {  '<',  '<',    '<',    '<',    '<',    '>',    '>',    '<',    '<',    '<',    R_ERR,  '<',    '>',    '>'     },
-    /*  ! */   {  '>',  '>',    '>',    '>',    '<',    '>',    '>',    '<',    '>',    '<',    '>',    '<',    '>',    '>'     },
-    /*  && */  {  '<',  '<',    '<',    '<',    '<',    '>',    '>',    '<',    '<',    '<',    '<',    '<',    '>',    '>'     },
-    /*  || */  {  '<',  '<',    '<',    '<',    '<',    '>',    '>',    '<',    '<',    '<',    '<',    '<',    '<',    '>'     }
+const char precedence_table[15][15] = {
+    /*	  	       +     -	     *	      /	     (       )	     $      id      rel      u-	    eq      !       &&      ||      .		*/
+    /*	+	*/ {  '>',  '>',    '<',    '<',    '<',    '>',    '>',    '<',    '>',    '<',    '>',    '<',    '>',    '>',    '<'     },
+    /*	-	*/ {  '>',  '>',    '<',    '<',    '<',    '>',    '>',    '<',    '>',    '<',    '>',    '<',    '>',    '>',    '<'     },
+    /*	*	*/ {  '>',  '>',    '>',    '>',    '<',    '>',    '>',    '<',    '>',    '<',    '>',    '<',    '>',    '>',    '<'     },
+    /*	/	*/ {  '>',  '>',    '>',    '>',    '<',    '>',    '>',    '<',    '>',    '<',    '>',    '<',    '>',    '>',    '<'     },
+    /*	(	*/ {  '<',  '<',    '<',    '<',    '<',    '=',    R_ERR,  '<',    '<',    '<',    '<',    '<',    '<',    '<',    R_ERR   },
+    /*	)	*/ {  '>',  '>',    '>',    '>',    R_ERR,  '>',    '>',    R_ERR,  '>',    R_ERR,  '>',    R_ERR,  '>',    '>',    '>'     },
+    /*	$	*/ {  '<',  '<',    '<',    '<',    '<',    R_ERR,  R_ERR,  '<',    '<',    '<',    '<',    '<',    '<',    '<',    '<'     },
+    /*	id	*/ {  '>',  '>',    '>',    '>',    R_ERR,  '>',    '>',    R_ERR,  '>',    R_ERR,  '>',    R_ERR,  '>',    '>',    '>'     },
+    /*	rel	*/ {  '<',  '<',    '<',    '<',    '<',    '>',    '>',    '<',    R_ERR,  '<',    '>',    '<',    '>',    '>',    '<'     },
+    /*	u-	*/ {  '>',  '>',    '>',    '>',    '<',    '>',    '>',    '<',    '>',    '<',    '>',    '<',    '>',    '>',    '<'     },
+    /*  eq  */ {  '<',  '<',    '<',    '<',    '<',    '>',    '>',    '<',    '<',    '<',    R_ERR,  '<',    '>',    '>',    '<'     },
+    /*  !   */ {  '>',  '>',    '>',    '>',    '<',    '>',    '>',    '<',    '>',    '<',    '>',    '<',    '>',    '>',    '<'     },
+    /*  &&  */ {  '<',  '<',    '<',    '<',    '<',    '>',    '>',    '<',    '<',    '<',    '<',    '<',    '>',    '>',    '<'     },
+    /*  ||  */ {  '<',  '<',    '<',    '<',    '<',    '>',    '>',    '<',    '<',    '<',    '<',    '<',    '<',    '>',    '<'     },
+    /*  .   */ {  '>',  '>',    '>',    '>',    R_ERR,  '>',    '>',    R_ERR,  '>',    R_ERR,  '>',    R_ERR,  '>',    '>',    '>'     }
 };
 
 typedef enum {
@@ -238,6 +240,7 @@ typedef enum {
     index_not = 11,
     index_and = 12,
     index_or = 13,
+    index_dot = 14
 } PrecedenceIndex;
 
 int get_precedence_index(token_type_t t, bool is_unary)
@@ -282,6 +285,9 @@ int get_precedence_index(token_type_t t, bool is_unary)
 
     else if (t == TOKEN_OR)
         return index_or;
+
+    else if (t == TOKEN_DOT)
+        return index_dot;
 
     else
         return -1;
@@ -386,8 +392,8 @@ int reduce_rules(tstack_t* stack, size_t line, size_t col)
             return ERR_OK;
         }
 
-        // 4) E -> !E
-        if (control[1].symbol_type == SYMBOL_TERMINAL && control[1].token_type == TOKEN_NOT && control[0].symbol_type == SYBMOL_NON_TERMINAL){
+        // 4) E -> !E   (BOOLTHEN)
+        if (control[1].symbol_type == SYMBOL_TERMINAL && control[1].token_type == TOKEN_NOT && control[0].symbol_type == SYMBOL_NON_TERMINAL){
 
             ast_node_t* not_node = ast_new_unary(AST_OP_NOT, control[0].ast_node, line, col);
             if (not_node == NULL) {
@@ -402,10 +408,26 @@ int reduce_rules(tstack_t* stack, size_t line, size_t col)
             return ERR_OK;
         }
 
+        // 5) E -> E.member (VALEM)
+        if(control[1].symbol_type == SYMBOL_NON_TERMINAL && control[0].symbol_type == SYMBOL_TERMINAL && control[0].token_type == TOKEN_DOT){
+            ast_node_t *member_node = control[0].ast_node;
+            if(member_node == NULL || member_node->kind != AST_MEMBER){
+                free_control(control, count_control);
+                return ERR_INTERNAL;
+            }
+            member_node->member.receiver = control[1].ast_node;
+            non_terminal.ast_ndoe = member_node;
+            if (!push(stack, non_terminal)) {
+                ast_free(member_node);
+                return ERR_INTERNAL;
+            }
+            return ERR_OK;
+        }
+
     }
 
     if (count_control == 3) {
-        // 5) E -> ( E )
+        // 6) E -> ( E )
         if (control[2].token_type == TOKEN_LPAREN && control[1].symbol_type == SYMBOL_NON_TERMINAL && control[0].token_type == TOKEN_RPAREN) {
 
             non_terminal.ast_node = control[1].ast_node;
@@ -416,7 +438,7 @@ int reduce_rules(tstack_t* stack, size_t line, size_t col)
             return ERR_OK;
         }
 
-        // 6) E -> E op E
+        // 7) E -> E op E
         if (control[2].symbol_type == SYMBOL_NON_TERMINAL && control[1].symbol_type == SYMBOL_TERMINAL && control[0].symbol_type == SYMBOL_NON_TERMINAL) {
 
             ast_binary_op_t op;
@@ -451,10 +473,10 @@ int reduce_rules(tstack_t* stack, size_t line, size_t col)
             case TOKEN_GREATER_EQUAL:
                 op = AST_OP_GE;
                 break;
-            case TOKEN_AND:
+            case TOKEN_AND: //BOOLTHEN
                 op = AST_OP_AND;
                 break;
-            case TOKEN_OR:
+            case TOKEN_OR:  //BOOLTHEN
                 op = AST_OP_OR;
                 break;
             default:
@@ -536,17 +558,17 @@ int parser_expression(lexer_t* lexer, token_t* current_token, ast_node_t** out_n
             return ERR_SYNTAX;
         }
         // Using if as expression if <cond> then <expr> else <expr>
-        if (expect_operand && cuurent_token->type == TOKEN_IF){
+        if (expect_operand && current_token->type == TOKEN_IF){
             ast_node_t *if_expr_node = NULL;
             int if_err = parser_if_expression (lexer, current_token, &if_expr_node);        //bude volat z parser.c
             if (if_err != ERR_OK){
-                satck_free(&stack);
+                stack_free(&stack);
                 return if_err;
             }
         
             bool top_is_unary = (terminal_top->data.token_type == TOKEN_MINUS && terminal_top->next->data.symbol_type == SYMBOL_TERMINAL);
             int row = get_precedence_index(terminal_top->data.token_type, top_is_unary);
-            if(row < 0 || row > 13 || precedence_table[row][index_id] != '<'){
+            if(row < 0 || row > 14 || precedence_table[row][index_id] != '<'){
                 ast_free(if_expr_node);
                 stack_free(&stack);
                 return ERR_SYNTAX;
@@ -692,7 +714,7 @@ int parser_expression(lexer_t* lexer, token_t* current_token, ast_node_t** out_n
 
             bool top_is_unary = (terminal_top->data.token_type == TOKEN_MINUS && (terminal_top->next == NULL || terminal_top->next->data.symbol_type == SYMBOL_TERMINAL));
             int row = get_precedence_index(terminal_top->data.token_type, top_is_unary);
-            if (row < 0 || row > 13 || precedence_table[row][index_id] != '<') {
+            if (row < 0 || row > 14 || precedence_table[row][index_id] != '<') {
                 ast_free(operand_node);
                 stack_free(&stack);
                 return ERR_SYNTAX;
@@ -715,6 +737,12 @@ int parser_expression(lexer_t* lexer, token_t* current_token, ast_node_t** out_n
             continue;
         }
 
+         // '.' is only valid in postfix position (VALEM)
+        if (expect_operand && current_token->type == TOKEN_DOT) {
+            stack_free(&stack);
+            return ERR_SYNTAX;
+        }
+
         // Determine precedence table indices for the top stack terminal and current input token
         bool input_is_unary = (current_token->type == TOKEN_MINUS && expect_operand);
         bool top_is_unary = (terminal_top->data.token_type == TOKEN_MINUS && (terminal_top->next == NULL || terminal_top->next->data.symbol_type == SYMBOL_TERMINAL));
@@ -727,14 +755,18 @@ int parser_expression(lexer_t* lexer, token_t* current_token, ast_node_t** out_n
 
         // Contextual keywords 'to', 'until', 'by' end range expressions in 'for' loops
         bool is_for_keyword = false;
-        if(strcmp(current_token->lexeme, "to") == 0 || strcmp(current_token->lexeme, "until") == 0 || 
-            strcmp(current_token->lexeme, "by") == 0)
-            is_for_keyword = true;
-        
-        if (!expect_operand && paren_depth == 0 && is_for_keyword)
-            col = index_dollar;
+        if (current_token->type == TOKEN_IDENTIFIER && current_token->lexeme != NULL) {
+            if(strcmp(current_token->lexeme, "to") == 0 || strcmp(current_token->lexeme, "until") == 0 || 
+                strcmp(current_token->lexeme, "by") == 0)
 
-        if (row < 0 || row > 13 || col < 0 || col > 13) {
+                is_for_keyword = true;
+        }
+        if (!expect_operand && paren_depth == 0){
+            if (is_for_keyword || current_token->starts_line) 
+                col = index_dollar;
+        }
+
+        if (row < 0 || row > 14 || col < 0 || col > 14) {
             stack_free(&stack);
             return ERR_SYNTAX;
         }
@@ -788,6 +820,54 @@ int parser_expression(lexer_t* lexer, token_t* current_token, ast_node_t** out_n
             size_t token_col = current_token->column;
             token_type_t token_type = current_token->type;
 
+            // VALMEM
+            if(token_type == TOKEN_DOT){
+                int adv_err = advance_shared_token(lexer, current_token);
+                if(adv_err != ERR_OK){
+                    stack_free(&stack);
+                    return adv_err;
+                }
+
+                if(current_token->type != TOKEN_IDENTIFIER){
+                    stack_free(&stack);
+                    return ERR_SYNTAX;
+                }
+
+                ast_node_t *fake_node = ast_new_unit_lit(token_line, token_col);
+                if(fake_node == NULL){
+                    stack_free(&stack);
+                    return ERR_INTERNAL;
+                }
+                leaf_node = ast_new_member(current_token->lexeme, fake_node, token_line, token_col);
+                if(leaf_node == NULL){
+                    ast_free(fake_node);
+                    stack_free(&stack);
+                    return ERR_INTERNAL;
+                }
+                ast_free(fake_node);
+                leaf_node->member.receiver = NULL;
+
+                tdata_t data = {
+                    .symbol_type = SYMBOL_TERMINAL,
+                    .token_type = TOKEN_DOT,
+                    .shift_mark = false,
+                    .ast_node = leaf_node
+                };
+
+                if (!push(&stack, data)) {
+                    ast_free(leaf_node);
+                    stack_free(&stack);
+                    return ERR_INTERNAL;
+                }
+
+                expect_operand = false;
+                adv_err = advance_shared_token(lexer, current_token);
+                if (adv_err != ERR_OK) {
+                    stack_free(&stack);
+                    return adv_err;
+                }
+                break;
+            }
             if (token_type == TOKEN_INTEGER) {
                 int64_t val = parser_int_literal(current_token->lexeme);
                 leaf_node = ast_new_int_lit(val, token_line, token_col);
@@ -820,7 +900,7 @@ int parser_expression(lexer_t* lexer, token_t* current_token, ast_node_t** out_n
                 expect_operand = false;
             }
             else if (token_type == TOKEN_TRUE || token_type == TOKEN_FALSE){
-                leaf_node = ast_new_bool_lit(token-type == TOKEN_TRUE, token_line, token_col);
+                leaf_node = ast_new_bool_lit(token_type == TOKEN_TRUE, token_line, token_col);
                 if (leaf_node == NULL) {
                     stack_free(&stack);
                     return ERR_INTERNAL;
