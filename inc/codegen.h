@@ -56,15 +56,6 @@ typedef enum {
     OP_INT2FLOATS
 } stack_op_t;
 
-// OP var symb
-typedef enum {
-    OP_INT2CHAR,
-    OP_FLOAT2INT,
-    OP_INT2STR,
-    OP_FLOAT2STR,
-    OP_STRLEN
-} unary_op_t;
-
 // OP var symb symb
 typedef enum {
     OP_CONCAT,
@@ -120,6 +111,7 @@ void codegen_program_end(codegen_t* codegen);
 //              model: Claude Opus 5.5
 // Prompt: "Write the Doxygen descriptions of the new public codegen
 //          functions in this header."
+// Prompt: "Remove the unused codegen_move and its description"
 // Scope: doc comments of codegen_defvar, codegen_move, codegen_write,
 //        codegen_func_begin, codegen_func_end, codegen_createframe
 //        and codegen_call only
@@ -130,14 +122,6 @@ void codegen_program_end(codegen_t* codegen);
  * @param var Variable to define.
  */
 void codegen_defvar(codegen_t* codegen, var_t var);
-
-/**
- * @brief Writes MOVE, copies symb into var.
- * @param codegen Generator created by codegen_init.
- * @param var Target variable.
- * @param symb Variable or constant to copy.
- */
-void codegen_move(codegen_t* codegen, var_t var, symb_t symb);
 
 /**
  * @brief Writes WRITE, prints symb to standard output.
@@ -275,18 +259,10 @@ void codegen_exit(codegen_t* codegen, int code);
 //              model: Claude Opus 5.5
 // Prompt: "Write the Doxygen descriptions of the new string, conversion
 //          and read codegen functions in this header."
+// Prompt: "Remove the unused codegen_unary_op, unary_op_t and codegen_read
+//          and their descriptions"
 // Scope: doc comments of codegen_unary_op, codegen_binary_op
 //        and codegen_read only
-
-/**
- * @brief Writes an instruction with a variable and one symbol
- *        (INT2CHAR, FLOAT2INT, INT2STR, FLOAT2STR, STRLEN).
- * @param codegen Generator created by codegen_init.
- * @param op Instruction to write.
- * @param var Variable for the result.
- * @param symb Operand.
- */
-void codegen_unary_op(codegen_t* codegen, unary_op_t op, var_t var, symb_t symb);
 
 /**
  * @brief Writes an instruction with a variable and two symbols
@@ -298,17 +274,6 @@ void codegen_unary_op(codegen_t* codegen, unary_op_t op, var_t var, symb_t symb)
  * @param symb2 Second operand.
  */
 void codegen_binary_op(codegen_t* codegen, binary_op_t op, var_t var, symb_t symb1, symb_t symb2);
-
-/**
- * @brief Writes READ, reads one line from standard input into var.
- *
- * On wrong input or EOF the interpreter stores nil into var.
- *
- * @param codegen Generator created by codegen_init.
- * @param var Variable for the read value.
- * @param type Type to read: "int", "float" or "string".
- */
-void codegen_read(codegen_t* codegen, var_t var, const char* type);
 
 // AI-generated using: Claude Code
 //              model: Claude Opus 5.5

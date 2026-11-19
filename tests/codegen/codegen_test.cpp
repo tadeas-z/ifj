@@ -75,6 +75,8 @@ TEST(CodegenFreeTest, FreeNullIsOk)
 // Prompt: "write gtest tests for codegen_defvar, codegen_move, codegen_write,
 //          codegen_func_begin, codegen_func_end, codegen_createframe
 //          and codegen_call"
+// Prompt: "codegen_move is removed, test the constants with codegen_write
+//          and use POPS in the call test"
 // Scope: make_var, make_int, make_string and all tests below
 
 static var_t make_var(frame_t frame, const char* name, int id)
@@ -108,44 +110,32 @@ TEST_F(CodegenTest, DefvarInAllFrames)
     EXPECT_EQ(output(), "DEFVAR GF@a$1\nDEFVAR LF@b$2\nDEFVAR TF@c$3\n");
 }
 
-// MOVE writes every type of constant in the IFJcode26 format
-TEST_F(CodegenTest, MoveConstants)
+// WRITE writes every type of constant in the IFJcode26 format
+TEST_F(CodegenTest, WriteConstants)
 {
-    var_t x = make_var(FRAME_LF, "x", 1);
     symb_t symb = {};
 
-    codegen_move(codegen, x, make_int(-5));
+    codegen_write(codegen, make_int(-5));
 
     symb.type = S_FLOAT;
     symb.float_val = 1.5;
-    codegen_move(codegen, x, symb);
+    codegen_write(codegen, symb);
 
     symb.type = S_BOOL;
     symb.bool_val = true;
-    codegen_move(codegen, x, symb);
+    codegen_write(codegen, symb);
 
     symb.type = S_NIL;
-    codegen_move(codegen, x, symb);
+    codegen_write(codegen, symb);
 
-    codegen_move(codegen, x, make_string("ok"));
+    codegen_write(codegen, make_string("ok"));
 
     EXPECT_EQ(output(),
-        "MOVE LF@x$1 int@-5\n"
-        "MOVE LF@x$1 float@0x1.8p+0\n"
-        "MOVE LF@x$1 bool@true\n"
-        "MOVE LF@x$1 nil@nil\n"
-        "MOVE LF@x$1 string@ok\n");
-}
-
-// MOVE from one variable to another
-TEST_F(CodegenTest, MoveVariable)
-{
-    symb_t symb = {};
-    symb.type = S_VAR;
-    symb.var = make_var(FRAME_LF, "y", 2);
-
-    codegen_move(codegen, make_var(FRAME_TF, "x", 1), symb);
-    EXPECT_EQ(output(), "MOVE TF@x$1 LF@y$2\n");
+        "WRITE int@-5\n"
+        "WRITE float@0x1.8p+0\n"
+        "WRITE bool@true\n"
+        "WRITE nil@nil\n"
+        "WRITE string@ok\n");
 }
 
 // WRITE escapes space, #, backslash and newline in strings
@@ -184,9 +174,9 @@ TEST_F(CodegenTest, CallWithParameter)
 
     codegen_createframe(codegen);
     codegen_defvar(codegen, param);
-    codegen_move(codegen, param, make_int(3));
+    codegen_pops(codegen, param);
     codegen_call(codegen, "foo");
-    EXPECT_EQ(output(), "CREATEFRAME\nDEFVAR TF@n$1\nMOVE TF@n$1 int@3\nCALL foo\n");
+    EXPECT_EQ(output(), "CREATEFRAME\nDEFVAR TF@n$1\nPOPS TF@n$1\nCALL foo\n");
 }
 
 // AI-generated using: Claude Code
@@ -311,28 +301,11 @@ TEST_F(CodegenLabelTest, WholeIfElse)
 // Prompt: "Add tests for the string, conversion and read functions: every
 //          unary_op_t and binary_op_t gives the right instruction with its
 //          operands and READ writes the type"
+// Prompt: "Remove the tests of the removed codegen_unary_op and codegen_read"
 // Scope: CodegenStringTest and all tests below
 
 // Same fixture, separate suite name for the string tests
 class CodegenStringTest : public CodegenTest { };
-
-// Every unary op is written with its name, var and symb
-TEST_F(CodegenStringTest, AllUnaryOps)
-{
-    var_t r = make_var(FRAME_LF, "r", 1);
-
-    codegen_unary_op(codegen, OP_INT2CHAR, r, make_int(65));
-    codegen_unary_op(codegen, OP_FLOAT2INT, r, make_int(1));
-    codegen_unary_op(codegen, OP_INT2STR, r, make_int(2));
-    codegen_unary_op(codegen, OP_FLOAT2STR, r, make_int(3));
-    codegen_unary_op(codegen, OP_STRLEN, r, make_string("abc"));
-    EXPECT_EQ(output(),
-        "INT2CHAR LF@r$1 int@65\n"
-        "FLOAT2INT LF@r$1 int@1\n"
-        "INT2STR LF@r$1 int@2\n"
-        "FLOAT2STR LF@r$1 int@3\n"
-        "STRLEN LF@r$1 string@abc\n");
-}
 
 // Every binary op is written with its name, var and both symbs
 TEST_F(CodegenStringTest, AllBinaryOps)
@@ -346,14 +319,6 @@ TEST_F(CodegenStringTest, AllBinaryOps)
         "CONCAT LF@r$1 string@a string@b\n"
         "GETCHAR LF@r$1 string@abc int@1\n"
         "STRI2INT LF@r$1 string@abc int@0\n");
-}
-
-// READ writes the variable and the type
-TEST_F(CodegenStringTest, ReadWritesType)
-{
-    codegen_read(codegen, make_var(FRAME_LF, "x", 1), "int");
-    codegen_read(codegen, make_var(FRAME_LF, "s", 2), "string");
-    EXPECT_EQ(output(), "READ LF@x$1 int\nREAD LF@s$2 string\n");
 }
 
 // AI-generated using: Claude Code
