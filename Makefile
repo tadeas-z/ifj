@@ -36,7 +36,7 @@ CHECK_FILES = $(shell find src inc tests -name '*.[ch]')
 
 check:
 	clang-format --dry-run --Werror $(CHECK_FILES)
-	cppcheck --error-exitcode=1 -Iinc $(CHECK_FILES)
+	cppcheck --error-exitcode=1 -Iinc --inline-suppr $(CHECK_FILES)
 
 build-check: check all
 

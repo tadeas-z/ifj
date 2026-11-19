@@ -1,0 +1,15 @@
+import ifj26.*
+
+@main
+def func() : Unit =
+    var n = readInt()
+    var result = n + 1
+    while result > -2 do
+        print(toStr(result) + "\n")
+        result = result - 1
+        str_len("Ahoj")
+    print(result)
+
+def str_len(str : String) : Int =
+    print("Length: " + toStr(10) + "\n")
+    return 2

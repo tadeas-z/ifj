@@ -551,7 +551,6 @@ static void operator_boundaries(void)
         const expected_t expected[] = { split[i].first, split[i].second };
         sequence(split[i].text, expected, 2);
     }
-
 }
 
 // AI-generated using: Claude Code

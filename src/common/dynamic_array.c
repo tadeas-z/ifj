@@ -2,19 +2,19 @@
 // dynamic_array.c
 // Author(s): Adam Zatloukal (xzatloa01)
 
+#include "dynamic_array.h"
 #include <stdbool.h>
 #include <stdlib.h>
-#include "dynamic_array.h"
 
-
-bool  dyn_arr_init(dyn_arr_t* ptr) {
+bool dyn_arr_init(dyn_arr_t* ptr)
+{
     if (ptr == NULL)
         return false;
 
     // Default values, allocate an array of pointers
     ptr->capacity = 0;
     ptr->count = 0;
-    ptr->items = malloc(DEFAULT_CAPACITY*sizeof(void*));
+    ptr->items = malloc(DEFAULT_CAPACITY * sizeof(void*));
     if (ptr->items == NULL)
         return false;
 
@@ -22,7 +22,8 @@ bool  dyn_arr_init(dyn_arr_t* ptr) {
     return true;
 }
 
-bool  dyn_arr_append(dyn_arr_t* ptr, void* item) {
+bool dyn_arr_append(dyn_arr_t* ptr, void* item)
+{
     if (ptr == NULL || item == NULL)
         return false;
 
@@ -30,7 +31,7 @@ bool  dyn_arr_append(dyn_arr_t* ptr, void* item) {
     if (ptr->count + 1 > ptr->capacity) {
         size_t new_capacity = ptr->capacity == 0 ? DEFAULT_CAPACITY : ptr->capacity * 2;
 
-        void* new_ptr = realloc(ptr->items, new_capacity*sizeof(void*));
+        void* new_ptr = realloc(ptr->items, new_capacity * sizeof(void*));
         if (new_ptr == NULL)
             return false;
 
@@ -43,7 +44,8 @@ bool  dyn_arr_append(dyn_arr_t* ptr, void* item) {
     return true;
 }
 
-void* dyn_arr_get(const dyn_arr_t* ptr, size_t i) {
+void* dyn_arr_get(const dyn_arr_t* ptr, size_t i)
+{
     if (ptr == NULL || i >= ptr->count)
         return NULL;
     return ptr->items[i];
@@ -54,7 +56,8 @@ void* dyn_arr_get(const dyn_arr_t* ptr, size_t i) {
 // Prompt: "implement dyn_arr_free"
 // Scope: dyn_arr_free only
 
-void  dyn_arr_free(dyn_arr_t* ptr, void (*free_item)(void*)) {
+void dyn_arr_free(dyn_arr_t* ptr, void (*free_item)(void*))
+{
     if (ptr == NULL)
         return;
 

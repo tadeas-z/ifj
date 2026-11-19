@@ -22,8 +22,9 @@ static int total_tests = 0;
 static int passed_tests = 0;
 
 /* Adjust these lines if your lexer initialization function has a different signature */
-static FILE *open_mem_file(const char *src, lexer_t *lexer) {
-    FILE *f = tmpfile();
+static FILE* open_mem_file(const char* src, lexer_t* lexer)
+{
+    FILE* f = tmpfile();
     assert(f != NULL);
     fputs(src, f);
     rewind(f);
@@ -31,9 +32,10 @@ static FILE *open_mem_file(const char *src, lexer_t *lexer) {
     return f;
 }
 
-static int parse_expr_str(const char *src, ast_node_t **out_ast) {
+static int parse_expr_str(const char* src, ast_node_t** out_ast)
+{
     lexer_t lexer;
-    FILE *f = open_mem_file(src, &lexer);
+    FILE* f = open_mem_file(src, &lexer);
 
     token_t tok;
     memset(&tok, 0, sizeof(token_t));
@@ -49,9 +51,10 @@ static int parse_expr_str(const char *src, ast_node_t **out_ast) {
     return err;
 }
 
-static void check_expr(const char *name, const char *src, int expected_err) {
+static void check_expr(const char* name, const char* src, int expected_err)
+{
     total_tests++;
-    ast_node_t *ast = NULL;
+    ast_node_t* ast = NULL;
     int actual = parse_expr_str(src, &ast);
 
     if (actual == expected_err) {
@@ -62,7 +65,7 @@ static void check_expr(const char *name, const char *src, int expected_err) {
         printf("[PASS] %s\n", name);
     } else {
         printf("[FAIL] %s -> got %d, expected %d (input: `%s`)\n",
-               name, actual, expected_err, src);
+            name, actual, expected_err, src);
     }
 
     if (ast != NULL) {
@@ -70,7 +73,8 @@ static void check_expr(const char *name, const char *src, int expected_err) {
     }
 }
 
-int main(void) {
+int main(void)
+{
     /* --- Valid expressions (ERR_OK) --- */
     check_expr("Simple integer literal", "42", ERR_OK);
     check_expr("Hexadecimal and underscore literals", "0xFF + 1_000", ERR_OK);
@@ -83,11 +87,11 @@ int main(void) {
     check_expr("Function call without arguments", "foo()", ERR_OK);
     check_expr("Nested function calls with expressions", "foo((1 + 2) * 3, bar(4, 5 + 6))", ERR_OK);
     check_expr("Multi-line call with trailing comma",
-               "foo(\n"
-               "    1,\n"
-               "    2 + 3,\n"
-               "    )",
-               ERR_OK);
+        "foo(\n"
+        "    1,\n"
+        "    2 + 3,\n"
+        "    )",
+        ERR_OK);
 
     /* --- Invalid expressions (ERR_SYNTAX) --- */
     check_expr("Trailing comma on the same line", "foo(1,)", ERR_SYNTAX);
