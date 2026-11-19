@@ -21,12 +21,12 @@ typedef struct {
 
 static parser_t* active_parser = NULL;
 
-static int parser_block(parser_t* parser, ast_node_t** out_node);
-static int parser_statement(parser_t* parser, ast_node_t** out_node);
-static int parser_return(parser_t* parser, ast_node_t** out_node);
-static int parser_if_statement_internal(parser_t* parser, ast_node_t** out_node, bool require_else, bool is_expr_context);
-static int parser_body(parser_t* parser, ast_node_t** out_block, bool is_expr_context);
-static int parser_if_statement(parser_t* parser, ast_node_t** out_node);
+static error_code_t parser_block(parser_t* parser, ast_node_t** out_node);
+static error_code_t parser_statement(parser_t* parser, ast_node_t** out_node);
+static error_code_t parser_return(parser_t* parser, ast_node_t** out_node);
+static error_code_t parser_if_statement_internal(parser_t* parser, ast_node_t** out_node, bool require_else, bool is_expr_context);
+static error_code_t parser_body(parser_t* parser, ast_node_t** out_block, bool is_expr_context);
+static error_code_t parser_if_statement(parser_t* parser, ast_node_t** out_node);
 
 // AI-generated using: Gemini
 //                model: Gemini 4 HYDROGEN
@@ -35,7 +35,7 @@ static int parser_if_statement(parser_t* parser, ast_node_t** out_node);
 //                    and lexeme copying)."
 // Scope: get_next_token, is_expected, copy_lexeme
 
-static int get_next_token(parser_t* parser)
+static error_code_t get_next_token(parser_t* parser)
 {
     token_dispose(&parser->input_token);
     if (parser->has_peek) {
@@ -72,8 +72,9 @@ static char* copy_lexeme(const char* src)
 
 // AI-generated using: Claude
 //                model: Claude Sonnet 5.5
-// Prompt (summary): "Generate functions used in
-//                    syntactic analysis."
+// Prompt (summary): "Write parser helper functions to match contextual
+//                    identifier keywords, skip newline tokens, consume expected
+//                    tokens, and map type tokens to type_t pointers."
 // Scope: is_ident_word, skip_newlines, consume, parser_type
 
 // True if the current token is an identifier with exactly this spelling.
@@ -83,7 +84,7 @@ static bool is_ident_word(parser_t* parser, const char* word)
         && strcmp(parser->input_token.lexeme, word) == 0;
 }
 
-static int skip_newlines(parser_t* parser)
+static error_code_t skip_newlines(parser_t* parser)
 {
     while (is_expected(parser, TOKEN_NEWLINE)) {
         int err = get_next_token(parser);
@@ -94,7 +95,7 @@ static int skip_newlines(parser_t* parser)
 }
 
 // Checks that the current token has the given type and advances past it
-static int consume(parser_t* parser, token_type_t type)
+static error_code_t consume(parser_t* parser, token_type_t type)
 {
     if (!is_expected(parser, type))
         return ERR_SYNTAX;
@@ -102,7 +103,7 @@ static int consume(parser_t* parser, token_type_t type)
 }
 
 // Parses a type keyword (Int, Double, String, Unit, Boolean) and advances past it
-static int parser_type(parser_t* parser, type_t** out_type)
+static error_code_t parser_type(parser_t* parser, type_t** out_type)
 {
     type_t* type = NULL;
     switch (parser->input_token.type) {
@@ -128,7 +129,7 @@ static int parser_type(parser_t* parser, type_t** out_type)
     return get_next_token(parser);
 }
 
-static int expect_statement_end(parser_t* parser)
+static error_code_t expect_statement_end(parser_t* parser)
 {
     if (is_expected(parser, TOKEN_SEMICOLON))
         return get_next_token(parser);
@@ -139,7 +140,7 @@ static int expect_statement_end(parser_t* parser)
     return ERR_SYNTAX;
 }
 
-static int parser_expr_shared(parser_t* parser, ast_node_t** out_expr)
+static error_code_t parser_expr_shared(parser_t* parser, ast_node_t** out_expr)
 {
     return parser_expression(parser->lexer, &parser->input_token, out_expr);
 }
@@ -151,7 +152,7 @@ static int parser_expr_shared(parser_t* parser, ast_node_t** out_expr)
 ---------------------------------------------------------------------------------
 */
 
-static int parser_var_declaration(parser_t* parser, ast_node_t** out_node)
+static error_code_t parser_var_declaration(parser_t* parser, ast_node_t** out_node)
 {
     bool is_const = is_expected(parser, TOKEN_VAL);
     size_t line = parser->input_token.line;
@@ -236,7 +237,7 @@ static int parser_var_declaration(parser_t* parser, ast_node_t** out_node)
 ---------------------------------------------------------------------------------
 */
 
-static int parser_assignment(parser_t* parser, ast_node_t** out_node)
+static error_code_t parser_assignment(parser_t* parser, ast_node_t** out_node)
 {
     size_t line = parser->input_token.line;
     size_t col = parser->input_token.column;
@@ -292,7 +293,7 @@ static int parser_assignment(parser_t* parser, ast_node_t** out_node)
     return ERR_OK;
 }
 
-static int parser_body(parser_t* parser, ast_node_t** out_block, bool is_expr_context)
+static error_code_t parser_body(parser_t* parser, ast_node_t** out_block, bool is_expr_context)
 {
     if (is_expected(parser, TOKEN_NEWLINE))
         return parser_block(parser, out_block);
@@ -343,7 +344,7 @@ static int parser_body(parser_t* parser, ast_node_t** out_block, bool is_expr_co
 ---------------------------------------------------------------------------------
 */
 
-static int parser_if_statement_internal(parser_t* parser, ast_node_t** out_node, bool require_else, bool is_expr_context)
+static error_code_t parser_if_statement_internal(parser_t* parser, ast_node_t** out_node, bool require_else, bool is_expr_context)
 {
     size_t line = parser->input_token.line;
     size_t col = parser->input_token.column;
@@ -451,7 +452,7 @@ static int parser_if_statement_internal(parser_t* parser, ast_node_t** out_node,
 
 // Entry point for parser_expression.c: 'if <cond> then <expr> else <expr>' as an operan
 // Enters with current_token on 'if' and leaves it on the first token after the whole expression
-int parser_if_expression(lexer_t* lexer, token_t* current_token, ast_node_t** out_node)
+error_code_t parser_if_expression(lexer_t* lexer, token_t* current_token, ast_node_t** out_node)
 {
     if (active_parser == NULL || out_node == NULL || active_parser->lexer != lexer
         || &active_parser->input_token != current_token)
@@ -460,7 +461,7 @@ int parser_if_expression(lexer_t* lexer, token_t* current_token, ast_node_t** ou
     return parser_if_statement_internal(active_parser, out_node, true, true);
 }
 
-static int parser_if_statement(parser_t* parser, ast_node_t** out_node)
+static error_code_t parser_if_statement(parser_t* parser, ast_node_t** out_node)
 {
     return parser_if_statement_internal(parser, out_node, false, false);
 }
@@ -473,7 +474,7 @@ static int parser_if_statement(parser_t* parser, ast_node_t** out_node)
 ---------------------------------------------------------------------------------
 */
 
-static int parser_while_statement(parser_t* parser, ast_node_t** out_node)
+static error_code_t parser_while_statement(parser_t* parser, ast_node_t** out_node)
 {
     size_t line = parser->input_token.line;
     size_t col = parser->input_token.column;
@@ -531,7 +532,7 @@ static int parser_while_statement(parser_t* parser, ast_node_t** out_node)
 ---------------------------------------------------------------------------------
 */
 
-static int parser_for_statement(parser_t* parser, ast_node_t** out_node)
+static error_code_t parser_for_statement(parser_t* parser, ast_node_t** out_node)
 {
     size_t line = parser->input_token.line;
     size_t col = parser->input_token.column;
@@ -717,7 +718,7 @@ static int parser_for_statement(parser_t* parser, ast_node_t** out_node)
 ---------------------------------------------------------------------------------
 */
 
-static int parser_func_declaration(parser_t* parser, ast_node_t** out_node, bool is_main)
+static error_code_t parser_func_declaration(parser_t* parser, ast_node_t** out_node, bool is_main)
 {
     size_t line = parser->input_token.line;
     size_t col = parser->input_token.column;
@@ -806,16 +807,15 @@ static int parser_func_declaration(parser_t* parser, ast_node_t** out_node, bool
 
             // Continue parsing if a comma separates additional parameters
             if (is_expected(parser, TOKEN_COMMA)) {
+                size_t comma_line = parser->input_token.line;
                 err = get_next_token(parser);
                 if (err != ERR_OK) {
                     ast_free(func_node);
                     return err;
                 }
 
-                bool had_newline = false;
                 // Allow line breaks after a comma in multi-line parameter lists
                 while (is_expected(parser, TOKEN_NEWLINE)) {
-                    had_newline = true;
                     err = get_next_token(parser);
                     if (err != ERR_OK) {
                         ast_free(func_node);
@@ -823,13 +823,12 @@ static int parser_func_declaration(parser_t* parser, ast_node_t** out_node, bool
                     }
                 }
                 if (is_expected(parser, TOKEN_RPAREN)) {
-                    if (!had_newline) {
+                    if (parser->input_token.line <= comma_line) {
                         ast_free(func_node);
                         return ERR_SYNTAX;
                     }
                     break;
                 }
-
                 continue;
             }
             break;
@@ -924,7 +923,7 @@ static int parser_func_declaration(parser_t* parser, ast_node_t** out_node, bool
 ---------------------------------------------------------------------------------
 */
 
-static int parser_block(parser_t* parser, ast_node_t** out_node)
+static error_code_t parser_block(parser_t* parser, ast_node_t** out_node)
 {
     size_t line = parser->input_token.line;
     size_t col = parser->input_token.column;
@@ -1011,7 +1010,7 @@ static int parser_block(parser_t* parser, ast_node_t** out_node)
 ---------------------------------------------------------------------------------
 */
 
-static int parser_expression_statement(parser_t* parser, ast_node_t** out_node)
+static error_code_t parser_expression_statement(parser_t* parser, ast_node_t** out_node)
 {
     size_t line = parser->input_token.line;
     size_t col = parser->input_token.column;
@@ -1043,7 +1042,7 @@ static int parser_expression_statement(parser_t* parser, ast_node_t** out_node)
     return ERR_OK;
 }
 
-static int parser_statement(parser_t* parser, ast_node_t** out_node)
+static error_code_t parser_statement(parser_t* parser, ast_node_t** out_node)
 {
 
     // Var or const declaration
@@ -1101,7 +1100,7 @@ static int parser_statement(parser_t* parser, ast_node_t** out_node)
 ---------------------------------------------------------------------------------
 */
 
-static int parser_return(parser_t* parser, ast_node_t** out_node)
+static error_code_t parser_return(parser_t* parser, ast_node_t** out_node)
 {
     size_t line = parser->input_token.line;
     size_t col = parser->input_token.column;
@@ -1153,7 +1152,7 @@ static int parser_return(parser_t* parser, ast_node_t** out_node)
 */
 
 // Parses the prolog and all function definitions. The caller owns (and disposes) the tokens.
-static int parser_help_program(parser_t* parser, ast_node_t** out_ast)
+static error_code_t parser_help_program(parser_t* parser, ast_node_t** out_ast)
 {
     ast_node_t* program = ast_new_program();
     if (program == NULL)
