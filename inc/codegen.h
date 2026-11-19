@@ -258,6 +258,21 @@ void codegen_jumpifeqs(codegen_t* codegen, int num, const char* suffix);
 
 // AI-generated using: Claude Code
 //              model: Claude Opus 5.5
+// Prompt: "Write the Doxygen description of codegen_exit in this header."
+// Scope: doc comment of codegen_exit only
+
+/**
+ * @brief Writes EXIT, the program ends with the given code.
+ *
+ * Used for runtime errors, for example a zero step in for (code 40).
+ *
+ * @param codegen Generator created by codegen_init.
+ * @param code Exit code, 40 for a runtime error.
+ */
+void codegen_exit(codegen_t* codegen, int code);
+
+// AI-generated using: Claude Code
+//              model: Claude Opus 5.5
 // Prompt: "Write the Doxygen descriptions of the new string, conversion
 //          and read codegen functions in this header."
 // Scope: doc comments of codegen_unary_op, codegen_binary_op

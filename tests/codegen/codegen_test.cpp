@@ -362,6 +362,7 @@ TEST_F(CodegenStringTest, ReadWritesType)
 //          and PUSHFRAME and every built-in ends with RETURN"
 // Prompt: "Add tests for readBoolean and toStr of a Boolean (BOOLTHEN)"
 // Prompt: "Add $floor to the label test (VALMEM)"
+// Prompt: "Add a test for codegen_exit"
 // Scope: CodegenBuiltinTest and all tests below
 
 // Same fixture, separate suite name for the built-in tests
@@ -411,4 +412,11 @@ TEST_F(CodegenBuiltinTest, ToStrBool)
     EXPECT_NE(text.find("JUMPIFEQ $toStr$bool LF@r$0 string@bool\n"), std::string::npos);
     EXPECT_NE(text.find("MOVE LF@r$0 string@true\n"), std::string::npos);
     EXPECT_NE(text.find("MOVE LF@r$0 string@false\n"), std::string::npos);
+}
+
+// EXIT with the given code
+TEST_F(CodegenBuiltinTest, Exit)
+{
+    codegen_exit(codegen, 40);
+    EXPECT_EQ(output(), "EXIT int@40\n");
 }

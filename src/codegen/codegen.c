@@ -432,6 +432,11 @@ void codegen_jumpifeqs(codegen_t* codegen, int num, const char* suffix)
     fprintf(codegen->out, "\n");
 }
 
+void codegen_exit(codegen_t* codegen, int code)
+{
+    fprintf(codegen->out, "EXIT int@%d\n", code);
+}
+
 void codegen_unary_op(codegen_t* codegen, unary_op_t op, var_t var, symb_t symb)
 {
     fprintf(codegen->out, "%s ", unary_names[op]);
