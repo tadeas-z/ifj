@@ -21,6 +21,13 @@ typedef struct {
 
 static parser_t* active_parser = NULL;
 
+static int parser_block(parser_t* parser, ast_node_t** out_node);
+static int parser_statement(parser_t* parser, ast_node_t** out_node);
+static int parser_return(parser_t* parser, ast_node_t** out_node);
+static int parser_if_statement_internal(parser_t* parser, ast_node_t** out_node, bool require_else, bool is_expr_context);
+static int parser_body(parser_t* parser, ast_node_t** out_block, bool is_expr_context);
+static int parser_if_statement(parser_t* parser, ast_node_t** out_node);
+
 // AI-generated using: Gemini
 //                model: Gemini 4 HYDROGEN
 // Prompt (summary): "Generate comments for the helper functions used in
@@ -136,12 +143,6 @@ static int parser_expr_shared(parser_t* parser, ast_node_t** out_expr)
 {
     return parser_expression(parser->lexer, &parser->input_token, out_expr);
 }
-
-static int parser_block(parser_t* parser, ast_node_t** out_node);
-static int parser_statement(parser_t* parser, ast_node_t** out_node);
-static int parser_return(parser_t* parser, ast_node_t** out_node);
-static int parser_if_statement_internal(parser_t* parser, ast_node_t** out_node, bool require_else, bool is_expr_context);
-static int parser_body(parser_t* parser, ast_node_t** out_block, bool is_expr_context);
 
 /*
 ---------------------------------------------------------------------------------
