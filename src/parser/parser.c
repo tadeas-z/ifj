@@ -178,9 +178,9 @@ static int parser_var_declaration(parser_t* parser, ast_node_t** out_node)
     type_t* var_type = NULL;
     if (is_expected(parser, TOKEN_COLON)) {
         err = get_next_token(parser);
-        if(err != ERR_OK){
+        if (err != ERR_OK) {
             free(var_name);
-            return err; 
+            return err;
         }
         err = parser_type(parser, &var_type);
         if (err != ERR_OK) {
@@ -420,7 +420,7 @@ static int parser_if_statement_internal(parser_t* parser, ast_node_t** out_node,
                 return ERR_INTERNAL;
             }
         }
-        // (parser_expression handles it), so it goes through the inline body. 
+        // (parser_expression handles it), so it goes through the inline body.
         else {
             err = parser_body(parser, &else_block, is_expr_context);
             if (err != ERR_OK) {
@@ -429,8 +429,7 @@ static int parser_if_statement_internal(parser_t* parser, ast_node_t** out_node,
                 return err;
             }
         }
-    }
-    else if (require_else) {
+    } else if (require_else) {
         // if used as an expression must have both branches
         ast_free(cond_expr);
         ast_free(if_block);
@@ -1089,9 +1088,7 @@ static int parser_statement(parser_t* parser, ast_node_t** out_node)
     }
 
     // Expression starting with a literal, unary minus, or parenthesis
-    if (is_expected(parser, TOKEN_LPAREN) || is_expected(parser, TOKEN_INTEGER) || is_expected(parser, TOKEN_DOUBLE) || 
-        is_expected(parser, TOKEN_STRING) || is_expected(parser, TOKEN_MINUS) || is_expected(parser, TOKEN_TRUE) || 
-        is_expected(parser, TOKEN_FALSE) || is_expected(parser, TOKEN_NOT))
+    if (is_expected(parser, TOKEN_LPAREN) || is_expected(parser, TOKEN_INTEGER) || is_expected(parser, TOKEN_DOUBLE) || is_expected(parser, TOKEN_STRING) || is_expected(parser, TOKEN_MINUS) || is_expected(parser, TOKEN_TRUE) || is_expected(parser, TOKEN_FALSE) || is_expected(parser, TOKEN_NOT))
         return parser_expression_statement(parser, out_node);
 
     return ERR_SYNTAX;
@@ -1114,8 +1111,7 @@ static int parser_return(parser_t* parser, ast_node_t** out_node)
         return err;
 
     // Return without a value expression
-    if (is_expected(parser, TOKEN_NEWLINE) || is_expected(parser, TOKEN_SEMICOLON) || 
-        is_expected(parser, TOKEN_EOF) || is_expected(parser, TOKEN_ELSE)) {
+    if (is_expected(parser, TOKEN_NEWLINE) || is_expected(parser, TOKEN_SEMICOLON) || is_expected(parser, TOKEN_EOF) || is_expected(parser, TOKEN_ELSE)) {
         err = expect_statement_end(parser);
         if (err != ERR_OK)
             return err;
