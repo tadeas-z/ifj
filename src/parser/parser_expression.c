@@ -11,10 +11,11 @@
 #include "ast.h"
 #include "comp_error.h"
 #include "lexer.h"
+#include "parser.h"
 #include "parser_expression.h"
 #include "parser_stack.h"
 
-// macro relation_error, syntatic error
+// macro relation_error, syntactic error
 #define R_ERR ' '
 
 bool stack_err_flag = false;
@@ -61,8 +62,8 @@ static tdata_t top(tstack_t* s)
     if (s->top != NULL)
         return s->top->data;
     stack_err_flag = true;
-    tdata_t stack_is_empity = { SYMBOL_TERMINAL, 0, false, NULL };
-    return stack_is_empity;
+    tdata_t stack_is_empty = { SYMBOL_TERMINAL, 0, false, NULL };
+    return stack_is_empty;
 }
 
 // Searches from the top of the stack for the nearest terminal symbol
@@ -94,6 +95,14 @@ static void stack_free(tstack_t* s)
     }
 }
 // end stack function definition
+
+// Lookahead token to be consumed on the next expression token advance.
+void parser_expression_push_back(token_t* token)
+{
+    pending_token = *token;
+    memset(token, 0, sizeof(*token));
+    has_pending = true;
+}
 
 // AI-generated using: Gemini
 //                model: Gemini 4 HYDROGEN
@@ -139,10 +148,10 @@ static double parser_double_literal(const char* lexeme)
 static char* decode_string_literal(const char* lexeme)
 {
     if (lexeme == NULL) {
-        char* empity = (char*)malloc(1);
-        if (empity != NULL)
-            empity[0] = '\0';
-        return empity;
+        char* empty = (char*)malloc(1);
+        if (empty != NULL)
+            empty[0] = '\0';
+        return empty;
     }
     size_t len = strlen(lexeme);
 
@@ -196,19 +205,23 @@ static char* decode_string_literal(const char* lexeme)
     return out;
 }
 
-const char precedence_table[11][11] = {
-    /*	  	 +		 -		 *		 /		 (			 )		 $		id		rel		u-		eq		*/
-    /*	+	*/ { '>', '>', '<', '<', '<', '>', '>', '<', '>', '<', '>' },
-    /*	-	*/ { '>', '>', '<', '<', '<', '>', '>', '<', '>', '<', '>' },
-    /*	*	*/ { '>', '>', '>', '>', '<', '>', '>', '<', '>', '<', '>' },
-    /*	/	*/ { '>', '>', '>', '>', '<', '>', '>', '<', '>', '<', '>' },
-    /*	(	*/ { '<', '<', '<', '<', '<', '=', R_ERR, '<', '<', '<', '<' },
-    /*	)	*/ { '>', '>', '>', '>', R_ERR, '>', '>', R_ERR, '>', R_ERR, '>' },
-    /*	$	*/ { '<', '<', '<', '<', '<', R_ERR, R_ERR, '<', '<', '<', '<' },
-    /*	id	*/ { '>', '>', '>', '>', R_ERR, '>', '>', R_ERR, '>', R_ERR, '>' },
-    /*	rel	*/ { '<', '<', '<', '<', '<', '>', '>', '<', R_ERR, '<', '>' },
-    /*	u-	*/ { '>', '>', '>', '>', '<', '>', '>', '<', '>', '<', '>' },
-    /*  eq */ { '<', '<', '<', '<', '<', '>', '>', '<', '<', '<', R_ERR },
+const char precedence_table[15][15] = {
+    /*	  	      +    -	*	  /	  (    )	$    id  rel   u-   eq   !   &&   ||    .	*/
+    /*	+	*/ { '>', '>', '<', '<', '<', '>', '>', '<', '>', '<', '>', '<', '>', '>', '<' },
+    /*	-	*/ { '>', '>', '<', '<', '<', '>', '>', '<', '>', '<', '>', '<', '>', '>', '<' },
+    /*	*	*/ { '>', '>', '>', '>', '<', '>', '>', '<', '>', '<', '>', '<', '>', '>', '<' },
+    /*	/	*/ { '>', '>', '>', '>', '<', '>', '>', '<', '>', '<', '>', '<', '>', '>', '<' },
+    /*	(	*/ { '<', '<', '<', '<', '<', '=', R_ERR, '<', '<', '<', '<', '<', '<', '<', '<' },
+    /*	)	*/ { '>', '>', '>', '>', R_ERR, '>', '>', R_ERR, '>', R_ERR, '>', R_ERR, '>', '>', '>' },
+    /*	$	*/ { '<', '<', '<', '<', '<', R_ERR, R_ERR, '<', '<', '<', '<', '<', '<', '<', '<' },
+    /*	id	*/ { '>', '>', '>', '>', R_ERR, '>', '>', R_ERR, '>', R_ERR, '>', R_ERR, '>', '>', '>' },
+    /*	rel	*/ { '<', '<', '<', '<', '<', '>', '>', '<', R_ERR, '<', '>', '<', '>', '>', '<' },
+    /*	u-	*/ { '>', '>', '>', '>', '<', '>', '>', '<', '>', '<', '>', '<', '>', '>', '<' },
+    /*  eq  */ { '<', '<', '<', '<', '<', '>', '>', '<', '<', '<', R_ERR, '<', '>', '>', '<' },
+    /*  !   */ { '>', '>', '>', '>', '<', '>', '>', '<', '>', '<', '>', '<', '>', '>', '<' },
+    /*  &&  */ { '<', '<', '<', '<', '<', '>', '>', '<', '<', '<', '<', '<', '>', '>', '<' },
+    /*  ||  */ { '<', '<', '<', '<', '<', '>', '>', '<', '<', '<', '<', '<', '<', '>', '<' },
+    /*  .   */ { '>', '>', '>', '>', R_ERR, '>', '>', R_ERR, '>', R_ERR, '>', R_ERR, '>', '>', '>' }
 };
 
 typedef enum {
@@ -222,31 +235,57 @@ typedef enum {
     index_id = 7,
     index_rel = 8,
     index_uminus = 9,
-    index_eq = 10
+    index_eq = 10,
+    index_not = 11,
+    index_and = 12,
+    index_or = 13,
+    index_dot = 14
 } PrecedenceIndex;
 
 int get_precedence_index(token_type_t t, bool is_unary)
 {
     if (t == TOKEN_PLUS)
         return index_add;
+
     else if (t == TOKEN_MINUS)
         return is_unary ? index_uminus : index_sub;
+
     else if (t == TOKEN_STAR)
         return index_mul;
+
     else if (t == TOKEN_SLASH)
         return index_div;
+
     else if (t == TOKEN_LPAREN)
         return index_left_par;
+
     else if (t == TOKEN_RPAREN)
         return index_right_par;
-    else if (t == TOKEN_EOF || t == TOKEN_NEWLINE || t == TOKEN_SEMICOLON || t == TOKEN_COMMA || t == TOKEN_THEN || t == TOKEN_DO || t == TOKEN_ELSE || t == TOKEN_COLON)
+
+    else if (t == TOKEN_EOF || t == TOKEN_NEWLINE || t == TOKEN_SEMICOLON || t == TOKEN_COMMA || t == TOKEN_THEN || t == TOKEN_IF || t == TOKEN_DO || t == TOKEN_ELSE || t == TOKEN_COLON)
         return index_dollar;
-    else if (t == TOKEN_IDENTIFIER || t == TOKEN_INTEGER || t == TOKEN_DOUBLE || t == TOKEN_STRING)
+
+    else if (t == TOKEN_IDENTIFIER || t == TOKEN_INTEGER || t == TOKEN_DOUBLE || t == TOKEN_STRING || t == TOKEN_TRUE || t == TOKEN_FALSE)
         return index_id;
+
     else if (t == TOKEN_LESS || t == TOKEN_LESS_EQUAL || t == TOKEN_GREATER || t == TOKEN_GREATER_EQUAL)
         return index_rel;
+
     else if (t == TOKEN_EQUAL || t == TOKEN_NOT_EQUAL)
         return index_eq;
+
+    else if (t == TOKEN_NOT)
+        return index_not;
+
+    else if (t == TOKEN_AND)
+        return index_and;
+
+    else if (t == TOKEN_OR)
+        return index_or;
+
+    else if (t == TOKEN_DOT)
+        return index_dot;
+
     else
         return -1;
 }
@@ -254,7 +293,7 @@ int get_precedence_index(token_type_t t, bool is_unary)
 // Returns true if token type represents a literal or identifier
 static bool is_operand(token_type_t token)
 {
-    if (token == TOKEN_IDENTIFIER || token == TOKEN_INTEGER || token == TOKEN_DOUBLE || token == TOKEN_STRING) {
+    if (token == TOKEN_IDENTIFIER || token == TOKEN_INTEGER || token == TOKEN_DOUBLE || token == TOKEN_STRING || token == TOKEN_TRUE || token == TOKEN_FALSE) {
         return true;
     }
     return false;
@@ -272,7 +311,7 @@ static void free_control(tdata_t* control, int count)
 }
 
 // Pops symbols down to the shift mark and reduces them into a non-terminal AST node
-int reduce_rules(tstack_t* stack, size_t line, size_t col)
+static error_code_t reduce_rules(tstack_t* stack, size_t line, size_t col)
 {
     tdata_t control[5];
     int count_control = 0;
@@ -348,10 +387,42 @@ int reduce_rules(tstack_t* stack, size_t line, size_t col)
             }
             return ERR_OK;
         }
+
+        // 4) E -> !E   (BOOLTHEN)
+        if (control[1].symbol_type == SYMBOL_TERMINAL && control[1].token_type == TOKEN_NOT && control[0].symbol_type == SYMBOL_NON_TERMINAL) {
+
+            ast_node_t* not_node = ast_new_unary(AST_OP_NOT, control[0].ast_node, line, col);
+            if (not_node == NULL) {
+                free_control(control, count_control);
+                return ERR_INTERNAL;
+            }
+            non_terminal.ast_node = not_node;
+            if (!push(stack, non_terminal)) {
+                ast_free(not_node);
+                return ERR_INTERNAL;
+            }
+            return ERR_OK;
+        }
+
+        // 5) E -> E.member (VALEM)
+        if (control[1].symbol_type == SYMBOL_NON_TERMINAL && control[0].symbol_type == SYMBOL_TERMINAL && control[0].token_type == TOKEN_DOT) {
+            ast_node_t* member_node = control[0].ast_node;
+            if (member_node == NULL || member_node->kind != AST_MEMBER) {
+                free_control(control, count_control);
+                return ERR_INTERNAL;
+            }
+            member_node->member.receiver = control[1].ast_node;
+            non_terminal.ast_node = member_node;
+            if (!push(stack, non_terminal)) {
+                ast_free(member_node);
+                return ERR_INTERNAL;
+            }
+            return ERR_OK;
+        }
     }
 
     if (count_control == 3) {
-        // 4) E -> ( E )
+        // 6) E -> ( E )
         if (control[2].token_type == TOKEN_LPAREN && control[1].symbol_type == SYMBOL_NON_TERMINAL && control[0].token_type == TOKEN_RPAREN) {
 
             non_terminal.ast_node = control[1].ast_node;
@@ -362,7 +433,7 @@ int reduce_rules(tstack_t* stack, size_t line, size_t col)
             return ERR_OK;
         }
 
-        // 5) E -> E op E, op={+,-,*,/}
+        // 7) E -> E op E
         if (control[2].symbol_type == SYMBOL_NON_TERMINAL && control[1].symbol_type == SYMBOL_TERMINAL && control[0].symbol_type == SYMBOL_NON_TERMINAL) {
 
             ast_binary_op_t op;
@@ -397,6 +468,12 @@ int reduce_rules(tstack_t* stack, size_t line, size_t col)
             case TOKEN_GREATER_EQUAL:
                 op = AST_OP_GE;
                 break;
+            case TOKEN_AND: // BOOLTHEN
+                op = AST_OP_AND;
+                break;
+            case TOKEN_OR: // BOOLTHEN
+                op = AST_OP_OR;
+                break;
             default:
                 free_control(control, count_control);
                 return ERR_SYNTAX;
@@ -428,7 +505,7 @@ int reduce_rules(tstack_t* stack, size_t line, size_t col)
 // Scope: advance_shared_token
 
 // Advances the shared parser token from the pending buffer or directly from the lexer
-static int advance_shared_token(lexer_t* lexer, token_t* current_token)
+static error_code_t advance_shared_token(lexer_t* lexer, token_t* current_token)
 {
     token_dispose(current_token);
     if (has_pending) {
@@ -443,20 +520,13 @@ static int advance_shared_token(lexer_t* lexer, token_t* current_token)
     return ERR_OK;
 }
 
-// Lookahead token to be consumed on the next expression token advance.
-void parser_expression_push_back(token_t* token){
-    pending_token = *token;
-    memset(token, 0, sizeof(*token));
-    has_pending = true;
-}
-
 /*
 ---------------------------------------------------------------------------------
 |    Main precedence expression parser                              			|
 ---------------------------------------------------------------------------------
 */
 
-int parser_expression(lexer_t* lexer, token_t* current_token, ast_node_t** out_node)
+error_code_t parser_expression(lexer_t* lexer, token_t* current_token, ast_node_t** out_node)
 {
     if (lexer == NULL || current_token == NULL || out_node == NULL)
         return ERR_INTERNAL;
@@ -481,6 +551,38 @@ int parser_expression(lexer_t* lexer, token_t* current_token, ast_node_t** out_n
         if (terminal_top == NULL) {
             stack_free(&stack);
             return ERR_SYNTAX;
+        }
+        // Using if as expression if <cond> then <expr> else <expr>
+        if (expect_operand && current_token->type == TOKEN_IF) {
+            ast_node_t* if_expr_node = NULL;
+            int if_err = parser_if_expression(lexer, current_token, &if_expr_node); // bude volat z parser.c
+            if (if_err != ERR_OK) {
+                stack_free(&stack);
+                return if_err;
+            }
+
+            bool top_is_unary = (terminal_top->data.token_type == TOKEN_MINUS && terminal_top->next->data.symbol_type == SYMBOL_TERMINAL);
+            int row = get_precedence_index(terminal_top->data.token_type, top_is_unary);
+            if (row < 0 || row > 14 || precedence_table[row][index_id] != '<') {
+                ast_free(if_expr_node);
+                stack_free(&stack);
+                return ERR_SYNTAX;
+            }
+            terminal_top->data.shift_mark = true;
+            tdata_t data = {
+                .symbol_type = SYMBOL_TERMINAL,
+                .token_type = TOKEN_IDENTIFIER,
+                .shift_mark = false,
+                .ast_node = if_expr_node
+            };
+
+            if (!push(&stack, data)) {
+                ast_free(if_expr_node);
+                stack_free(&stack);
+                return ERR_INTERNAL;
+            }
+            expect_operand = false;
+            continue;
         }
 
         // Handle identifiers as either function calls 'id(...)' or variable references
@@ -548,6 +650,7 @@ int parser_expression(lexer_t* lexer, token_t* current_token, ast_node_t** out_n
                         }
 
                         if (current_token->type == TOKEN_COMMA) {
+                            size_t comma_line = current_token->line;
                             adv_err = advance_shared_token(lexer, current_token);
                             if (adv_err != ERR_OK) {
                                 ast_free(operand_node);
@@ -555,9 +658,7 @@ int parser_expression(lexer_t* lexer, token_t* current_token, ast_node_t** out_n
                                 return adv_err;
                             }
 
-                            bool had_newline = false;
                             while (current_token->type == TOKEN_NEWLINE) {
-                                had_newline = false;
                                 adv_err = advance_shared_token(lexer, current_token);
                                 if (adv_err != ERR_OK) {
                                     ast_free(operand_node);
@@ -567,7 +668,7 @@ int parser_expression(lexer_t* lexer, token_t* current_token, ast_node_t** out_n
                             }
 
                             if (current_token->type == TOKEN_RPAREN) {
-                                if (!had_newline) {
+                                if (current_token->line <= comma_line) {
                                     ast_free(operand_node);
                                     stack_free(&stack);
                                     return ERR_SYNTAX;
@@ -606,7 +707,7 @@ int parser_expression(lexer_t* lexer, token_t* current_token, ast_node_t** out_n
 
             bool top_is_unary = (terminal_top->data.token_type == TOKEN_MINUS && (terminal_top->next == NULL || terminal_top->next->data.symbol_type == SYMBOL_TERMINAL));
             int row = get_precedence_index(terminal_top->data.token_type, top_is_unary);
-            if (row < 0 || row >= 11 || precedence_table[row][index_id] != '<') {
+            if (row < 0 || row > 14 || precedence_table[row][index_id] != '<') {
                 ast_free(operand_node);
                 stack_free(&stack);
                 return ERR_SYNTAX;
@@ -629,6 +730,12 @@ int parser_expression(lexer_t* lexer, token_t* current_token, ast_node_t** out_n
             continue;
         }
 
+        // '.' is only valid in postfix position (VALEM)
+        if (expect_operand && current_token->type == TOKEN_DOT) {
+            stack_free(&stack);
+            return ERR_SYNTAX;
+        }
+
         // Determine precedence table indices for the top stack terminal and current input token
         bool input_is_unary = (current_token->type == TOKEN_MINUS && expect_operand);
         bool top_is_unary = (terminal_top->data.token_type == TOKEN_MINUS && (terminal_top->next == NULL || terminal_top->next->data.symbol_type == SYMBOL_TERMINAL));
@@ -639,7 +746,19 @@ int parser_expression(lexer_t* lexer, token_t* current_token, ast_node_t** out_n
         if (current_token->type == TOKEN_RPAREN && paren_depth == 0)
             col = index_dollar;
 
-        if (row < 0 || row >= 11 || col < 0 || col >= 11) {
+        // Contextual keywords 'to', 'until', 'by' end range expressions in 'for' loops
+        bool is_for_keyword = false;
+        if (current_token->type == TOKEN_IDENTIFIER && current_token->lexeme != NULL) {
+            if (strcmp(current_token->lexeme, "to") == 0 || strcmp(current_token->lexeme, "until") == 0 || strcmp(current_token->lexeme, "by") == 0)
+
+                is_for_keyword = true;
+        }
+        if (!expect_operand && paren_depth == 0) {
+            if (is_for_keyword || current_token->starts_line)
+                col = index_dollar;
+        }
+
+        if (row < 0 || row > 14 || col < 0 || col > 14) {
             stack_free(&stack);
             return ERR_SYNTAX;
         }
@@ -692,6 +811,54 @@ int parser_expression(lexer_t* lexer, token_t* current_token, ast_node_t** out_n
             size_t token_col = current_token->column;
             token_type_t token_type = current_token->type;
 
+            // VALMEM
+            if (token_type == TOKEN_DOT) {
+                int adv_err = advance_shared_token(lexer, current_token);
+                if (adv_err != ERR_OK) {
+                    stack_free(&stack);
+                    return adv_err;
+                }
+
+                if (current_token->type != TOKEN_IDENTIFIER) {
+                    stack_free(&stack);
+                    return ERR_SYNTAX;
+                }
+
+                ast_node_t* fake_node = ast_new_unit_lit(token_line, token_col);
+                if (fake_node == NULL) {
+                    stack_free(&stack);
+                    return ERR_INTERNAL;
+                }
+                leaf_node = ast_new_member(current_token->lexeme, fake_node, token_line, token_col);
+                if (leaf_node == NULL) {
+                    ast_free(fake_node);
+                    stack_free(&stack);
+                    return ERR_INTERNAL;
+                }
+                ast_free(fake_node);
+                leaf_node->member.receiver = NULL;
+
+                tdata_t data = {
+                    .symbol_type = SYMBOL_TERMINAL,
+                    .token_type = TOKEN_DOT,
+                    .shift_mark = false,
+                    .ast_node = leaf_node
+                };
+
+                if (!push(&stack, data)) {
+                    ast_free(leaf_node);
+                    stack_free(&stack);
+                    return ERR_INTERNAL;
+                }
+
+                expect_operand = false;
+                adv_err = advance_shared_token(lexer, current_token);
+                if (adv_err != ERR_OK) {
+                    stack_free(&stack);
+                    return adv_err;
+                }
+                break;
+            }
             if (token_type == TOKEN_INTEGER) {
                 int64_t val = parser_int_literal(current_token->lexeme);
                 leaf_node = ast_new_int_lit(val, token_line, token_col);
@@ -717,6 +884,13 @@ int parser_expression(lexer_t* lexer, token_t* current_token, ast_node_t** out_n
                 leaf_node = ast_new_string_lit(decoded, token_line, token_col);
                 free(decoded);
 
+                if (leaf_node == NULL) {
+                    stack_free(&stack);
+                    return ERR_INTERNAL;
+                }
+                expect_operand = false;
+            } else if (token_type == TOKEN_TRUE || token_type == TOKEN_FALSE) {
+                leaf_node = ast_new_bool_lit(token_type == TOKEN_TRUE, token_line, token_col);
                 if (leaf_node == NULL) {
                     stack_free(&stack);
                     return ERR_INTERNAL;

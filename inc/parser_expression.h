@@ -5,19 +5,15 @@
 #ifndef IFJ_PARSER_EXPRESSION_H
 #define IFJ_PARSER_EXPRESSION_H
 
-#include <stdbool.h>
-#include "parser_expression.h"
-#include "parser_stack.h"
 #include "ast.h"
-#include "lexer.h"
 #include "comp_error.h"
+#include "lexer.h"
 
 // AI-generated using: Gemini
-//               model: Gemini 4 hydrogen
-// Prompt (summary): "Generate comments of parse_expression() function for 
-//                    shift-reduce precedence algorithm, and comment for 
-//                    parser_expression_push_back."
-// Scope: parser_expression, get_precedence_index, reduce_rules, get_next_token
+//                model: Gemini 4 HYDROGEN
+// Prompt (summary): "Generate Doxygen comments for parser_expression() and
+//                    parser_expression_push_back()."
+// Scope: parser_expression, parser_expression_push_back
 
 /**
  * @brief Parses an expression using the shift-reduce precedence algorithm.
@@ -30,20 +26,16 @@
  * @param out_node Pointer to an AST node pointer where the root of the generated tree will be stored.
  * @return ERR_OK (0) on success, or an error code (ERR_LEXICAL, ERR_SYNTAX, ERR_INTERNAL).
  */
-
-int parser_expression(lexer_t *lexer, token_t *current_token, ast_node_t **out_node);
+error_code_t parser_expression(lexer_t* lexer, token_t* current_token, ast_node_t** out_node);
 
 /**
- * @brief Pushes a new symbol/token onto the back of the expression stack.
+ * @brief Stores a lookahead token to be consumed on the next expression token advance.
  *
- * Allocates and appends an element (terminal or non-terminal) to the end of
- * the precedence parsing stack/list used during bottom-up expression analysis.
+ * Moves the given token into an internal pending buffer and zeroes out the caller's
+ * token structure so ownership is transferred without double-disposal.
  *
- * @param stack Pointer to the expression stack structure.
- * @param symbol Symbol or token to be pushed onto the stack.
- * @return True if the element was successfully pushed, false on memory allocation failure.
+ * @param token Pointer to the lookahead token to push back (ownership is transferred).
  */
-
-void parser_expression_push_back(token_t *token);
+void parser_expression_push_back(token_t* token);
 
 #endif
