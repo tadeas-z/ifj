@@ -20,6 +20,9 @@
 // Prompt: "Create tests using google-tests for unknown nodes (exit code 99)"
 // Prompt: "Create tests using google-tests for VALMEM members (length, toString,
 //          toInt, floor and chains)"
+// Prompt: "Create tests using google-tests for CONTROL (if as expression,
+//          else if value, for with to, until, by, guards, locals)"
+// Prompt: "Add a test for if as expression with an empty block"
 // Scope: whole file
 
 extern "C" {
@@ -683,4 +686,166 @@ TEST_F(CodegenValmemTest, Chain)
     EXPECT_EQ(output(),
         "PUSHS LF@d$1\nCREATEFRAME\nDEFVAR TF@value$0\nPOPS TF@value$0\nCALL $floor\n"
         "CREATEFRAME\nDEFVAR TF@value$0\nPOPS TF@value$0\nCALL toInt\n");
+}
+
+// Same setup for the CONTROL tests
+class CodegenControlTest : public CodegenExprTest {
+};
+
+static ast_node_t* for_loop(ast_node_t* from, ast_node_t* to, ast_node_t* step, bool inclusive, ast_node_t* body)
+{
+    ast_node_t* node = ast_new_for("i", from, to, step, inclusive, 1, 1);
+    node->for_stmt.var_id = 1;
+    node->for_stmt.end_id = 2;
+    if (step != nullptr)
+        node->for_stmt.step_id = 3;
+    node->for_stmt.body = body;
+    return node;
+}
+
+// if as expression leaves the value of the branch on the stack
+TEST_F(CodegenControlTest, IfExpression)
+{
+    tree = ast_new_if(var_ref("b", 1, TYPE_BOOL), block(ast_new_expr_stmt(int_lit(1), 1, 1)),
+        block(ast_new_expr_stmt(int_lit(2), 1, 1)), 1, 1);
+    tree->type = TYPE_INT;
+
+    codegen_expr(codegen, tree);
+    EXPECT_EQ(output(),
+        "PUSHS LF@b$1\nPUSHS bool@false\nJUMPIFEQS $1$else\n"
+        "PUSHS int@1\nJUMP $1$end\n"
+        "LABEL $1$else\n"
+        "PUSHS int@2\n"
+        "LABEL $1$end\n");
+}
+
+// else if is an if in the else block, it gives the value too
+TEST_F(CodegenControlTest, IfExpressionElseIf)
+{
+    ast_node_t* inner = ast_new_if(var_ref("c", 2, TYPE_BOOL), block(ast_new_expr_stmt(int_lit(2), 1, 1)),
+        block(ast_new_expr_stmt(int_lit(3), 1, 1)), 1, 1);
+    tree = ast_new_if(var_ref("b", 1, TYPE_BOOL), block(ast_new_expr_stmt(int_lit(1), 1, 1)), block(inner), 1, 1);
+
+    codegen_expr(codegen, tree);
+    EXPECT_EQ(output(),
+        "PUSHS LF@b$1\nPUSHS bool@false\nJUMPIFEQS $1$else\n"
+        "PUSHS int@1\nJUMP $1$end\n"
+        "LABEL $1$else\n"
+        "PUSHS LF@c$2\nPUSHS bool@false\nJUMPIFEQS $2$else\n"
+        "PUSHS int@2\nJUMP $2$end\n"
+        "LABEL $2$else\n"
+        "PUSHS int@3\n"
+        "LABEL $2$end\n"
+        "LABEL $1$end\n");
+}
+
+// empty block gives ()
+TEST_F(CodegenControlTest, IfExpressionEmptyBlock)
+{
+    tree = ast_new_if(var_ref("b", 1, TYPE_BOOL), ast_new_block(1, 1), ast_new_block(1, 1), 1, 1);
+    tree->type = TYPE_UNIT;
+
+    codegen_expr(codegen, tree);
+    EXPECT_EQ(output(),
+        "PUSHS LF@b$1\nPUSHS bool@false\nJUMPIFEQS $1$else\n"
+        "PUSHS nil@nil\nJUMP $1$end\n"
+        "LABEL $1$else\n"
+        "PUSHS nil@nil\n"
+        "LABEL $1$end\n");
+}
+
+// for i <- 1 to 3, no by means step 1 and no check of the step
+TEST_F(CodegenControlTest, ForTo)
+{
+    tree = for_loop(int_lit(1), int_lit(3), nullptr, true, block(assign("a", 4, var_ref("i", 1, TYPE_INT))));
+
+    codegen_stmt(codegen, tree);
+    EXPECT_EQ(output(),
+        "PUSHS int@1\nPOPS LF@i$1\n"
+        "PUSHS int@3\nPOPS LF@end$2\n"
+        "LABEL $1$for\n"
+        "PUSHS LF@i$1\nPUSHS LF@end$2\nGTS\nNOTS\nPUSHS bool@false\nJUMPIFEQS $1$end\n"
+        "LABEL $1$body\n"
+        "PUSHS LF@i$1\nPOPS LF@a$4\n"
+        "LABEL $1$next\n"
+        "PUSHS LF@i$1\nPUSHS int@1\nADDS\nPOPS LF@i$1\n"
+        "JUMP $1$for\n"
+        "LABEL $1$end\n");
+}
+
+// until stops before the end
+TEST_F(CodegenControlTest, ForUntil)
+{
+    tree = for_loop(int_lit(0), int_lit(3), nullptr, false, block(assign("a", 4, var_ref("i", 1, TYPE_INT))));
+
+    codegen_stmt(codegen, tree);
+    std::string text = output();
+    EXPECT_NE(text.find("PUSHS LF@i$1\nPUSHS LF@end$2\nLTS\nPUSHS bool@false\nJUMPIFEQS $1$end\n"), std::string::npos);
+}
+
+// by: step is stored once, 0 ends with 40, minus step goes down
+TEST_F(CodegenControlTest, ForWithStep)
+{
+    tree = for_loop(int_lit(5), int_lit(1), var_ref("s", 5, TYPE_INT), true, block(assign("a", 4, var_ref("i", 1, TYPE_INT))));
+
+    codegen_stmt(codegen, tree);
+    EXPECT_EQ(output(),
+        "PUSHS int@5\nPOPS LF@i$1\n"
+        "PUSHS int@1\nPOPS LF@end$2\n"
+        "PUSHS LF@s$5\nPOPS LF@step$3\n"
+        "PUSHS LF@step$3\nPUSHS int@0\nEQS\nPUSHS bool@false\nJUMPIFEQS $1$for\n"
+        "EXIT int@40\n"
+        "LABEL $1$for\n"
+        "PUSHS LF@step$3\nPUSHS int@0\nLTS\nPUSHS bool@true\nJUMPIFEQS $1$down\n"
+        "PUSHS LF@i$1\nPUSHS LF@end$2\nGTS\nNOTS\nPUSHS bool@false\nJUMPIFEQS $1$end\n"
+        "JUMP $1$body\n"
+        "LABEL $1$down\n"
+        "PUSHS LF@i$1\nPUSHS LF@end$2\nLTS\nNOTS\nPUSHS bool@false\nJUMPIFEQS $1$end\n"
+        "LABEL $1$body\n"
+        "PUSHS LF@i$1\nPOPS LF@a$4\n"
+        "LABEL $1$next\n"
+        "PUSHS LF@i$1\nPUSHS LF@step$3\nADDS\nPOPS LF@i$1\n"
+        "JUMP $1$for\n"
+        "LABEL $1$end\n");
+}
+
+// a false guard skips the body and goes to the next i
+TEST_F(CodegenControlTest, ForGuard)
+{
+    tree = for_loop(int_lit(1), int_lit(3), nullptr, true, block(assign("a", 4, var_ref("i", 1, TYPE_INT))));
+    dyn_arr_append(&tree->for_stmt.guards, var_ref("g", 6, TYPE_BOOL));
+
+    codegen_stmt(codegen, tree);
+    std::string text = output();
+    EXPECT_NE(text.find("LABEL $1$body\nPUSHS LF@g$6\nPUSHS bool@false\nJUMPIFEQS $1$next\n"), std::string::npos);
+}
+
+// locals of a for are the loop variable, end and step
+TEST_F(CodegenControlTest, ForLocals)
+{
+    ast_node_t* loop = for_loop(int_lit(1), int_lit(3), int_lit(1), true, block(assign("a", 4, var_ref("i", 1, TYPE_INT))));
+    tree = func("main", true, TYPE_UNIT, block(loop));
+    dyn_arr_append(&tree->func_def.locals, loop);
+
+    codegen_func(codegen, tree);
+    std::string text = output();
+    EXPECT_NE(text.find("PUSHFRAME\nDEFVAR LF@i$1\nDEFVAR LF@end$2\nDEFVAR LF@step$3\n"), std::string::npos);
+}
+
+// function ends with an if, the value of the branch is the result
+TEST_F(CodegenControlTest, FuncEndsWithIf)
+{
+    ast_node_t* last = ast_new_if(var_ref("b", 1, TYPE_BOOL), block(ast_new_expr_stmt(int_lit(1), 1, 1)),
+        block(ast_new_expr_stmt(int_lit(2), 1, 1)), 1, 1);
+    tree = func("f", false, TYPE_INT, block(last));
+
+    codegen_func(codegen, tree);
+    EXPECT_EQ(output(),
+        "LABEL f\nPUSHFRAME\n"
+        "PUSHS LF@b$1\nPUSHS bool@false\nJUMPIFEQS $1$else\n"
+        "PUSHS int@1\nJUMP $1$end\n"
+        "LABEL $1$else\n"
+        "PUSHS int@2\n"
+        "LABEL $1$end\n"
+        "POPFRAME\nRETURN\n");
 }

@@ -24,15 +24,6 @@ static const char* op_names[] = {
     "INT2FLOATS"
 };
 
-// same order as unary_op_t in header
-static const char* unary_names[] = {
-    "INT2CHAR",
-    "FLOAT2INT",
-    "INT2STR",
-    "FLOAT2STR",
-    "STRLEN"
-};
-
 // same order as binary_op_t in header
 static const char* binary_names[] = {
     "CONCAT",
@@ -345,15 +336,6 @@ void codegen_defvar(codegen_t* codegen, var_t var)
     fprintf(codegen->out, "\n");
 }
 
-void codegen_move(codegen_t* codegen, var_t var, symb_t symb)
-{
-    fprintf(codegen->out, "MOVE ");
-    print_var(codegen, var);
-    fprintf(codegen->out, " ");
-    print_symb(codegen, symb);
-    fprintf(codegen->out, "\n");
-}
-
 void codegen_write(codegen_t* codegen, symb_t symb)
 {
     fprintf(codegen->out, "WRITE ");
@@ -432,13 +414,9 @@ void codegen_jumpifeqs(codegen_t* codegen, int num, const char* suffix)
     fprintf(codegen->out, "\n");
 }
 
-void codegen_unary_op(codegen_t* codegen, unary_op_t op, var_t var, symb_t symb)
+void codegen_exit(codegen_t* codegen, int code)
 {
-    fprintf(codegen->out, "%s ", unary_names[op]);
-    print_var(codegen, var);
-    fprintf(codegen->out, " ");
-    print_symb(codegen, symb);
-    fprintf(codegen->out, "\n");
+    fprintf(codegen->out, "EXIT int@%d\n", code);
 }
 
 void codegen_binary_op(codegen_t* codegen, binary_op_t op, var_t var, symb_t symb1, symb_t symb2)
@@ -450,13 +428,6 @@ void codegen_binary_op(codegen_t* codegen, binary_op_t op, var_t var, symb_t sym
     fprintf(codegen->out, " ");
     print_symb(codegen, symb2);
     fprintf(codegen->out, "\n");
-}
-
-void codegen_read(codegen_t* codegen, var_t var, const char* type)
-{
-    fprintf(codegen->out, "READ ");
-    print_var(codegen, var);
-    fprintf(codegen->out, " %s\n", type);
 }
 
 void codegen_builtins(codegen_t* codegen)

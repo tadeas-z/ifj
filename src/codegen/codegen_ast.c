@@ -11,6 +11,10 @@
 // true when the current function returns Unit
 static bool unit_func = false;
 
+// used before they are defined
+static void generate_if_value(codegen_t* codegen, ast_node_t* expr);
+static void generate_value(codegen_t* codegen, ast_node_t* stmt);
+
 // minus, multiply by -1
 static void generate_neg(codegen_t* codegen, ast_node_t* expr)
 {
@@ -285,6 +289,9 @@ void codegen_expr(codegen_t* codegen, ast_node_t* expr)
     case AST_CALL:
         generate_call(codegen, expr);
         break;
+    case AST_IF:
+        generate_if_value(codegen, expr);
+        break;
     default:
         fprintf(stderr, "codegen: unknown expression\n");
         exit(ERR_INTERNAL);
@@ -327,6 +334,56 @@ static void generate_if(codegen_t* codegen, ast_node_t* stmt)
     codegen_label(codegen, num, "end");
 }
 
+// value of a block, last statement leaves it on the stack
+static void generate_block_value(codegen_t* codegen, ast_node_t* block)
+{
+    dyn_arr_t* stmts = &block->block.statements;
+    symb_t unit = { 0 };
+    unit.type = S_NIL;
+
+    // empty block is ()
+    if (stmts->count == 0) {
+        codegen_pushs(codegen, unit);
+        return;
+    }
+
+    for (size_t i = 0; i < stmts->count - 1; i++)
+        codegen_stmt(codegen, dyn_arr_get(stmts, i));
+    generate_value(codegen, dyn_arr_get(stmts, stmts->count - 1));
+}
+
+// if as expression, value of the branch stays on the stack
+static void generate_if_value(codegen_t* codegen, ast_node_t* expr)
+{
+    int num = codegen_new_label(codegen);
+
+    generate_cond(codegen, expr->if_stmt.cond, num, "else");
+    generate_block_value(codegen, expr->if_stmt.then_block);
+    codegen_jump(codegen, num, "end");
+    codegen_label(codegen, num, "else");
+    generate_block_value(codegen, expr->if_stmt.else_block);
+    codegen_label(codegen, num, "end");
+}
+
+// value of one statement on the stack
+static void generate_value(codegen_t* codegen, ast_node_t* stmt)
+{
+    symb_t unit = { 0 };
+    unit.type = S_NIL;
+
+    if (stmt->kind == AST_EXPR_STMT) {
+        codegen_expr(codegen, stmt->expr_stmt.expr);
+    } else if (stmt->kind == AST_IF) {
+        generate_if_value(codegen, stmt);
+    } else if (stmt->kind == AST_RETURN) {
+        // leaves the function, no value here
+        codegen_stmt(codegen, stmt);
+    } else {
+        codegen_stmt(codegen, stmt);
+        codegen_pushs(codegen, unit);
+    }
+}
+
 // check, body, jump back
 static void generate_while(codegen_t* codegen, ast_node_t* stmt)
 {
@@ -336,6 +393,107 @@ static void generate_while(codegen_t* codegen, ast_node_t* stmt)
     generate_cond(codegen, stmt->while_stmt.cond, num, "end");
     codegen_stmt(codegen, stmt->while_stmt.body);
     codegen_jump(codegen, num, "while");
+    codegen_label(codegen, num, "end");
+}
+
+// for i <- from to/until end by step, guards skip the body
+static void generate_for(codegen_t* codegen, ast_node_t* stmt)
+{
+    ast_for_t* loop = &stmt->for_stmt;
+    int num = codegen_new_label(codegen);
+
+    var_t i = { FRAME_LF, loop->var_name, loop->var_id };
+    var_t end = { FRAME_LF, "end", loop->end_id };
+    var_t step = { FRAME_LF, "step", loop->step_id };
+    symb_t si = { 0 };
+    si.type = S_VAR;
+    si.var = i;
+    symb_t send = { 0 };
+    send.type = S_VAR;
+    send.var = end;
+    symb_t sstep = { 0 };
+    symb_t zero = { 0 };
+    zero.type = S_INT;
+    zero.int_val = 0;
+    symb_t false_val = { 0 };
+    false_val.type = S_BOOL;
+    false_val.bool_val = false;
+    symb_t true_val = { 0 };
+    true_val.type = S_BOOL;
+    true_val.bool_val = true;
+
+    // without by the step is 1
+    if (loop->step != NULL) {
+        sstep.type = S_VAR;
+        sstep.var = step;
+    } else {
+        sstep.type = S_INT;
+        sstep.int_val = 1;
+    }
+
+    // from, end and step only once
+    codegen_expr(codegen, loop->from);
+    codegen_pops(codegen, i);
+    codegen_expr(codegen, loop->to);
+    codegen_pops(codegen, end);
+    if (loop->step != NULL) {
+        codegen_expr(codegen, loop->step);
+        codegen_pops(codegen, step);
+        // step 0 is error 40
+        codegen_pushs(codegen, sstep);
+        codegen_pushs(codegen, zero);
+        codegen_stack_op(codegen, OP_EQS);
+        codegen_pushs(codegen, false_val);
+        codegen_jumpifeqs(codegen, num, "for");
+        codegen_exit(codegen, 40);
+    }
+
+    codegen_label(codegen, num, "for");
+    if (loop->step != NULL) {
+        // minus step goes down
+        codegen_pushs(codegen, sstep);
+        codegen_pushs(codegen, zero);
+        codegen_stack_op(codegen, OP_LTS);
+        codegen_pushs(codegen, true_val);
+        codegen_jumpifeqs(codegen, num, "down");
+    }
+
+    // up: to is i <= end, until is i < end
+    codegen_pushs(codegen, si);
+    codegen_pushs(codegen, send);
+    if (loop->inclusive)
+        generate_not(codegen, OP_GTS);
+    else
+        codegen_stack_op(codegen, OP_LTS);
+    codegen_pushs(codegen, false_val);
+    codegen_jumpifeqs(codegen, num, "end");
+
+    if (loop->step != NULL) {
+        codegen_jump(codegen, num, "body");
+        codegen_label(codegen, num, "down");
+        // down: to is i >= end, until is i > end
+        codegen_pushs(codegen, si);
+        codegen_pushs(codegen, send);
+        if (loop->inclusive)
+            generate_not(codegen, OP_LTS);
+        else
+            codegen_stack_op(codegen, OP_GTS);
+        codegen_pushs(codegen, false_val);
+        codegen_jumpifeqs(codegen, num, "end");
+    }
+
+    codegen_label(codegen, num, "body");
+    for (size_t g = 0; g < loop->guards.count; g++)
+        generate_cond(codegen, dyn_arr_get(&loop->guards, g), num, "next");
+    codegen_stmt(codegen, loop->body);
+
+    // i = i + step
+    codegen_label(codegen, num, "next");
+    codegen_pushs(codegen, si);
+    codegen_pushs(codegen, sstep);
+    codegen_stack_op(codegen, OP_ADDS);
+    codegen_pops(codegen, i);
+    codegen_jump(codegen, num, "for");
     codegen_label(codegen, num, "end");
 }
 
@@ -394,6 +552,9 @@ void codegen_stmt(codegen_t* codegen, ast_node_t* stmt)
     case AST_WHILE:
         generate_while(codegen, stmt);
         break;
+    case AST_FOR:
+        generate_for(codegen, stmt);
+        break;
     case AST_RETURN:
         generate_return(codegen, stmt);
         break;
@@ -422,12 +583,24 @@ static void generate_locals(codegen_t* codegen, ast_func_def_t* def)
 {
     for (size_t i = 0; i < def->locals.count; i++) {
         ast_node_t* local = dyn_arr_get(&def->locals, i);
-        var_t var = { FRAME_LF, local->var_def.name, local->var_def.id };
-        codegen_defvar(codegen, var);
+        if (local->kind == AST_FOR) {
+            // loop variable, end and step
+            var_t var = { FRAME_LF, local->for_stmt.var_name, local->for_stmt.var_id };
+            var_t end = { FRAME_LF, "end", local->for_stmt.end_id };
+            codegen_defvar(codegen, var);
+            codegen_defvar(codegen, end);
+            if (local->for_stmt.step != NULL) {
+                var_t step = { FRAME_LF, "step", local->for_stmt.step_id };
+                codegen_defvar(codegen, step);
+            }
+        } else {
+            var_t var = { FRAME_LF, local->var_def.name, local->var_def.id };
+            codegen_defvar(codegen, var);
+        }
     }
 }
 
-// body, the last expression is the result
+// body, the last statement is the result
 static void generate_body(codegen_t* codegen, ast_node_t* body)
 {
     dyn_arr_t* stmts = &body->block.statements;
@@ -436,9 +609,9 @@ static void generate_body(codegen_t* codegen, ast_node_t* body)
 
     for (size_t i = 0; i < stmts->count; i++) {
         ast_node_t* stmt = dyn_arr_get(stmts, i);
-        // last expression stays on the stack
-        if (i == stmts->count - 1 && !unit_func && stmt->kind == AST_EXPR_STMT) {
-            codegen_expr(codegen, stmt->expr_stmt.expr);
+        // last statement leaves the result on the stack
+        if (i == stmts->count - 1 && !unit_func) {
+            generate_value(codegen, stmt);
             return;
         }
         codegen_stmt(codegen, stmt);
