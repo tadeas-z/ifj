@@ -31,7 +31,6 @@ static int parse_program_str(const char *src, ast_node_t **out_ast) {
 
     int err = parser_main(&lexer, out_ast);
 
-    lexer_free(&lexer);
     fclose(f);
     return err;
 }
