@@ -44,7 +44,6 @@ static int parse_expr_str(const char *src, ast_node_t **out_ast) {
     }
 
     token_dispose(&tok);
-    lexer_free(&lexer);
     fclose(f);
     return err;
 }
