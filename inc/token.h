@@ -60,7 +60,13 @@ typedef enum {
     TOKEN_NOT,
     TOKEN_AND,
     TOKEN_OR,
-    TOKEN_LARROW
+    TOKEN_LARROW,
+    TOKEN_UNDERSCORE,
+    TOKEN_PIPE,
+    TOKEN_LBRACKET,
+    TOKEN_RBRACKET,
+    TOKEN_LBRACE,
+    TOKEN_RBRACE
 } token_type_t;
 
 typedef struct {
