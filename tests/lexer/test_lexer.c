@@ -212,10 +212,10 @@ static void number_boundaries(void)
 static void errors(void)
 {
     const char* bad[] = {
-        "_", "01", "0_1", "0__1", "1_", "1__", "1__x", "1e", "1e+", "1e_2", "1e2_",
+        "01", "0_1", "0__1", "1_", "1__", "1__x", "1e", "1e+", "1e_2", "1e2_",
         "1e2__", "1.0__", "1.0__d",
         "1.0_", "1ex", "1e+x", "1_x", "1.5_d", "01abc", "00_1", "1e2_x",
-        "@", "@ main", "@other", "@mainly", "&", "|", "%", "{", "}",
+        "@", "@ main", "@other", "@mainly", "&", "%",
         "`name`", "\x80",
         "1e309", "1e-9999"
     };
@@ -551,7 +551,6 @@ static void operator_boundaries(void)
         const expected_t expected[] = { split[i].first, split[i].second };
         sequence(split[i].text, expected, 2);
     }
-
 }
 
 // AI-generated using: Claude Code
@@ -682,9 +681,8 @@ static void extension_tokens(void)
     sequence("5.toString 1.5.floor.toInt \"abc\".length 1.0d.toInt", members,
         sizeof members / sizeof members[0]);
 
-    /* Bitwise & and | are not part of IFJ26. */
-    const char* bad[] = { "&", "|", "& &", "| |", "a & b", "a | b", "&|", "|&",
-        "&&&", "|||", "&\n&", "&=", "|=" };
+    /* A lone & is not part of IFJ26 (a lone | is f32, see unused_extension_tokens). */
+    const char* bad[] = { "&", "& &", "a & b", "&|", "|&", "&&&", "&\n&", "&=" };
     for (size_t i = 0; i < sizeof bad / sizeof bad[0]; ++i)
         expect_error(bad[i]);
 }
@@ -730,12 +728,8 @@ static void identifier_boundaries(void)
     };
     sequence("__ _1 a_", underscores, sizeof underscores / sizeof underscores[0]);
 
-    /* A lone underscore is not an identifier wherever it appears. */
-    const char* bad[] = {
-        "_ ", "_(", "(_)", "x _", "_+1", "val _ = 1", "_\n", "_// c", "a\n_"
-    };
-    for (size_t i = 0; i < sizeof bad / sizeof bad[0]; ++i)
-        expect_error(bad[i]);
+    /* A lone underscore is TOKEN_UNDERSCORE (f31), never an identifier;
+     * cases are in unused_extension_tokens. */
 }
 
 static void comment_layout(void)
@@ -929,7 +923,7 @@ static void automaton_boundaries(void)
         sequence(cases[i].text, cases[i].tokens, cases[i].count);
 
     const char* bad[] = {
-        ".5_", "01.", "01.x", "._", "1e2_d", "1_.5", "\"\"\x80", "@main1", "@main_",
+        ".5_", "01.", "01.x", "1e2_d", "1_.5", "\"\"\x80", "@main1", "@main_",
         "@mai", "@ma in", "/*/", "/* /* */", "&x"
     };
     for (size_t i = 0; i < sizeof bad / sizeof bad[0]; ++i)
@@ -1056,6 +1050,50 @@ static void raw_string_quotes(void)
         expect_error(bad[i]);
 }
 
+// AI-generated using: Claude Code
+//              model: Claude Opus 5.5
+// Prompt (summary): "Test my updated lexer diagram: lone _ is f31
+//          TOKEN_UNDERSCORE, lone | is f32 TOKEN_PIPE (|| stays TOKEN_OR),
+//          [ ] { } are f33..f36 alone and in context; _x and __ stay
+//          identifiers; drop these inputs from the error-1 lists."
+// Scope: unused_extension_tokens, the edited bad[] lists in errors,
+//        automaton_boundaries, extension_tokens and identifier_boundaries.
+
+typedef struct {
+    const char* text;
+    expected_t tokens[4];
+    size_t count;
+} extension_case_t;
+
+static void unused_extension_tokens(void)
+{
+    const extension_case_t cases[] = {
+        /* f31: a lone underscore, f31 -name char-> f1 keeps identifiers. */
+        { "_", { { TOKEN_UNDERSCORE, "_", 1, 1 }, { TOKEN_EOF, NULL, 1, 2 } }, 2 },
+        { "val _ = 1", { { TOKEN_VAL, "val", 1, 1 }, { TOKEN_UNDERSCORE, "_", 1, 5 }, { TOKEN_ASSIGN, "=", 1, 7 }, { TOKEN_INTEGER, "1", 1, 9 } }, 4 },
+        { "(_)", { { TOKEN_LPAREN, "(", 1, 1 }, { TOKEN_UNDERSCORE, "_", 1, 2 }, { TOKEN_RPAREN, ")", 1, 3 } }, 3 },
+        { "_+1", { { TOKEN_UNDERSCORE, "_", 1, 1 }, { TOKEN_PLUS, "+", 1, 2 }, { TOKEN_INTEGER, "1", 1, 3 } }, 3 },
+        { "._", { { TOKEN_DOT, ".", 1, 1 }, { TOKEN_UNDERSCORE, "_", 1, 2 } }, 2 },
+        { "_x _ __", { { TOKEN_IDENTIFIER, "_x", 1, 1 }, { TOKEN_UNDERSCORE, "_", 1, 4 }, { TOKEN_IDENTIFIER, "__", 1, 6 } }, 3 },
+        { "a\n_", { { TOKEN_IDENTIFIER, "a", 1, 1 }, { TOKEN_NEWLINE, "\n", 1, 2 }, { TOKEN_UNDERSCORE, "_", 2, 1 } }, 3 },
+        /* f32: a lone pipe, f32 -|-> f29. */
+        { "|", { { TOKEN_PIPE, "|", 1, 1 }, { TOKEN_EOF, NULL, 1, 2 } }, 2 },
+        { "Int | Unit", { { TOKEN_TYPE_INT, "Int", 1, 1 }, { TOKEN_PIPE, "|", 1, 5 }, { TOKEN_TYPE_UNIT, "Unit", 1, 7 } }, 3 },
+        { "a|b", { { TOKEN_IDENTIFIER, "a", 1, 1 }, { TOKEN_PIPE, "|", 1, 2 }, { TOKEN_IDENTIFIER, "b", 1, 3 } }, 3 },
+        { "|||", { { TOKEN_OR, "||", 1, 1 }, { TOKEN_PIPE, "|", 1, 3 } }, 2 },
+        { "| |", { { TOKEN_PIPE, "|", 1, 1 }, { TOKEN_PIPE, "|", 1, 3 } }, 2 },
+        { "|=", { { TOKEN_PIPE, "|", 1, 1 }, { TOKEN_ASSIGN, "=", 1, 2 } }, 2 },
+        /* f33..f36 have no outgoing transition. */
+        { "List[Int]", { { TOKEN_RESERVED_KEYWORD, "List", 1, 1 }, { TOKEN_LBRACKET, "[", 1, 5 }, { TOKEN_TYPE_INT, "Int", 1, 6 }, { TOKEN_RBRACKET, "]", 1, 9 } }, 4 },
+        { "a[1]", { { TOKEN_IDENTIFIER, "a", 1, 1 }, { TOKEN_LBRACKET, "[", 1, 2 }, { TOKEN_INTEGER, "1", 1, 3 }, { TOKEN_RBRACKET, "]", 1, 4 } }, 4 },
+        { "{ x }", { { TOKEN_LBRACE, "{", 1, 1 }, { TOKEN_IDENTIFIER, "x", 1, 3 }, { TOKEN_RBRACE, "}", 1, 5 } }, 3 },
+        { "{}[]", { { TOKEN_LBRACE, "{", 1, 1 }, { TOKEN_RBRACE, "}", 1, 2 }, { TOKEN_LBRACKET, "[", 1, 3 }, { TOKEN_RBRACKET, "]", 1, 4 } }, 4 },
+        { "[[", { { TOKEN_LBRACKET, "[", 1, 1 }, { TOKEN_LBRACKET, "[", 1, 2 }, { TOKEN_EOF, NULL, 1, 3 } }, 3 }
+    };
+    for (size_t i = 0; i < sizeof cases / sizeof cases[0]; ++i)
+        sequence(cases[i].text, cases[i].tokens, cases[i].count);
+}
+
 int main(void)
 {
     basic_program();
@@ -1080,9 +1118,10 @@ int main(void)
     layout_decisions();
     raw_string_quotes();
     extension_tokens();
+    unused_extension_tokens();
 #ifdef LEXER_TEST_ALLOC_FAILURES
     allocation_failures();
 #endif
-    puts("Lexer: all 22 test groups passed.");
+    puts("Lexer: all 23 test groups passed.");
     return 0;
 }

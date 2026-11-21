@@ -199,16 +199,23 @@ typedef struct {
 
 /* ---- Identifiers, keywords and @main ---------------------------------- */
 
+// AI-generated using: Claude Code
+//              model: Claude Opus 5.5
+// Prompt (summary): "Implement page 1 of my updated diagram: q1 becomes the
+//          accepting f31 TOKEN_UNDERSCORE (a lone _), f31 -a..z+A..Z+0..9+_->
+//          f1 stays, so _x and __ are still identifiers."
+// Scope: id_state_t, the ID_UNDERSCORE case in scan_identifier.
+
 typedef enum {
-    ID_UNDERSCORE, /* q1: a lone '_' is not an identifier yet */
+    ID_UNDERSCORE, /* f31: a lone '_', TOKEN_UNDERSCORE */
     ID_NAME /* f1: identifier or keyword */
 } id_state_t;
 
-/* Diagram 1: scans an identifier or keyword (states q1 and f1); returns
- * SCAN_TOKEN, or SCAN_ERROR for a lone '_'. */
+/* Diagram 1: scans an identifier, keyword or a lone '_' (states f31 and f1);
+ * always returns SCAN_TOKEN unless reading fails. */
 static scan_result_t scan_identifier(lexer_t* lexer, buffer_t* buffer, token_type_t* type)
 {
-    /* s -'_'-> q1, s -a..z+A..Z-> f1 */
+    /* s -'_'-> f31, s -a..z+A..Z-> f1 */
     id_state_t state = lexer->current == '_' ? ID_UNDERSCORE : ID_NAME;
     if (!take(lexer, buffer))
         return SCAN_ERROR;
@@ -216,10 +223,10 @@ static scan_result_t scan_identifier(lexer_t* lexer, buffer_t* buffer, token_typ
         switch (state) {
         case ID_UNDERSCORE:
             if (!id_part(lexer->current)) {
-                invalid(lexer);
-                return SCAN_ERROR;
+                *type = TOKEN_UNDERSCORE; /* f31 accepts */
+                return SCAN_TOKEN;
             }
-            state = ID_NAME;
+            state = ID_NAME; /* f31 -a..z+A..Z+0..9+_-> f1 */
             break;
         case ID_NAME:
             if (!id_part(lexer->current)) {
@@ -294,20 +301,27 @@ static scan_result_t scan_main(lexer_t* lexer, buffer_t* buffer, token_type_t* t
 //          is an error), and f12 -'-'-> f30 TOKEN_LARROW."
 // Scope: operator_state_t, the '!' '&' '|' cases and the second switch in
 //        scan_operator, the '&' and '|' cases in scan_token.
+// AI-generated using: Claude Code
+//              model: Claude Opus 5.5
+// Prompt (summary): "Implement my updated diagram page 2: q20 becomes the
+//          accepting f32 TOKEN_PIPE (lone |, || still f29), new s -[-> f33,
+//          -]-> f34, -{-> f35, -}-> f36; a lone & (q19) stays an error."
+// Scope: OP_PIPE comment, the '[' ']' '{' '}' cases and the OP_PIPE accept in
+//        scan_operator, the '[' ']' '{' '}' cases in scan_token.
 
 typedef enum {
-    OP_SINGLE, /* f3..f10: ( ) : , ; + - * have no outgoing transition */
+    OP_SINGLE, /* f3..f10, f33..f36: ( ) : , ; + - * [ ] { } have no outgoing transition */
     OP_ASSIGN, /* f11: "=" */
     OP_LESS, /* f12: "<" */
     OP_GREATER, /* f13: ">" */
     OP_BANG, /* f27: "!" (BOOLTHEN; q6 of the base diagram is gone) */
     OP_AMP, /* q19: a lone "&" is an error */
-    OP_PIPE /* q20: a lone "|" is an error */
+    OP_PIPE /* f32: a lone "|", TOKEN_PIPE */
 } operator_state_t;
 
 /* Diagram 2: scans an operator or delimiter, including the optional second
- * character of ==, <=, >=, !=, <-, && and || (states f3-f17, f27-f30, q19,
- * q20); returns SCAN_TOKEN or SCAN_ERROR. */
+ * character of ==, <=, >=, !=, <-, && and || (states f3-f17, f27-f36, q19);
+ * returns SCAN_TOKEN or SCAN_ERROR. */
 static scan_result_t scan_operator(lexer_t* lexer, buffer_t* buffer, token_type_t* type)
 {
     operator_state_t state = OP_SINGLE;
@@ -336,6 +350,18 @@ static scan_result_t scan_operator(lexer_t* lexer, buffer_t* buffer, token_type_
     case '*':
         *type = TOKEN_STAR;
         break;
+    case '[':
+        *type = TOKEN_LBRACKET;
+        break;
+    case ']':
+        *type = TOKEN_RBRACKET;
+        break;
+    case '{':
+        *type = TOKEN_LBRACE;
+        break;
+    case '}':
+        *type = TOKEN_RBRACE;
+        break;
     case '=':
         state = OP_ASSIGN;
         *type = TOKEN_ASSIGN;
@@ -357,6 +383,7 @@ static scan_result_t scan_operator(lexer_t* lexer, buffer_t* buffer, token_type_
         break;
     case '|':
         state = OP_PIPE;
+        *type = TOKEN_PIPE;
         break;
     default:
         invalid(lexer);
@@ -390,17 +417,17 @@ static scan_result_t scan_operator(lexer_t* lexer, buffer_t* buffer, token_type_
         second = '&';
         doubled = TOKEN_AND;
         break;
-    case OP_PIPE: /* q20 -'|'-> f29, otherwise error */
+    case OP_PIPE: /* f32 -'|'-> f29 */
         second = '|';
         doubled = TOKEN_OR;
         break;
     }
     if (lexer->current != second) {
-        if (state == OP_AMP || state == OP_PIPE) {
+        if (state == OP_AMP) {
             invalid(lexer);
             return SCAN_ERROR;
         }
-        return SCAN_TOKEN; /* f11, f12, f13, f27 accept */
+        return SCAN_TOKEN; /* f11, f12, f13, f27, f32 accept */
     }
     *type = doubled; /* f14..f17, f28, f29 have no outgoing transition */
     return take(lexer, buffer) ? SCAN_TOKEN : SCAN_ERROR;
@@ -754,6 +781,10 @@ static scan_result_t scan_token(lexer_t* lexer, buffer_t* buffer, token_type_t* 
     case '!':
     case '&':
     case '|':
+    case '[':
+    case ']':
+    case '{':
+    case '}':
         return scan_operator(lexer, buffer, type);
     default:
         invalid(lexer);
