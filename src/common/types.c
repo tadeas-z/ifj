@@ -2,9 +2,9 @@
 // types.c
 // Author(s): Adam Zatloukal (xzatloa01)
 
-#include <stdio.h>
-#include <stdbool.h>
 #include "types.h"
+#include <stdbool.h>
+#include <stdio.h>
 
 static type_t INT_INST = { .kind = T_INT };
 static type_t DOUBLE_INST = { .kind = T_DOUBLE };

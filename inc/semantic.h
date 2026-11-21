@@ -10,8 +10,8 @@
 #define SEMANTIC_H_
 
 #include "ast.h"
-#include "symtable.h"
 #include "comp_error.h"
+#include "symtable.h"
 
 typedef struct sema_frame {
     symbol_t* func_sym;

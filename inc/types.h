@@ -28,7 +28,6 @@ typedef struct type {
 extern type_t *const TYPE_INT, *const TYPE_DOUBLE, *const TYPE_STRING,
                                                        *const TYPE_UNIT, *const TYPE_BOOL, *const TYPE_ANY;
 
-
 // ========================================
 //  Type checks
 // ========================================
