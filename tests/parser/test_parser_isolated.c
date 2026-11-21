@@ -19,29 +19,36 @@
 
 /* ---- Mock lekser ------------------------------------------------------- */
 
-static const token_t *mock_tokens = NULL;
+static const token_t* mock_tokens = NULL;
 static size_t mock_count = 0;
 static size_t mock_pos = 0;
 
-static char *c11_strdup(const char *s) {
-    if (!s) return NULL;
+static char* c11_strdup(const char* s)
+{
+    if (!s)
+        return NULL;
     size_t len = strlen(s) + 1;
-    char *copy = malloc(len);
-    if (copy) memcpy(copy, s, len);
+    char* copy = malloc(len);
+    if (copy)
+        memcpy(copy, s, len);
     return copy;
 }
 
-void token_dispose(token_t *token) {
+void token_dispose(token_t* token)
+{
     if (token) {
         free(token->lexeme);
-        *token = (token_t){0};
+        *token = (token_t) { 0 };
     }
 }
 
-lexer_status_t lexer_next(lexer_t *lexer, token_t *output) {
-    if (!output) return ERR_INTERNAL;
-    *output = (token_t){0};
-    if (!lexer) return ERR_INTERNAL;
+lexer_status_t lexer_next(lexer_t* lexer, token_t* output)
+{
+    if (!output)
+        return ERR_INTERNAL;
+    *output = (token_t) { 0 };
+    if (!lexer)
+        return ERR_INTERNAL;
 
     if (mock_pos < mock_count) {
         *output = mock_tokens[mock_pos++];
@@ -61,30 +68,34 @@ lexer_status_t lexer_next(lexer_t *lexer, token_t *output) {
 }
 
 /* Pomoćni makroi za čitljivo pisanje niza tokena */
-#define TOK(t, text, indent, starts) \
-    { .type = (t), .lexeme = (text), .length = sizeof(text) - 1, \
-      .line = 1, .column = 1, .indentation = (indent), .starts_line = (starts) }
+#define TOK(t, text, indent, starts)                                                                                                        \
+    {                                                                                                                                       \
+        .type = (t), .lexeme = (text), .length = sizeof(text) - 1, .line = 1, .column = 1, .indentation = (indent), .starts_line = (starts) \
+    }
 
-#define NL(indent) \
-    { .type = TOKEN_NEWLINE, .lexeme = "\n", .length = 1, \
-      .line = 1, .column = 1, .indentation = (indent), .starts_line = 0 }
+#define NL(indent)                                                                                                            \
+    {                                                                                                                         \
+        .type = TOKEN_NEWLINE, .lexeme = "\n", .length = 1, .line = 1, .column = 1, .indentation = (indent), .starts_line = 0 \
+    }
 
-#define EOF_TOK(indent) \
-    { .type = TOKEN_EOF, .lexeme = NULL, .length = 0, \
-      .line = 1, .column = 1, .indentation = (indent), .starts_line = 0 }
+#define EOF_TOK(indent)                                                                                                   \
+    {                                                                                                                     \
+        .type = TOKEN_EOF, .lexeme = NULL, .length = 0, .line = 1, .column = 1, .indentation = (indent), .starts_line = 0 \
+    }
 
 /* ---- Test runner ------------------------------------------------------- */
 
 static int passed = 0;
 static int failed = 0;
 
-static void run_parser_test(const char *name, const token_t *tokens, size_t count, error_code_t expected) {
+static void run_parser_test(const char* name, const token_t* tokens, size_t count, error_code_t expected)
+{
     mock_tokens = tokens;
     mock_count = count;
     mock_pos = 0;
 
-    lexer_t dummy_lexer = {0};
-    ast_node_t *ast = NULL;
+    lexer_t dummy_lexer = { 0 };
+    ast_node_t* ast = NULL;
     error_code_t got = parser_main(&dummy_lexer, &ast);
 
     if (ast) {
@@ -95,15 +106,17 @@ static void run_parser_test(const char *name, const token_t *tokens, size_t coun
         printf("[PASS] %s\n", name);
         passed++;
     } else {
-        const char *last = (mock_pos > 0 && mock_tokens[mock_pos - 1].lexeme)
-            ? mock_tokens[mock_pos - 1].lexeme : "EOF";
+        const char* last = (mock_pos > 0 && mock_tokens[mock_pos - 1].lexeme)
+            ? mock_tokens[mock_pos - 1].lexeme
+            : "EOF";
         printf("[FAIL] %s -> got %d, expected %d (at token #%zu: '%s')\n",
-               name, got, expected, mock_pos, last);
+            name, got, expected, mock_pos, last);
         failed++;
     }
 }
 
-int main(void) {
+int main(void)
+{
     /* 1. Kompleksan ispravan program (funkcija, if-izraz, val/var, &&, ||, !, pozivi) */
     {
         const token_t tokens[] = {
