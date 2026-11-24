@@ -1,0 +1,51 @@
+% KA lexeru -- operátory a oddělovače
+% oba uzly s = tentýž stav
+\begin{tikzpicture}[ka,px,every state/.append style={minimum size=7.5mm}]
+  % --- levá část: jednoznakové tokeny ---------------------------------
+  \node[state,initial] (s) at (88,616) {$s$};
+  \foreach \i/\id/\sym/\tk/\x in {
+      0/3/(/LPAREN/180,  1/4/)/RPAREN/193,  2/5/:/COLON/207,
+      3/6/{,}/COMMA/221, 4/7/;/SEMICOLON/235, 5/8/+/PLUS/249,
+      6/9/-/MINUS/263,   7/10/*/STAR/277,   8/33/[/LBRACKET/291,
+      9/34/]/RBRACKET/305, 10/35/\{/LBRACE/319, 11/36/\}/RBRACE/333} {
+    \node[state,accepting] (f\id) at (448,236+110*\i) {$f_{\id}$};
+    % popisky vpravo od stavů
+    \node[tok,right=0.5mm of f\id] {TOKEN\_\tk};
+    \draw[hrana] (s.east) -- (\x,616) |- (f\id);
+    \node[lbl,above] at (362,236+110*\i) {\texttt{\sym}};
+  }
+
+  % --- pravá část: víceznakové operátory -----------------------------
+  \node[state,initial] (t)   at (838,616)   {$s$};
+  \node[state,accepting] (f11) at (1138,276)  {$f_{11}$};
+  \node[state,accepting] (f14) at (1438,276)  {$f_{14}$};
+  \node[state,accepting] (f12) at (1138,496)  {$f_{12}$};
+  \node[state,accepting] (f15) at (1438,496)  {$f_{15}$};
+  \node[state,accepting] (f30) at (1438,606)  {$f_{30}$};
+  \node[state,accepting] (f13) at (1138,716)  {$f_{13}$};
+  \node[state,accepting] (f16) at (1438,716)  {$f_{16}$};
+  \node[state,accepting] (f27) at (1138,936)  {$f_{27}$};
+  \node[state,accepting] (f17) at (1438,936)  {$f_{17}$};
+  \node[state]           (q19) at (1138,1066) {$q_{19}$};
+  \node[state,accepting] (f28) at (1438,1066) {$f_{28}$};
+  \node[state,accepting] (f32) at (1138,1196) {$f_{32}$};
+  \node[state,accepting] (f29) at (1438,1196) {$f_{29}$};
+
+  \foreach \n/\tk in {f11/ASSIGN, f14/EQUAL, f12/LESS, f15/LESS\_EQUAL,
+                      f30/LARROW, f13/GREATER, f16/GREATER\_EQUAL,
+                      f27/NOT, f17/NOT\_EQUAL, f28/AND, f32/PIPE, f29/OR}
+    \node[tok,below=0.2mm of \n] {TOKEN\_\tk};
+  \node[pozn,below=0.2mm of q19,xshift=4mm] {samotné \& je chyba};
+
+  \foreach \n/\sym/\x in {f11/=/930, f12/</944, f13/>/958, f27/!/972,
+                          q19/\&/990, f32/|/1010}
+    \draw[hrana] (t.east) -- (\x,616) |-
+      node[lbl,above,pos=0.8] {\texttt{\sym}} (\n);
+  \draw[hrana] (f11) -- node[lbl,above] {\texttt{=}} (f14);
+  \draw[hrana] (f12) -- node[lbl,above] {\texttt{=}} (f15);
+  \draw[hrana] (f12.east) -- (1252,496) |- node[lbl,above,pos=0.75] {\texttt{-}} (f30);
+  \draw[hrana] (f13) -- node[lbl,above] {\texttt{=}} (f16);
+  \draw[hrana] (f27) -- node[lbl,above] {\texttt{=}} (f17);
+  \draw[hrana] (q19) -- node[lbl,above] {\texttt{\&}} (f28);
+  \draw[hrana] (f32) -- node[lbl,above] {\texttt{|}} (f29);
+\end{tikzpicture}

@@ -1,0 +1,34 @@
+% =====================================================================
+%  Spolupráce, testování, formátování
+% =====================================================================
+\section{Spolupráce a vývojový proces}\label{sec:spoluprace}
+
+\subsection{Spolupráce, code review a schvalování PR}
+% diktováno Tadeáš UPRAVIT!!!
+\begin{itemize}[nosep]
+  \item Spolupráce hlavně probíhala na GitHubu.
+  \item Snažili jsme se všichni dodržovat vlastní větve pro projekt
+        a nepushovat přímo do \texttt{main}.
+  \item Jednotlivé commity měly být kratší úseky a měly být celé
+        přeložitelné.
+  \item Kód do \texttt{main} vždycky schvaloval někdo další z~kolegů,
+        případně s~komentáři přímo ke kódu. Nikdy si to člověk
+        neschvaloval sám.
+  \item Komunikovali jsme na Discordu a dělali jsme si časté meetingy
+        a informace o~pokroku na projektu.
+\end{itemize}
+\TODO{VŠICHNI: Uhladit. Chcete doplnit konvenci commitů nebo kolik lidí schvaluje PR?}
+
+\subsection{Testování}
+% převzato z README.md
+Testy tabulky symbolů, AST a sémantiky používají GoogleTest
+(\texttt{libgtest-dev}).
+
+Lexikální analyzátor testují regresní testy v~\texttt{test\_lexer.c}. Ověřuje
+typy tokenů, jejich pozice a lexémy, číselné a řetězcové literály, vnořené
+komentáře, logické řádky, odsazení a chybové vstupy. Další testy pokrívají
+hraniční případy automatu, rozšíření jazyka, správu paměti a celé programy.
+
+\subsection{Formátování kódu}
+% .clang-format: BasedOnStyle WebKit
+\texttt{clang-format}, styl \texttt{WebKit} (\soubor{.clang-format}).

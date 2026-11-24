@@ -1,0 +1,85 @@
+% =====================================================================
+%  Pomocná makra
+% =====================================================================
+
+% --- poznámky "co sem napsat" ----------------------------------------
+% \TODOtrue  = poznámky jsou vidět (žlutě zvýrazněný text)
+% \TODOfalse = poznámky zmizí (PŘED ODEVZDÁNÍM)
+\newif\ifTODO
+\TODOtrue
+
+% zvýraznění textu přes více řádků (soulutf8 = soul s podporou UTF-8)
+\usepackage{soulutf8}
+\sethlcolor{yellow!45}
+% příkazy, které se v \hl{} smí objevit (berou se jako celek)
+\soulregister\texttt7
+\soulregister\textbf7
+\soulregister\emph7
+\soulregister\ref7
+\soulregister\dots0
+\soulregister\soubor7
+\soulregister\fce7
+\soulregister\tok7
+
+\newcommand{\TODO}[1]{%
+  \ifTODO
+    \par\noindent{\small\hl{\textbf{TODO:} #1}}\par
+    \typeout{TODO: zbyva vyplnit poznamku v dokumentaci}%
+  \fi}
+\newcommand{\TODOinline}[1]{%
+  \ifTODO{\small\hl{#1}}\typeout{TODO: inline}\fi}
+
+% --- titulní strana --------------------------------------------------
+% \clen{Jméno Příjmení}{xlogin00}{VUT ID}{procenta}
+\newcommand{\clen}[4]{#1 & \texttt{#2} & #3 & #4\,\% \\}
+\newcommand{\vedouci}[4]{\textbf{#1} & \texttt{\textbf{#2}} & \textbf{#3} & \textbf{#4\,\%} \\}
+
+% --- identifikátory, soubory -----------------------------------------
+\newcommand{\soubor}[1]{\texttt{#1}}     % \soubor{lexer.c}
+\newcommand{\fce}[1]{\texttt{#1()}}       % \fce{lexer_next} -> lexer_next()
+\newcommand{\tok}[1]{\texttt{#1}}         % \tok{TOKEN\_IDENTIFIER}
+
+% --- gramatika -------------------------------------------------------
+\newcommand{\nt}[1]{\ensuremath{\langle}\textit{#1}\ensuremath{\rangle}} % neterminál
+\newcommand{\tm}[1]{\texttt{#1}}          % terminál
+\newcommand{\eps}{\ensuremath{\varepsilon}}
+\newcommand{\pravidlo}{\ensuremath{\rightarrow}}
+
+% pravidlo: \item ... \label{r:x}, v LL tabulce \ref{r:x}
+\newlist{gramatika}{enumerate}{1}
+\setlist[gramatika]{label=\arabic*.,ref=\arabic*,itemsep=0pt,leftmargin=2.5em}
+
+% --- konečný automat (TikZ) -----------------------------------------
+% konvence IFJ: koncový stav = dvojitý kruh, "+" = jeden ze znaků
+\usetikzlibrary{automata}
+\tikzset{
+  ka/.style={
+    >={Stealth[round,length=2mm]}, shorten >=1pt, auto,
+    font=\footnotesize,
+    every state/.style={draw, thick, minimum size=7.5mm, inner sep=0pt,
+                        font=\small, fill=white},
+    every edge/.style={draw, ->, thin},
+    every edge quotes/.style={font=\footnotesize, inner sep=1.5pt},
+    initial text={}, initial distance=6mm,
+  },
+  % souřadnice = pixely původních PNG z diagrams.io
+  px/.style={x=0.0098cm, y=-0.0115cm},
+  hrana/.style={->, >={Stealth[round,length=2mm]}, shorten >=1pt,
+                rounded corners=4pt},
+  lbl/.style={font=\footnotesize, inner sep=1.5pt},
+  tok/.style={font=\scriptsize\ttfamily, text=black!70},
+  pozn/.style={font=\scriptsize\itshape, text=black!60},
+}
+% symboly v popiscích hran (babel czech dělá z " aktivní znak!)
+\newcommand{\kaUv}{\texttt{\textquotedbl}}            % "
+\newcommand{\kaBs}{\texttt{\textbackslash}}           % \
+\newcommand{\kaPod}{\texttt{\_}}                      % _
+\newcommand{\kaPis}{\texttt{a..z}\,+\,\texttt{A..Z}}  % písmena
+\newcommand{\kaCis}{\texttt{0..9}}                    % číslice
+\newcommand{\kaKrome}[1]{\ensuremath{\Sigma-\{}#1\ensuremath{\}}}
+
+% --- precedenční tabulka -------------------------------------------
+\newcommand{\shift}{\ensuremath{<}}
+\newcommand{\reduce}{\ensuremath{>}}
+\newcommand{\equal}{\ensuremath{=}}
+\newcommand{\chyba}{}

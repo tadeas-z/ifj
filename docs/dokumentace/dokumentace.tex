@@ -1,0 +1,132 @@
+% =====================================================================
+%  Dokumentace projektu IFJ26 (IFJ + IAL 2026/2027)
+%
+%  Pravidla ze zadání (sekce 4 a 5), na která je třeba myslet:
+%   - Text dokumentace píšeme SAMI. AI je zakázáno použít na generování
+%     i úpravu textu dokumentace a na přípravu gramatiky, LL tabulky,
+%     automatu a precedenční tabulky. Takže se omlouvám za moje překlepy a %     nedostatek čárek.
+%   - Dokumentace má být velmi stručná. Projekt nepředstavujeme ani
+%     nevysvětlujeme, co dělá -- rovnou píšeme, JAK jsme to udělali,
+%     případně co neumí.
+%   - Jako vždy nekopírovat úryvky kódu. Identifikátory sázet \texttt{}.
+%   - Diagramy a tabulky musí být čitelné po vytištění na A4. Testuji KA.
+%   - Hodnotí se obsah, stylistika, pochopitelnost, struktura a sazba.
+%   - Zdroják se verzuje v gitu s projektem, ale NEDÁVAT do archivu.
+%
+%  Před odevzdáním: \TODOfalse (níže) skryje všechny žluté poznámky
+%  a v logu nesmí zůstat žádné "TODO"!!!
+% =====================================================================
+\documentclass[11pt,a4paper]{article}
+
+% --- kódování, jazyk, písmo ------------------------------------------
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage[czech]{babel}
+\usepackage{lmodern}
+\usepackage{microtype}
+\usepackage{csquotes}            % \enquote{...} = české uvozovky
+
+% --- sazba stránky ----------------------------------------------------
+\usepackage[a4paper,left=2.5cm,right=2.5cm,top=2.5cm,bottom=2.5cm]{geometry}
+\usepackage{parskip}            % odstavce oddělené mezerou, bez odsazení
+
+% --- obrázky, tabulky -------------------------------------------------
+\usepackage{graphicx}
+\usepackage{float}
+\usepackage[section]{placeins}  % obrázky nepřetečou za konec své sekce
+\usepackage{booktabs}
+\usepackage{array}
+\usepackage{multirow}
+\usepackage{longtable}
+\usepackage{pdflscape}          % LL tabulka na šířku
+\usepackage[table]{xcolor}
+\usepackage{caption}
+\usepackage{subcaption}
+\usepackage{tikz}
+\usetikzlibrary{positioning,arrows.meta,shapes.geometric,babel} % babel: czech dělá - aktivní
+
+% --- seznamy, odkazy, citace -----------------------------------------
+\usepackage{enumitem}
+\usepackage{amsmath,amssymb}
+\usepackage[hidelinks,unicode]{hyperref}
+\usepackage{url}
+
+% --- vlastní makra ----------------------------------------------------
+\input{makra}
+
+% =====================================================================
+%  ÚDAJE NA TITULNÍ STRANU -- vyplnit jen tady
+% =====================================================================
+\newcommand{\tymID}{xpopovd00}                % login vedoucího = ID týmu
+\newcommand{\varianta}{vv-BVS}                 % podle registrace v IS VUT
+% musí sedět se souborem rozsireni
+\newcommand{\rozsireni}{\texttt{FUNEXP}, \texttt{VALMEM}, \texttt{BOOLTHEN}, \texttt{CONTROL}}
+\newcommand{\repozitar}{\url{https://github.com/tadeas-z/ifj}}
+
+\begin{document}
+
+% =====================================================================
+%  TITULNÍ STRANA
+% =====================================================================
+\begin{titlepage}
+  \centering
+  % logo FIT VUT
+  \includegraphics[width=0.6\linewidth]{obrazky/FIT_barevne_CMYK_CZ.pdf}\par
+  \vspace{3.5cm}
+
+  {\Huge\bfseries Implementace překladače\\[0.3em]
+   imperativního jazyka IFJ26\par}
+  \vspace{1em}
+  {\Large Dokumentace k~projektu IFJ a IAL 2026/2027\par}
+  \vspace{2.5cm}
+
+  {\large Tým \texttt{\tymID}, varianta \textbf{\varianta}\par}
+  \vspace{1.5cm}
+
+  % \clen / \vedouci{jméno}{login}{VUT ID}{procenta}, podle rozdeleni
+  \begin{tabular}{l l l r}
+    \toprule
+    \textbf{Jméno} & \textbf{Login} & \textbf{VUT ID} & \textbf{Body} \\
+    \midrule
+    \vedouci{Dušan Popović}{xpopovd00}{282582}{25}
+    \clen{Marek Záchenský}{xzachem00}{270480}{25}
+    \clen{Adam Zatloukal}{xzatloa01}{282559}{25}
+    \clen{Tadeáš Zonyga}{xzonygt00}{282294}{25}
+    \bottomrule
+  \end{tabular}
+  \par\vspace{1.5cm}
+
+  \begin{tabular}{r l}
+    Implementovaná rozšíření: & \rozsireni \\
+    Repozitář:                & \repozitar \\
+  \end{tabular}
+
+  \vfill
+  {\large \today\par}   % datum překladu
+\end{titlepage}
+
+\tableofcontents
+\newpage
+
+% =====================================================================
+%  OBSAH (pořadí podle sekce 5 zadání)
+% =====================================================================
+\input{sekce/01-tym}
+\input{sekce/02-spoluprace}
+\input{sekce/03-architektura}
+\input{sekce/04-lexer}
+\input{sekce/05-parser}
+\input{sekce/06-tabulka-symbolu}
+\input{sekce/07-moduly}
+\input{sekce/08-ai}
+
+% --- literatura -------------------------------------------------------
+\nocite{ifj26zadani,ifj26specifikace} % smazat, až budou v textu \cite{}
+\bibliographystyle{plainurl}
+\bibliography{literatura}
+
+% --- přílohy ----------------------------------------------------------
+\appendix
+\input{sekce/A-gramatika}
+
+\end{document}

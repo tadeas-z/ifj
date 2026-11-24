@@ -1,0 +1,22 @@
+% KA lexeru -- komentáře (rozšíření o čítač depth)
+\begin{tikzpicture}[ka,px]
+  \node[state,initial]   (s)   at (88,377)  {$s$};
+  \node[state,accepting] (f26) at (338,377) {$f_{26}$};
+  \node[state]           (p1)  at (638,377) {$p_{1}$};
+  \node[state]           (p2)  at (638,727) {$p_{2}$};
+
+  \node[tok, below=1mm of f26] {TOKEN\_SLASH};
+  \node[pozn,below=1mm of p1]  {řádkový komentář};
+  \node[pozn,below=1mm of p2]  {blokový komentář};
+
+  \draw[hrana] (s) -- node[lbl,above] {\texttt{/}} (f26);
+  \draw[hrana] (f26.east) -- (462,377) |- node[lbl,above,pos=0.75] {\texttt{/}} (p1);
+  \path (p1) edge[loop right] node[lbl] {\kaKrome{LF}} ();
+  \draw[hrana] (p1) |- node[lbl,above,pos=0.75] {LF / zpracuj konec řádku} (88,185) -- (s);
+  \draw[hrana] (f26.east) -- (462,377) |- (p2);
+  \node[lbl,left] at (462,640) {\texttt{*} / $\mathit{depth}=1$};
+  \path (p2) edge[loop above] node[lbl] {\texttt{/*} / $\mathit{depth}{+}{+}$} ();
+  \path (p2) edge[loop right] node[lbl] {\texttt{*/} a $\mathit{depth}>1$ / $\mathit{depth}{-}{-}$} ();
+  \draw[hrana] (p2.west) -- (492,727) |- (492,928) -| (s);
+  \node[lbl,below] at (290,928) {\texttt{*/} a $\mathit{depth}=1$ / $\mathit{depth}{-}{-}$; dokonči komentář};
+\end{tikzpicture}

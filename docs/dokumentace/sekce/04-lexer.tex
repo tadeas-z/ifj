@@ -1,0 +1,80 @@
+% =====================================================================
+%  Lexikální analýza
+% =====================================================================
+\section{Lexikální analýza}\label{sec:lexer}
+
+\subsubsection*{Popis automatu}
+Lexer implementuje konečný automat viditelný na obrázcích~\ref{fig:ka-id}
+až~\ref{fig:ka-komentare}, které mají společný počáteční stav \texttt{s}.
+Stavy \texttt{q} nepřijímající, stavy \texttt{f} přijímající a stavy
+\texttt{p} pro zpracování komentáře. Lexer čte nejdelší platný lexém. Když
+skončí v~přijímajícím stavu, vrátí token a nepoužitý znak nechá pro další
+volání. Neplatný přechod z~nepřijímajícího stavu je lexikální chyba
+s~návratovým kódem 1.
+
+\subsubsection*{Odchylka: Vnořené komentáře}
+Blokové komentáře lze libovolně vnořovat, což konečný automat sám rozpoznat
+nedokáže. Stav \texttt{p2} proto používá čítač \texttt{depth}: \texttt{/*} ho
+zvýší, \texttt{*/} sníží a při nule komentář končí. Neuzavřený komentář je
+lexikální chyba.
+
+\subsubsection*{Odchylka: Dopředné čtení}
+Lexer drží aktuální znak \texttt{current} a jeden znak dopředu,
+\texttt{lookahead}. Díky němu rozliší desetinnou tečku od samostatného tokenu
+(\texttt{1.5} oproti \texttt{1.foo}) a v~komentářích pozná dvojice
+\texttt{/*} a \texttt{*/}.
+
+\subsubsection*{Odchylka: Dodatečná validace}
+Po přečtení identifikátoru rozhodne funkce \texttt{keyword()}, jestli jde
+o~klíčové nebo rezervované slovo. U~číselných literálů lexer kontroluje
+počáteční nuly a pomocí \texttt{strtod} rozsah typu \texttt{Double}. Hlídá
+i~hranice tokenů, třeba když za číslem nebo \texttt{@main} pokračuje znak
+identifikátoru. Původní zápis lexému se nemění.
+
+\subsubsection*{Odchylka: Logické řádky a odsazení}
+Bílé znaky, komentáře a odsazení zpracovává lexer mimo samotný automat.
+\texttt{TOKEN\_NEWLINE} vrací jen na konci neprázdného logického řádku mimo
+závorky. Kontroluje pokračování řádků, tabulátory v~odsazení a pravidla pro
+víceřádkové komentáře. Tokeny \texttt{INDENT} a \texttt{DEDENT} nepoužívá,
+parser dostane odsazení a příznak na začátku řádku přímo ve struktuře
+\texttt{token\_t}.
+
+% diagramy v TikZu: obrazky/ka-*.tex (všechny začínají ve stavu s)
+
+\begin{figure}[htbp]
+  \centering
+  \input{obrazky/ka-1-identifikatory}
+  \caption{Konečný automat lexeru -- identifikátory, klíčová slova
+           a \texttt{@main}}
+  \label{fig:ka-id}
+\end{figure}
+
+\begin{figure}[htbp]
+  \centering
+  \input{obrazky/ka-2-operatory}
+  \caption{Konečný automat lexeru -- operátory a oddělovače
+           (oba uzly $s$ jsou tentýž počáteční stav)}
+  \label{fig:ka-op}
+\end{figure}
+
+\begin{figure}[htbp]
+  \centering
+  \input{obrazky/ka-3-cisla}
+  \caption{Konečný automat lexeru -- číselné literály a tečka}
+  \label{fig:ka-cisla}
+\end{figure}
+
+\begin{figure}[htbp]
+  \centering
+  \input{obrazky/ka-4-retezce}
+  \caption{Konečný automat lexeru -- běžné a víceřádkové řetězce}
+  \label{fig:ka-retezce}
+\end{figure}
+
+\begin{figure}[htbp]
+  \centering
+  \input{obrazky/ka-5-komentare}
+  \caption{Konečný automat lexeru -- komentáře
+           (rozšíření o~čítač $\mathit{depth}$)}
+  \label{fig:ka-komentare}
+\end{figure}

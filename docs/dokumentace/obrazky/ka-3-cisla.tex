@@ -1,0 +1,61 @@
+% KA lexeru -- číselné literály a tečka
+\begin{tikzpicture}[ka,px]
+  \node[state,initial]   (s)   at (96,467)   {$s$};
+  \node[state,accepting] (f22) at (96,277)   {$f_{22}$};
+  \node[state,accepting] (f18) at (376,467)  {$f_{18}$};
+  \node[state]           (q7)  at (376,706)  {$q_{7}$};
+  \node[state]           (q8)  at (676,467)  {$q_{8}$};
+  \node[state,accepting] (f19) at (976,467)  {$f_{19}$};
+  \node[state]           (q9)  at (976,706)  {$q_{9}$};
+  \node[state,accepting] (f21) at (1276,467) {$f_{21}$};
+  \node[state]           (q12) at (1276,677) {$q_{12}$};
+  \node[state]           (q10) at (676,906)  {$q_{10}$};
+  \node[state]           (q11) at (976,906)  {$q_{11}$};
+  \node[state,accepting] (f20) at (1276,906) {$f_{20}$};
+
+  \node[tok,above=1mm of f22]  {TOKEN\_DOT};
+  \node[tok,below=1mm of f18]  {TOKEN\_INTEGER};
+  \node[tok,below=1mm of f19]  {TOKEN\_DOUBLE};
+  \node[tok,below=1mm of f21]  {TOKEN\_DOUBLE};
+  \node[tok,anchor=north west] at (f20.south east) {TOKEN\_DOUBLE};
+  \node[pozn,below=1mm of q7,align=center]  {po \kaPod{} je\\nutná číslice};
+  \node[pozn,below=1mm of q8,align=center]  {nutná desetinná\\číslice};
+  \node[pozn,below=1mm of q9,align=center]  {po \kaPod{} je\\nutná číslice};
+  \node[pozn,below=0.5mm of q12,align=center] {po \kaPod{} je\\nutná číslice};
+  \node[pozn,anchor=north east,align=right] at (q10.south west) {za \texttt{e}/\texttt{E}\\musí být číslice};
+  \node[pozn,below=1mm of q11,align=center] {po znaménku\\číslice};
+
+  % s
+  \draw[hrana] (s) -- node[lbl,above] {\kaCis} (f18);
+  \draw[hrana] (s) -- node[lbl,left] {\large\texttt{.}} (f22);
+  \draw[hrana] (f22) -| node[lbl,above,pos=0.25] {\kaCis} (f19);
+  % celá část
+  \path (f18) edge[loop above] node[lbl] {\kaCis} ();
+  \draw[hrana] (f18.east) -- (492,467) |- (q7);
+  \node[lbl,above] at (462,467) {\kaPod};
+  \draw[hrana] (q7) -- (245,706) |- node[lbl,left,pos=0.25] {\kaCis} (f18);
+  \path (q7) edge[loop above] node[lbl] {\kaPod} ();
+  \draw[hrana] (f18) -- node[lbl,above,pos=0.8] {\large\texttt{.}} (q8);
+  \draw[hrana] (f18.east) -- (530,467) |- (q10);
+  \node[lbl,right] at (530,620) {\texttt{e}\,+\,\texttt{E}};
+  % desetinná část
+  \draw[hrana] (q8) -- node[lbl,above,pos=0.35] {\kaCis} (f19);
+  \path (f19) edge[out=115,in=160,looseness=7] node[lbl,above] {\kaCis} (f19);
+  \draw[hrana] (f19.east) -- (1092,467) |- (q9);
+  \node[lbl,above] at (1050,467) {\kaPod};
+  \draw[hrana] (q9) -- (845,706) |- node[lbl,left,pos=0.25] {\kaCis} (f19);
+  \path (q9) edge[loop above] node[lbl] {\kaPod} ();
+  \draw[hrana] (f19) -- node[lbl,above,pos=0.7] {\texttt{d}\,+\,\texttt{D}} (f21);
+  \draw[hrana] (f19.east) -- (1110,467) |- (1110,828) -| (q10);
+  \node[lbl,above] at (780,828) {\texttt{e}\,+\,\texttt{E}};
+  % exponent
+  \draw[hrana] (q10) -- node[lbl,above] {\texttt{+}\,+\,\texttt{-}} (q11);
+  \draw[hrana] (q11) -- node[lbl,above] {\kaCis} (f20);
+  \draw[hrana] (q10) |- (676,1080) -| node[lbl,above,pos=0.25] {\kaCis} (f20);
+  \path (f20) edge[loop above] node[lbl] {\kaCis} ();
+  \draw[hrana] (f20.west) -- (1160,906) |- (q12);
+  \node[lbl,left] at (1160,800) {\kaPod};
+  \draw[hrana] (q12) -- (1430,677) |- node[lbl,left,pos=0.25] {\kaCis} (f20);
+  \path (q12) edge[loop above] node[lbl] {\kaPod} ();
+  \draw[hrana] (f20.east) -- (1520,906) |- node[lbl,right,pos=0.25] {\texttt{d}\,+\,\texttt{D}} (f21);
+\end{tikzpicture}

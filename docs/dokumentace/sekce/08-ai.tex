@@ -1,0 +1,71 @@
+% =====================================================================
+%  Využití AI
+% =====================================================================
+\section{Využití nástrojů AI}\label{sec:ai}
+
+\subsection{Použité nástroje a modely}
+% počty = kolik jsem našel AI labels v kódech všech
+\begin{center}
+\small
+\begin{tabular}{@{}l l p{7.2cm}@{}}
+  \toprule
+  \textbf{Člen} & \textbf{Nástroj / model} & \textbf{Kde (označené segmenty)} \\
+  \midrule
+  Dušan Popović   & Gemini / Gemini 4 HYDROGEN
+                  & komentáře v~\texttt{parser.h}, \texttt{parser\_expression.h},
+                    pomocné funkce parseru, testy parseru \\
+                  & Claude / Claude Sonnet 5.5
+                  & pomocné funkce v~\texttt{parser.c} \\
+  \addlinespace
+  Marek Záchenský & Claude Code / Claude Opus 5.5
+                  & komentáře v~\texttt{codegen.h}, \texttt{codegen\_ast.h},
+                    testy generátoru, end-to-end testy (\texttt{tests/e2e}) \\
+  \addlinespace
+  Adam Zatloukal  & Claude Code / Claude Opus 5.5
+                  & pomocná makra a funkce v~\texttt{ast}, \texttt{dynamic\_array},
+                    \texttt{types}, \texttt{utils}, \texttt{comp\_error.h},
+                    \texttt{.clang-format}, makra pro inicializaci
+                    \texttt{symbol\_t}, testy AST, tabulky symbolů a sémantiky \\
+                  & Claude Code / Claude Fable 5.2
+                  & část pro BOOLTHEN (\texttt{ast.c}, testy sémantiky) \\
+  \addlinespace
+  Tadeáš Zonyga   & Claude Code / Claude Opus 5.5
+                  & části \texttt{lexer.c} implementované podle vlastního
+                    diagramu automatu, testy lexeru \\
+                  & Codex CLI / GPT-6 Astra (Medium)
+                  & rozšíření testů lexeru (řetězce, komentáře, chyby,
+                    logické řádky, celé programy) \\
+  \bottomrule
+\end{tabular}
+\end{center}
+
+\subsection{Pracovní postup}
+Tadeáš: AI jsem se při práci na lexeru pokoušel využíval skoro v~každé části
+projektu kromě samotného návrhu konečného automatu. I~tam jsem ale s~pomocí
+AI vytvořil vlastní nástroj pro návrh automatů, ve kterém jsem automat
+skládal z~jednotlivých dílků jako LEGO a hned viděl, jak jím budou procházet
+jednotlivé vstupy viz. obrázek \TODOinline{ten ještě musím doplnit}. Z~tohoto
+nástroje jsme pak postavili i~interaktivní vizualizaci pro kolegy dostupnou
+zde \url{https://ifj26-lexer.zonyga-tadeas.workers.dev/}. Nejvíc mi AI
+pomohla při code review, při implementaci podle mého diagramu a při psaní
+regresních testů. Diagram jsem nejdřív převedl do podrobného zadání pro AI,
+následně se mě ptala na doplňující otázky pro upřesnění jednotlivých
+pravidel, na jejichž základě jsme pak psali samotný kód.
+
+\TODO{VŠICHNI: Uhladit. K čemu jste AI typicky používali?}
+
+\subsection{Problémy a odmítnuté návrhy}
+Tadeáš: Při rozšiřování testů AI (konkrétně GPT-6 Astra) začala upravovat
+implementaci lexeru, aby nové testy, které měla napsat, procházely. Místo
+toho mě měla upozornit na neprocházejíci testy dle instrukcí v~promptu. Tyto
+změny jsem odmítl, kód vrátil a diagram upravil sám, aby nové testy taky
+procházely.
+
+\TODO{VŠICHNI: Uhladit. Kdy vám AI poradila špatně?}
+
+\subsection{Kde jsme AI nepoužili}
+Konečný automat lexeru a pravidla pro rozpoznávání tokenů jsme navrhli sami.
+AI jsme použili až na vizualizaci (o~čem mluvil Tadeáš), kontrolu přechodů
+a převod návrhu do kódu.
+
+\TODO{VŠICHNI: Uhladit. Kde jste AI nepoužili? Je strom bez AI (AI jsou jen makra pro symbol\_t)?}

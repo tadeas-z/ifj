@@ -1,0 +1,28 @@
+% =====================================================================
+%  Rozdělení práce
+% =====================================================================
+\section{Rozdělení práce}\label{sec:tym}
+
+\begin{description}[style=nextline]
+  % git: src/parser, tests/parser
+  \item[Dušan Popović]
+    LL parser programu a příkazů, precedenční analýza výrazů,
+    syntaktické chyby (kód 2), testy parseru.
+
+  % git: src/codegen, tests/e2e, tests/codegen
+  \item[Marek Záchenský]
+    generování IFJcode26, vestavěné funkce, \texttt{main}, Makefile
+    a propojení všech částí, end-to-end testy.
+
+  % git: src/semantic, src/symtable, src/common, .clang-format
+  \item[Adam Zatloukal]
+    tabulka symbolů (vv-BVS), AST, dynamické pole, společné typy
+    a chybové kódy (\texttt{comp\_error.h}), sémantické kontroly
+    (kódy 3--7 a 10), testy v~GoogleTestu.
+
+  % git: src/lexer, tests/lexer, diagramy lexeru
+  \item[Tadeáš Zonyga]
+    konečný automat, tokeny (\texttt{token.h}), čísla, stringy
+    a víceřádkové stringy, komentáře, odsazení a logické řádky,
+    lexikální chyby (kód 1), testy lexeru.
+\end{description}

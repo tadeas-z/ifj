@@ -1,0 +1,31 @@
+% =====================================================================
+%  Příloha A: LL gramatika a LL tabulka (bez AI)
+% =====================================================================
+\section{LL gramatika}\label{app:gramatika}
+
+\TODO{Doplnit číslovaná pravidla. Výraz je jeden neterminál <expr>.}
+
+\begin{gramatika}
+  \item \nt{prog} \pravidlo{} \TODOinline{...} \label{r:prog}
+  % \item \nt{...} \pravidlo{} \tm{...} \nt{...}
+  % \item \nt{...} \pravidlo{} \eps
+\end{gramatika}
+
+% ---------------------------------------------------------------------
+\begin{landscape}
+\section{LL tabulka}\label{app:ll-tabulka}
+
+% řádky = neterminály, sloupce = terminály, buňka = číslo pravidla
+\begin{table}[H]
+  \centering
+  \small
+  \setlength{\tabcolsep}{3pt}
+  \begin{tabular}{l|*{6}{c}}
+                & \tm{t1} & \tm{t2} & \tm{t3} & \tm{t4} & \tm{t5} & \tm{EOF} \\ \hline
+    \nt{prog}   &         &         &         &         &         &          \\
+    \nt{\dots}  &         &         &         &         &         &          \\
+  \end{tabular}
+  \caption{LL tabulka (čísla odkazují na pravidla v~příloze~\ref{app:gramatika})}
+  \label{tab:ll}
+\end{table}
+\end{landscape}

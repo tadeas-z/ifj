@@ -1,0 +1,47 @@
+% =====================================================================
+%  Popis modulů
+%  Tady se to snažte držet skromně dle zadání jedna věta stačí.
+% =====================================================================
+\section{Popis modulů}\label{sec:moduly}
+
+\begin{description}[style=nextline]
+  \item[\texttt{ast.c/.h}]
+    Obsahuje deklarace všech uzlů abstraktního syntaktického stromu (AST)
+    a deklarace jejich konstruktorů. Implementuje konstruktory pro všechny
+    typy uzlů AST. Součástí je také funkce pro výpis AST, vygenerovaná
+    pomocí AI, která slouží k~ladění programu.
+  \item[\texttt{codegen.c/.h}]              \TODOinline{...}
+  \item[\texttt{codegen\_ast.c/.h}]         \TODOinline{...}
+  \item[\texttt{comp\_error.h}]             \TODOinline{...}
+  \item[\texttt{dynamic\_array.c/.h}]       \TODOinline{...}
+  \item[\texttt{lexer.c/.h}]
+    Provádí lexikální analýzu dle diagramu automatu. Samostatné funkce čtou
+    identifikátory, operátory, čísla, řetězce a komentáře, pomocné funkce
+    kontrolují literály, logické řádky, odsazení a hlásí případné chyby.
+  \item[\texttt{main.c}]
+    Načítá zdrojový kód ze standardního vstupu (\texttt{stdin}) a vypisuje
+    vygenerovaný kód IFJcode26 na standardní výstup (\texttt{stdout}).
+  \item[\texttt{parser.c/.h}]               \TODOinline{...}
+  \item[\texttt{parser\_expression.c/.h}]   \TODOinline{...}
+  \item[\texttt{parser\_stack.h}]           \TODOinline{...}
+  \item[\texttt{semantic.c/.h}]
+    Jedinou funkcí, která by se z~tohoto modulu \textbf{měla používat},
+    je \texttt{semantic\_analyze}, která provádí sémantickou analýzu AST
+    předaného programu.
+  \item[\texttt{symtable.c/.h}]
+    Proměnné jsou uloženy v~zásobníku oblastí platnosti (scope), přičemž
+    každá oblast je reprezentována jedním binárním vyhledávacím stromem
+    (BST). Funkce jsou uloženy v~globálním binárním vyhledávacím stromu
+    (BST).
+  \item[\texttt{test\_lexer.c}]
+    Regresní testy lexeru. Obsahuje platné i~neplatné vstupy, hraniční
+    případy, rozšíření jazyka a kontrola správy paměti.
+  \item[\texttt{token.h}]
+    Zajišťuje typy tokenů a strukturu \texttt{token\_t}, kterou sdílí lexer
+    s~parserem. Nese typ tokenu, původní lexém a jeho délku, pozici ve
+    zdrojovém souboru, odsazení a příznak začátku logického řádku.
+  \item[\texttt{types.c/.h}]                \TODOinline{...}
+  \item[\texttt{utils.c/.h}]
+    Alokuje paměť pro řetězec (\texttt{str}) a vrací jeho kopii, která je
+    uložena na haldě (heap).
+\end{description}

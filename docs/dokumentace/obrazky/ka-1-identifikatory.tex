@@ -1,0 +1,26 @@
+% KA lexeru -- identifikátory, klíčová slova, @main, samotné _
+\begin{tikzpicture}[ka,px]
+  \node[state,initial]   (s)   at (208,266)  {$s$};
+  \node[state,accepting] (f31) at (458,147)  {$f_{31}$};
+  \node[state,accepting] (f1)  at (818,266)  {$f_{1}$};
+  \node[state]           (q2)  at (408,666)  {$q_{2}$};
+  \node[state]           (q3)  at (628,666)  {$q_{3}$};
+  \node[state]           (q4)  at (848,666)  {$q_{4}$};
+  \node[state]           (q5)  at (1068,666) {$q_{5}$};
+  \node[state,accepting] (f2)  at (1288,666) {$f_{2}$};
+
+  \node[tok,below=0.5mm of f31]            {TOKEN\_UNDERSCORE};
+  \node[tok,below=1mm of f1,align=center]  {TOKEN\_IDENTIFIER\\/ klíčové slovo};
+  \node[tok,below=1mm of f2]               {TOKEN\_MAIN};
+
+  \draw[hrana] (s) -- (320,266) |- node[lbl,above,pos=0.75] {\kaPod} (f31);
+  \draw[hrana] (s) -- node[lbl,below,pos=0.5] {\kaPis} (f1);
+  \draw[hrana] (f31) -| (712,266) -- (f1);
+  \node[lbl,above right] at (500,147) {\kaPis\,+\,\kaCis\,+\,\kaPod};
+  \path (f1) edge[loop right] node[right] {\kaPis\,+\,\kaCis\,+\,\kaPod} ();
+  \draw[hrana] (s) |- node[lbl,above,pos=0.75] {\texttt{@}} (q2);
+  \draw[hrana] (q2) -- node[lbl,above] {\texttt{m}} (q3);
+  \draw[hrana] (q3) -- node[lbl,above] {\texttt{a}} (q4);
+  \draw[hrana] (q4) -- node[lbl,above] {\texttt{i}} (q5);
+  \draw[hrana] (q5) -- node[lbl,above] {\texttt{n}} (f2);
+\end{tikzpicture}
