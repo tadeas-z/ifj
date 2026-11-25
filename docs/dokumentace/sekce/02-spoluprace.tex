@@ -4,31 +4,20 @@
 \section{Spolupráce a vývojový proces}\label{sec:spoluprace}
 
 \subsection{Spolupráce, code review a schvalování PR}
-% diktováno Tadeáš UPRAVIT!!!
-\begin{itemize}[nosep]
-  \item Spolupráce hlavně probíhala na GitHubu.
-  \item Snažili jsme se všichni dodržovat vlastní větve pro projekt
-        a nepushovat přímo do \texttt{main}.
-  \item Jednotlivé commity měly být kratší úseky a měly být celé
-        přeložitelné.
-  \item Kód do \texttt{main} vždycky schvaloval někdo další z~kolegů,
-        případně s~komentáři přímo ke kódu. Nikdy si to člověk
-        neschvaloval sám.
-  \item Komunikovali jsme na Discordu a dělali jsme si časté meetingy
-        a informace o~pokroku na projektu.
-\end{itemize}
-\TODO{VŠICHNI: Uhladit. Chcete doplnit konvenci commitů nebo kolik lidí schvaluje PR?}
+Vývoj probíhal na GitHubu, kde každý člen týmu pracoval ve vlastní větvi.
+Snažili jsme se vytvářet menší commity, po kterých byl projekt stále
+přeložitelný. Každý pull request před začleněním do větve \texttt{main}
+kontroloval a schvaloval jiný člen týmu. Ke komunikaci jsme využívali
+Discord, kde jsme pravidelně probírali průběh vývoje a případné problémy.
 
 \subsection{Testování}
-% převzato z README.md
-Testy tabulky symbolů, AST a sémantiky používají GoogleTest
-(\texttt{libgtest-dev}).
-
-Lexikální analyzátor testují regresní testy v~\texttt{test\_lexer.c}. Ověřuje
-typy tokenů, jejich pozice a lexémy, číselné a řetězcové literály, vnořené
-komentáře, logické řádky, odsazení a chybové vstupy. Další testy pokrívají
-hraniční případy automatu, rozšíření jazyka, správu paměti a celé programy.
+Pro testování tabulky symbolů, AST a sémantické analýzy jsme využili
+GoogleTest. Lexer má vlastní regresní testy v~\texttt{test\_lexer.c}, které
+ověřují typy tokenů, jejich pozice, lexémy, hraniční případy a chybové
+vstupy. Testovali jsme také rozšíření jazyka, správu paměti a funkčnost
+celého překladače.
 
 \subsection{Formátování kódu}
-% .clang-format: BasedOnStyle WebKit
-\texttt{clang-format}, styl \texttt{WebKit} (\soubor{.clang-format}).
+Pro jednotné formátování kódu jsme používali \texttt{clang-format} se stylem
+WebKit, jehož konfigurace je součástí repozitáře v~souboru
+\soubor{.clang-format}.

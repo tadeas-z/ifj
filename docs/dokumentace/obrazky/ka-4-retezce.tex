@@ -1,5 +1,5 @@
 % KA lexeru -- běžné a víceřádkové řetězce
-\begin{tikzpicture}[ka,px]
+\begin{tikzpicture}[ka,px,x=0.0091cm,y=-0.0106cm]
   \node[state,initial]   (s)   at (96,377)   {$s$};
   \node[state]           (q13) at (346,377)  {$q_{13}$};
   \node[state,accepting] (f23) at (646,377)  {$f_{23}$};
@@ -36,7 +36,7 @@
   \draw[hrana] (q14.west) -- (96,687) -- node[lbl,left,pos=0.5] {\kaUv} (f24);
   % víceřádkový řetězec
   \draw[hrana] (f23) -- node[lbl,above] {\kaUv} (q16);
-  \path (q16) edge[out=110,in=150,looseness=7] node[lbl,left] {\kaKrome{\kaUv}} (q16);
+  \path (q16) edge[out=105,in=145,looseness=7] node[lbl,above left=-1pt] {\kaKrome{\kaUv}} (q16);
   \draw[hrana] (q16) -- node[lbl,above] {\kaUv} (q17);
   \draw[hrana] (q17) -- node[lbl,above] {\kaUv} (q18);
   \draw[hrana] (q17) |- (946,545) -- (q16);

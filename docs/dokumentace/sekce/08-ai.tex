@@ -40,32 +40,45 @@
 \end{center}
 
 \subsection{Pracovní postup}
-Tadeáš: AI jsem se při práci na lexeru pokoušel využíval skoro v~každé části
-projektu kromě samotného návrhu konečného automatu. I~tam jsem ale s~pomocí
-AI vytvořil vlastní nástroj pro návrh automatů, ve kterém jsem automat
-skládal z~jednotlivých dílků jako LEGO a hned viděl, jak jím budou procházet
-jednotlivé vstupy viz. obrázek \TODOinline{ten ještě musím doplnit}. Z~tohoto
-nástroje jsme pak postavili i~interaktivní vizualizaci pro kolegy dostupnou
-zde \url{https://ifj26-lexer.zonyga-tadeas.workers.dev/}. Nejvíc mi AI
-pomohla při code review, při implementaci podle mého diagramu a při psaní
-regresních testů. Diagram jsem nejdřív převedl do podrobného zadání pro AI,
-následně se mě ptala na doplňující otázky pro upřesnění jednotlivých
-pravidel, na jejichž základě jsme pak psali samotný kód.
-
-\TODO{VŠICHNI: Uhladit. K čemu jste AI typicky používali?}
+\begin{description}[style=nextline]
+  \item[Tadeáš Zonyga]
+    AI jsem se při práci na lexeru pokoušel využíval skoro v~každé části
+    projektu kromě samotného návrhu konečného automatu. I~tam jsem ale
+    s~pomocí AI vytvořil vlastní nástroj pro návrh automatů, ve kterém jsem
+    automat skládal z~jednotlivých dílků jako LEGO a hned viděl, jak jím
+    budou procházet jednotlivé vstupy viz. obrázek
+    \TODOinline{ten ještě musím doplnit}. Z~tohoto nástroje jsme pak
+    postavili i~interaktivní vizualizaci pro kolegy~\cite{ifj26vizualizace}.
+    Nejvíc mi AI pomohla při code review, při implementaci podle mého
+    diagramu a při psaní regresních testů. Diagram jsem nejdřív převedl do
+    podrobného zadání pro AI, následně se mě ptala na doplňující otázky pro
+    upřesnění jednotlivých pravidel, na jejichž základě jsme pak psali
+    samotný kód.
+  \item[Dušan Popović] \TODOinline{doplnit vlastní pracovní postup s~AI}
+  \item[Marek Záchenský] \TODOinline{doplnit vlastní pracovní postup s~AI}
+  \item[Adam Zatloukal] \TODOinline{doplnit vlastní pracovní postup s~AI}
+\end{description}
 
 \subsection{Problémy a odmítnuté návrhy}
-Tadeáš: Při rozšiřování testů AI (konkrétně GPT-6 Astra) začala upravovat
-implementaci lexeru, aby nové testy, které měla napsat, procházely. Místo
-toho mě měla upozornit na neprocházejíci testy dle instrukcí v~promptu. Tyto
-změny jsem odmítl, kód vrátil a diagram upravil sám, aby nové testy taky
-procházely.
-
-\TODO{VŠICHNI: Uhladit. Kdy vám AI poradila špatně?}
+\begin{description}[style=nextline]
+  \item[Tadeáš Zonyga]
+    Při rozšiřování testů AI (konkrétně GPT-6 Astra) začala upravovat
+    implementaci lexeru, aby nové testy, které měla napsat, procházely.
+    Místo toho mě měla upozornit na neprocházejíci testy dle instrukcí
+    v~promptu. Tyto změny jsem odmítl, kód vrátil a diagram upravil sám,
+    aby nové testy taky procházely.
+  \item[Dušan Popović] \TODOinline{doplnit problémy / odmítnuté návrhy}
+  \item[Marek Záchenský] \TODOinline{doplnit problémy / odmítnuté návrhy}
+  \item[Adam Zatloukal] \TODOinline{doplnit problémy / odmítnuté návrhy}
+\end{description}
 
 \subsection{Kde jsme AI nepoužili}
-Konečný automat lexeru a pravidla pro rozpoznávání tokenů jsme navrhli sami.
-AI jsme použili až na vizualizaci (o~čem mluvil Tadeáš), kontrolu přechodů
-a převod návrhu do kódu.
-
-\TODO{VŠICHNI: Uhladit. Kde jste AI nepoužili? Je strom bez AI (AI jsou jen makra pro symbol\_t)?}
+\begin{description}[style=nextline]
+  \item[Tadeáš Zonyga]
+    Konečný automat lexeru a pravidla pro rozpoznávání tokenů jsme navrhli
+    sami. AI jsme použili až na vizualizaci~\cite{ifj26vizualizace},
+    kontrolu přechodů a převod návrhu do kódu.
+  \item[Dušan Popović] \TODOinline{doplnit (LL gramatika, LL tabulka, precedenční tabulka...)}
+  \item[Marek Záchenský] \TODOinline{doplnit}
+  \item[Adam Zatloukal] \TODOinline{doplnit (strom bez AI?)}
+\end{description}
