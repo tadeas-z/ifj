@@ -3,9 +3,33 @@
 % =====================================================================
 \section{Tabulka symbolů}\label{sec:symtable}
 
-% text od doplnit týmu
-Proměnné jsou uloženy v~zásobníku scopes, přičemž každý scope je
-reprezentován jedním BST. Funkce jsou uloženy v~globálním BST.
-% symtable.h: key = jméno, height = AVL, scope_t.parent = zásobník
+Na základě vybrané varianty vv-BVS jsme museli tabulku symbolů implementovat jako výškově vyvážený binární
+vyhledávací strom (zvolili jsme AVL strom). Klíčem do tabulky symbolů je jméno identifkátoru, uzly se řadí lexikograficky
+pomocí \fce{strcmp}.
 
-\TODO{AVL? Co je klíč a co hodnota? Něco nad rámec IAL?}
+\subsection{Struktura}
+Funkce a proměnné jsou uloženy v~tabulce symbolů odděleně. Funkce (uživatelské i~vestavěné) jsou v~jednom globálním
+stromu, protože jsou viditelné pro celý program. Proměnné se ukládají do zásobníku rozsahů, který je implementován
+jako jednosměrně vázaný seznam. Každý rozsah by měl odpovídat jednomu bloku zdrojového kódu
+(má vlastní strom a hloubku na zásobníku). Sémantická analýza vždy při vstupu do bloku vloží rozsah (\fce{symtable\_push\_scope}) a když jej opouští, volá se
+\fce{symtable\_pop\_scope}.
+
+\subsection{Obsah symbolu}
+Každý uzel obsahuje strukturu \texttt{symbol\_t}. U~proměnné obsahuje typ, příznak konstanty a jedinečný identifikátor. U~funkce symbol obsahuje navíc ještě návratový typ,
+typy a jména parametrů, příznak vestavěné funkce, příznak \texttt{@main}, stav kontroly těla (kapitola~\ref{sec:semantika}) a příznak odvození
+návratového typu a ukazatel na definici funkce v~AST.
+
+\subsection{Operace se stromem}
+Vkládaní probíhá rekurzivně sestupem. Když se z~rekurze vrací, přepočítá se výška a strom se případně vyváží na základě rozdílu výšek podstromů.
+Vyvážení se provádí aplikací jedné ze čtyř možných rotací (LL, LR, RL, RR). Když uzel se stejným klíčem už existuje, funkce která vkládaní provádí,
+vrátí \texttt{ST\_EXISTS}. V~sémantice se z toho stane chyba~4.
+
+Vyhledávání probíhá následovně: proměnná se hledá od vrcholu zásobníku směrem dolů a
+vratí se první nalezená hodnota - ta z nejvnitřnějšího bloku (funguje tak zastíňení). Pro kontrolu redefinice prohledá funkce \fce{symtable\_lookup\_local} jen aktuální rozsah.
+
+Proměnné zanikají vždy s~celým blokem (při odstranění rozsahu se uvolňuje celý jeho strom).
+Vkládaní i~vyhledávání má časovou složitost $O(\log n)$.
+
+Součástí tabulky symbolů je taky čítač, který přiřazuje jedinečná čísla symbolům.
+Vkládaní vrací ukazatel na vložený symbol, aby ho volající mohl hned doplnit.
+
