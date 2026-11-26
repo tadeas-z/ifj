@@ -1,5 +1,5 @@
 // Implementation of the IFJ26 imperative language compiler
-// parser_expression.h
+// parser_stack.h
 // Author(s): Dusan Popovic (xpopovd00)
 
 #ifndef SYNTATIC_STACK_H
