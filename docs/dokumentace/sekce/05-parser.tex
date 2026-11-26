@@ -8,7 +8,7 @@ Syntaktická analýza (SA) je tvořena pravidly LL-gramatiky a implementována m
 
 Parser vždy pracuje s aktuálním tokenem a jedním tokenem dopředu, což umožňuje rozlišit jednotlivé konstrukce se stejným prefixem a rozhodnout, které pravidlo z gramatiky je potřeba použít, jako například rozdíl mezi pravidlem \verb|ident = expr| a \verb|ident(...)|. Parser sleduje odsazení bloků pomocí atributů \verb|indentation| a starts\_line, a tímto pozná, kdy začíná nový blok a kdy končí.
 
- 
+
 
 
 \subsection{Precedenční analýza výrazů}\label{sec:precedence}
@@ -17,7 +17,7 @@ Precedenční analýza výrazů je volána ze syntaktického analyzátoru odpov�
 
 Precedenční analýza je tvořena pomocným zásobníkem a precedenční tabulkou. Na zásobník se ukládají terminály a analýza se řídí pomocí \verb|'<'| (\textit{angl. shift}), \verb|'>'| (\textit{angl. reduce}) a \verb|'='| (\textit{angl. equal}). Zpracování výrazu končí ve chvíli, kdy je nejvyšším terminálem na zásobníku \verb|'$'| a na vstupu se nachází token, který již nemůže být součástí výrazu. Nakonec funkce vrátí výsledný podstrom AST zpět rekurzivnímu sestupu, který řídí syntaktickou analýzu.
 
- 
+
 
 % --- precedenční tabulka ---------------------------------------------
 % \shift <  \reduce >  \equal =  prázdná buňka = chyba
@@ -46,19 +46,3 @@ Precedenční analýza je tvořena pomocným zásobníkem a precedenční tabulk
            sloupec = vstupní token)}
   \label{tab:precedence}
 \end{table}
-
-\subsection{Sémantická analýza}\label{sec:semantika}
-Pro provedení sémantické analýzy se volá funkce \texttt{semantic\_analyze}.
-\begin{itemize}[nosep]
-  \item Pass 0: Přidá všechny vestavěné funkce do tabulky symbolů.
-  \item Pass 1: Projde všechny funkce a přidá je do tabulky symbolů.
-  \item Pass 2: Projde tělo každé funkce a provede sémantickou analýzu,
-        včetně kontroly pravidel, typových kontrol, typových konverzí,
-        kompatibility typů a odvozování typů. Zároveň do AST doplní
-        informace potřebné pro codegen.
-\end{itemize}
-
-\TODO{Něco doplnit k průchodům, třeba val a var nebo návratové typy?}
-
-\subsection{Generování cílového kódu}\label{sec:codegen}
-\TODO{Jak se řeší rámce, návěští a vestavěné funkce?}

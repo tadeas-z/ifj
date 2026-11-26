@@ -1,12 +1,52 @@
 \section{Sémantická analýza}\label{sec:semantika}
-Pro provedení sémantické analýzy se volá funkce \texttt{semantic\_analyze}.
-\begin{itemize}[nosep]
-  \item Pass 0: Přidá všechny vestavěné funkce do tabulky symbolů.
-  \item Pass 1: Projde všechny funkce a přidá je do tabulky symbolů.
-  \item Pass 2: Projde tělo každé funkce a provede sémantickou analýzu,
-        včetně kontroly pravidel, typových kontrol, typových konverzí,
-        kompatibility typů a odvozování typů. Zároveň do AST doplní
-        informace potřebné pro codegen.
-\end{itemize}
 
-\TODO{Něco doplnit k průchodům, třeba val a var nebo návratové typy?}
+  Sémantická analýza na vstupu požaduje AST od syntaktického analyzátoru. Výstupem je
+  stejný AST doplněný o~dodatečné informace, které využije generátor kódu.
+  Celý tento proces se pustí pomocí funkce \fce{semantic\_analyze}. Informace o~proměnných
+  a funkcích drží tabulka symbolů. Sémantická analýza je také schopna rozpoznat
+  chyby 3--7 a~10.
+
+  Analýza je složena ze tří průchodů:
+  \begin{itemize}
+    \item Průchod 0: do tabulky symbolů se zapíší vestavěné funkce, jejichž signaturu známe ze specifikace
+    \item Průchod 1: do tabulky symbolů zapíšeme signatury všech uživatelských funkcí, provedeme kontrolu \texttt{@main} (smí být jedna, bez parametrů a vrací \texttt{Unit})
+    \item Průchod 2: kontrola těl funkcí
+  \end{itemize}
+
+  \subsection {Kontrola těl funkcí a odvození návratového typu}
+  Pro funkce, které nemají explicitně uvedený návratový typ se musí návratový typ odvodit z~jejího těla.
+  Když tělo funkce volá jinou funkci, která zatím nebyla zkontrolována, zkontroluje se okamžitě, aby se znal
+  její návratový typ. Hlavní smyčka 2. průchodu takto zkontrolované funkce přeskočí.
+  Stav (nezkontrolovaná, rozpracovaná, hotová) toho zda funkce již byla zkontrolovaná je uložen v~tabulce symbolů.
+
+  Volání funkce jejíž stav je rozpracovaná znamená rekurzi. Pro tento případ existuje řetězec
+  kontrolovaných funkcí (\texttt{call\_chain}). Ten se projde až k~volané funkci. Funkce v~tomto řetězci nesmí mít
+  odvozený návratový typ (chyba 6), protože typ nejde určit. Musí tedy platit, že rekurzivní funkce mají explicitní
+  návratový typ.
+
+  \subsection{Rozsahy platnosti a proměnné}
+  Každý blok vytvoří nový rozsah na zásobníku v~tabulce symbolů. Parametry mají vlastní rozsah oddělený od těla, čímž se umožňuje
+  zastiňovaní. Hloubka rozsahu, kde funkce začíná (\texttt{base\_depth}) funguje jako hranice: proměnná nalezena pod ní patří
+  jiné funkci a naší právě analyzované funkci tedy není definovaná (chyba~3).
+
+  U~definice např. \texttt{val x = x + 1} se tedy nejdřív zkontroluje inicializátor a až potom se nová proměnná vloží do tabulky.
+  Výraz vpravo tedy odkazuje na původní \texttt{x}. Přiřazení do \texttt{val}, do parametru nebo proměnné cyklu \texttt{for} je chyba~7.
+
+  \subsection{Kontrola typů}
+  Typy výrazů se určují/odvozují zdola nahoru. Aritmetické operátory požadují číselné operandy (\texttt{+} může být i~konkatenace).
+  Relační operátory porovnávají čísla nebo řetězce. \texttt{==} a \texttt{!=} porovnávají 2 operandy stejného typu (mimo implicitní konverzi).
+  Logické operátory a podmínky vyžadují \texttt{Bool}. Při kombinaci \texttt{Int} a \texttt{Double} se nad operand typu \texttt{Int} dá uzel
+  \texttt{AST\_CONVERT}. Stejně se kontrolují i~přiřazení, argumenty volání funkcí a návratové hodnoty.
+
+  V~cyklu \texttt{for} musí být meze i~krok typu \texttt{Int}, krok nesmí být literál 0 (chyba~10).
+
+  \subsection{Anotovaný AST}
+  Sémantická analýza doplňuje AST o~informace, které využívá generátor kódu:
+  \begin{itemize}
+    \item typ každého výrazu
+    \item uzly \texttt{AST\_CONVERT}
+    \item Seznam lokálních proměnných každé funkce (\texttt{locals}), aby šly všechny proměnné definovat už na začátku funkce
+    \item identifikátor proměnné na základě tabulky symbolů (kvůli podpoře pro zastiňovaní)
+    \item pomocné proměnné cyklu \texttt{for} (krok)
+  \end{itemize}
+
