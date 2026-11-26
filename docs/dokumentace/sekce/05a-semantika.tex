@@ -1,0 +1,12 @@
+\section{Sémantická analýza}\label{sec:semantika}
+Pro provedení sémantické analýzy se volá funkce \texttt{semantic\_analyze}.
+\begin{itemize}[nosep]
+  \item Pass 0: Přidá všechny vestavěné funkce do tabulky symbolů.
+  \item Pass 1: Projde všechny funkce a přidá je do tabulky symbolů.
+  \item Pass 2: Projde tělo každé funkce a provede sémantickou analýzu,
+        včetně kontroly pravidel, typových kontrol, typových konverzí,
+        kompatibility typů a odvozování typů. Zároveň do AST doplní
+        informace potřebné pro codegen.
+\end{itemize}
+
+\TODO{Něco doplnit k průchodům, třeba val a var nebo návratové typy?}
