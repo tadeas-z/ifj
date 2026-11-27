@@ -84,8 +84,9 @@
   \item[Dušan Popović] U generovaných testů parseru se stávalo, že AI (konkrétně Gemini Pro 3.1 a Gemini Hydrogen) zaměňovala lexikální chyby (chyba 1) či sémantické chyby (chyba 3) se syntaktickými chybami (chyba 2). Tyto chybné testy jsem proto odmítl a upravil ručně podle zadání.
   \item[Marek Záchenský] \TODOinline{doplnit problémy / odmítnuté návrhy}
   \item[Adam Zatloukal]
-  Největší problémy mi dělalo pochopení a následná implementace některých sémantických pravidel. V code review jsem podal několik návrhu, které
-  nakonec byly zamítnuty (vetšinou díky mé nepozornosti) jako například společná datová struktura pro zásobník.
+  Největší problémy mi dělalo pochopení a následná implementace některých sémantických pravidel. U ast\_free
+  mi AI navrhovalo řešení, které bylo špatně čitelné a mělo problémy se správou paměti. Nakonec jsem tuto funkci
+  napsal sám.
 
 \end{description}
 
