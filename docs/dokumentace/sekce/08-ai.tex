@@ -42,19 +42,17 @@
 \subsection{Pracovní postup}
 \begin{description}[style=nextline]
   \item[Tadeáš Zonyga]
-    AI jsem se při práci na lexeru pokoušel využíval skoro v~každé části
-    projektu kromě samotného návrhu konečného automatu. I~tam jsem ale
-    s~pomocí AI vytvořil vlastní nástroj pro návrh automatů, ve kterém jsem
-    automat skládal z~jednotlivých dílků jako LEGO a hned viděl, jak jím
-    budou procházet jednotlivé vstupy viz. obrázek
-    \TODOinline{ten ještě musím doplnit}. Z~tohoto nástroje jsme pak
-    postavili i~interaktivní vizualizaci pro kolegy~\cite{ifj26vizualizace}.
-    Nejvíc mi AI pomohla při code review, při implementaci podle mého
-    diagramu a při psaní regresních testů. Diagram jsem nejdřív převedl do
-    podrobného zadání pro AI, následně se mě ptala na doplňující otázky pro
-    upřesnění jednotlivých pravidel, na jejichž základě jsme pak psali
-    samotný kód.
-  \item[Dušan Popović] \TODOinline{doplnit vlastní pracovní postup s~AI}
+    AI jsem se při práci na lexeru pokoušel smysluplně využíval skoro
+    v~každé části projektu kromě samotného návrhu konečného automatu. Ale
+    našla svoje využití i~v~této části, kdy po navrhnutí KA postavila
+    interaktivní vizualizaci pro kolegy~\cite{ifj26vizualizace}. Nejvíc mi
+    AI pomohla při code review, psaní regresních testů, rychlejším
+    zorientováním se v~kódu kolegů a při implementaci podle mého diagramu.
+    Diagram jsem nejdřív převedl do podrobného zadání pro AI (obrázky + HTML
+    + moje poznámky). Následně se mě doptávala na to, jak chci postupovat
+    a případné doplňující otázky ohledně zadání, až poté, co jsme si vše
+    vyjasnili jsme začali tvořit samotný kód.
+  \item[Dušan Popović] Nástroje AI jsem využíval hlavně při generování jednotkových testů pro syntaktický analyzátor, psaní dokumentačních komentářů v hlavičkových souborech (\verb|parser.h|, \verb|parser_expression.h|) a při návrhu či refaktoringu pomocných funkcí v \verb|parser.c|. Postupoval jsem tak, že jsem nejdříve připravil kostru rekurzivního sestupu a precedenční analýzy podle vlastní gramatiky. AI jsem také použil na vysvětlení některých částí projektu, jako například rozšíření \verb|BOOLTHEN|. Vygenerované testy i úpravy jsem vždy ručně zkontroloval a ověřil oproti specifikaci jazyka. 
   \item[Marek Záchenský] \TODOinline{doplnit vlastní pracovní postup s~AI}
   \item[Adam Zatloukal] \TODOinline{doplnit vlastní pracovní postup s~AI}
 \end{description}
@@ -67,7 +65,7 @@
     Místo toho mě měla upozornit na neprocházejíci testy dle instrukcí
     v~promptu. Tyto změny jsem odmítl, kód vrátil a diagram upravil sám,
     aby nové testy taky procházely.
-  \item[Dušan Popović] \TODOinline{doplnit problémy / odmítnuté návrhy}
+  \item[Dušan Popović] U generovaných testů parseru se stávalo, že AI (konkrétně Gemini Pro 3.1 a Gemini Hydrogen) zaměňovala lexikální chyby (chyba 1) či sémantické chyby (chyba 3) se syntaktickými chybami (chyba 2). Tyto chybné testy jsem proto odmítl a upravil ručně podle zadání. 
   \item[Marek Záchenský] \TODOinline{doplnit problémy / odmítnuté návrhy}
   \item[Adam Zatloukal] \TODOinline{doplnit problémy / odmítnuté návrhy}
 \end{description}
@@ -78,7 +76,7 @@
     Konečný automat lexeru a pravidla pro rozpoznávání tokenů jsme navrhli
     sami. AI jsme použili až na vizualizaci~\cite{ifj26vizualizace},
     kontrolu přechodů a převod návrhu do kódu.
-  \item[Dušan Popović] \TODOinline{doplnit (LL gramatika, LL tabulka, precedenční tabulka...)}
+  \item[Dušan Popović] Samotný návrh LL gramatiky jazyka IFJ26, sestavení LL tabulky, návrh precedenční tabulky výrazů i celkovou architekturu rekurzivního sestupu a zásobníkové precedenční analýzy jsem vytvořil ručně.
   \item[Marek Záchenský] \TODOinline{doplnit}
   \item[Adam Zatloukal] \TODOinline{doplnit (strom bez AI?)}
 \end{description}

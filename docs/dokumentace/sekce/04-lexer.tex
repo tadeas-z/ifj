@@ -5,7 +5,7 @@
 
 \subsubsection*{Popis automatu}
 Lexer implementuje konečný automat viditelný na obrázcích~\ref{fig:ka-id}
-až~\ref{fig:ka-komentare}, které mají společný počáteční stav \texttt{s}.
+až~\ref{fig:ka-retezce}, které mají společný počáteční stav \texttt{s}.
 Stavy \texttt{q} nepřijímající, stavy \texttt{f} přijímající a stavy
 \texttt{p} pro zpracování komentáře. Lexer čte nejdelší platný lexém. Když
 skončí v~přijímajícím stavu, vrátí token a nepoužitý znak nechá pro další
@@ -51,6 +51,14 @@ parser dostane odsazení a příznak na začátku řádku přímo ve struktuře
 
 \begin{figure}[htbp]
   \centering
+  \input{obrazky/ka-5-komentare}
+  \caption{Konečný automat lexeru -- komentáře
+           (rozšíření o~čítač $\mathit{depth}$)}
+  \label{fig:ka-komentare}
+\end{figure}
+
+\begin{figure}[htbp]
+  \centering
   \input{obrazky/ka-2-operatory}
   \caption{Konečný automat lexeru -- operátory a oddělovače
            (oba uzly $s$ jsou tentýž počáteční stav)}
@@ -69,12 +77,4 @@ parser dostane odsazení a příznak na začátku řádku přímo ve struktuře
   \input{obrazky/ka-4-retezce}
   \caption{Konečný automat lexeru -- běžné a víceřádkové řetězce}
   \label{fig:ka-retezce}
-\end{figure}
-
-\begin{figure}[htbp]
-  \centering
-  \input{obrazky/ka-5-komentare}
-  \caption{Konečný automat lexeru -- komentáře
-           (rozšíření o~čítač $\mathit{depth}$)}
-  \label{fig:ka-komentare}
 \end{figure}
