@@ -21,9 +21,9 @@
   \item[\texttt{main.c}]
     Načítá zdrojový kód ze standardního vstupu (\texttt{stdin}) a vypisuje
     vygenerovaný kód IFJcode26 na standardní výstup (\texttt{stdout}).
-  \item[\texttt{parser.c/.h}]               Implementuje syntaktický analyzátor řízený rekurzivním sestupem. Zpracovává hlavičku, definice funkcí, vstupní bod, vnořené bloky řízené odsazením, deklarace proměnných, přiřazení i řídicí konstrukce a sestavuje AST, a hlásí případné chzbz.
-  \item[\texttt{parser\_expression.c/.h}]   \TODOinline{...}
-  \item[\texttt{parser\_stack.h}]           \TODOinline{...}
+  \item[\texttt{parser.c/.h}]               Implementuje syntaktický analyzátor řízený rekurzivním sestupem. Zpracovává hlavičku, definice funkcí, vstupní bod, vnořené bloky řízené odsazením, deklarace proměnných, přiřazení i řídicí konstrukce a sestavuje AST, a hlásí případné chyby.
+  \item[\texttt{parser\_expression.c/.h}]   Implementuje precedenční analýzu výrazů zdola nahoru. Zpracovává aritmetické, relační a logické operátory, , volání funkcí i podmíněné výrazy a vrací odpovídající podstrom AST, a hlásí případné chyby.
+  \item[\texttt{parser\_stack.h}]          Definuje datové struktury zásobníku využívané při precedenční syntaktické analýze výrazů.
   \item[\texttt{semantic.c/.h}]
     Jedinou funkcí, která by se z~tohoto modulu \textbf{měla používat},
     je \texttt{semantic\_analyze}, která provádí sémantickou analýzu AST
