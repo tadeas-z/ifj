@@ -2,3 +2,5 @@
 *.in  text eol=lf
 *.out text eol=lf
 
+rozdeleni text eol=lf
+rozsireni text eol=lf
