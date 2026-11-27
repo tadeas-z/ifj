@@ -2,6 +2,10 @@
 // dynamic_array.h
 // Author(s): Adam Zatloukal (xzatloa01)
 
+// Generic dynamic array of pointers (dyn_arr_t). Items are appended at the end
+// and the capacity doubles when full. Only pointers are stored. On free the caller
+// passes a function that frees the items
+
 // items ──► [ ptr0 | ptr1 | ptr2 | ... ]   (capacity slots, count used)
 //              │      │      │
 //              ▼      ▼      ▼

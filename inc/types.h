@@ -2,6 +2,11 @@
 // types.h
 // Author(s): Adam Zatloukal (xzatloa01)
 
+// Basic tyoes (Int, Double, String, Bool, Unit and Any (builtin only)) exist only once
+// as shared constants referenced by the AST and the symbol table.
+// type_compatible() decides if a value of one type can be used where another type is expected
+// (including the implicit Int -> Double conversion).
+
 #ifndef TYPES_H_
 #define TYPES_H_
 

@@ -2,6 +2,12 @@
 // codegen_ast.h
 // Author(s): Marek Zachensky (xzachem00)
 
+// AST walker of the code generator. Walks the annoted AST once and
+// Translates functions, statements and expressions into calls to codegen.c
+// Expressions are evaluated on the data stack, arguments and return values
+// are passed through it, and all local variables are defined at the start
+// of each function so that loops do not redefine them
+
 #ifndef CODEGEN_AST_H
 #define CODEGEN_AST_H
 
