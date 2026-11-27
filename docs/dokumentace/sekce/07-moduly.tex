@@ -1,0 +1,73 @@
+% =====================================================================
+%  Popis modulů
+%  Tady se to snažte držet skromně dle zadání jedna věta stačí.
+% =====================================================================
+\section{Popis modulů}\label{sec:moduly}
+
+\begin{description}[style=nextline]
+  \item[\texttt{ast.c/.h}]
+    Obsahuje deklarace všech uzlů abstraktního syntaktického stromu (AST)
+    a deklarace jejich konstruktorů. Implementuje konstruktory pro všechny
+    typy uzlů AST. Součástí je také funkce pro výpis AST, vygenerovaná
+    pomocí AI, která slouží k~ladění programu.
+  \item[\texttt{codegen.c/.h}]
+    Nízkoúrovňový generátor instrukcí IFJcode26 (codegen.c). Každá funkce
+    zapíše jednu instrukci se správně naformátovanými operandy (proměnné, konstanty, navěstí).
+    O tom, co se generuje rozhoduje \soubor{codegen\_ast.c}.
+  \item[\texttt{codegen\_ast.c/.h}]
+    Průchod AST generátoru kódu. Jednou projde anotovaný AST a funkce,
+    příkazy a výrazy převede na volání codegen.c. Výrazy se vyhodnocují
+    na datovém zásobníku, přes který se předávají i argumenty a návratové hodnoty,
+    a všechny lokální proměnné se definují na začátku funkce, aby je cykly nedefinovali opakovaně.
+  \item[\texttt{comp\_error.h}]
+    Výčet \texttt{error\_code\_t} s~návratovými kódy překladače podle specifikace.
+    Používají ho všechny části překladače a \soubor{main.c} vrací první chybový kód
+    jako návratovou hodnotu programu. Kód 40 překladač nikdy nevrací.
+  \item[\texttt{dynamic\_array.c/.h}]
+    Obecné dynamické pole ukazatelů (\texttt{dyn\_arr\_t}). Prvky se přidávají na konec a při zaplnění se kapacita zdvojnásobí.
+    Pole ukládá jen ukazatele, při uvolňování mu volající předá funkci, která uvolní samotné prvky (nebo \texttt{NULL}).
+    V~AST drží seznamy funkcí, příkazů bloku, parametrů a argumentů volání funkce. V~sémantice se využívá jako seznam lokálních
+    proměnných funkce.
+  \item[\texttt{lexer.c/.h}]
+    Provádí lexikální analýzu dle diagramu automatu. Samostatné funkce čtou
+    identifikátory, operátory, čísla, řetězce a komentáře, pomocné funkce
+    kontrolují literály, logické řádky, odsazení a hlásí případné chyby.
+  \item[\texttt{main.c}]
+    Inicializuje lexer a postupně spouští syntaktickou analýzu, sémantickou
+    analýzu a generátor kódu. Čte ze standardního vstupu, kód IFJcode26
+    vypisuje na standardní výstup a když nastane chyba, vrátí její kód.
+  \item[\texttt{parser.c/.h}]               Implementuje syntaktický analyzátor řízený rekurzivním sestupem. Zpracovává hlavičku, definice funkcí, vstupní bod, vnořené bloky řízené odsazením, deklarace proměnných, přiřazení i řídicí konstrukce a sestavuje AST a hlásí případné chyby.
+  \item[\texttt{parser\_expression.c/.h}]
+    Precedenční syntaktická analýza výrazů pomocí zásobníku a precedenční tabulky. Je volán z~rekurzivního
+    sestupu, se kterým sdíli aktuální token a vrací podstom AST výrazu Převádí také literály na hodnoty
+  \item[\texttt{parser\_stack.h}]
+    Datové typy zásobníku precedenční analýzy. Implementovaný jako jednosměrně vázaný seznam.
+    Každá položka nese druh symbolu, typ tokenu, značku pro shift a u~neterminálů ukazatel na jeho podstrom AST.
+  \item[\texttt{semantic.c/.h}]
+    Jedinou funkcí, která by se z~tohoto modulu \textbf{měla používat},
+    je \texttt{semantic\_analyze}, která provádí sémantickou analýzu AST
+    předaného programu. Ve třech průchodech naplní tabulku symbolů a zkontroluje
+    těla funkcí -- definice proměnných, typy výrazů a volání. Do AST doplní typy, uzly implicitního převodu
+    a seznamy lokálních proměnných pro generátor kódu.
+  \item[\texttt{symtable.c/.h}]
+    Výškově vyvážený BVS (AVL), funkce v globálním stromu, proměnné v zásobníku rozsahů.
+  \item[\texttt{test\_lexer.c}]
+    Regresní testy lexeru. Obsahuje platné i~neplatné vstupy, hraniční
+    případy, rozšíření jazyka a kontrolu správy paměti.
+  \item[\texttt{token.h}]
+    Zajišťuje typy tokenů a strukturu \texttt{token\_t}, kterou sdílí lexer
+    s~parserem. Nese typ tokenu, původní lexém a jeho délku, pozici ve
+    zdrojovém souboru, odsazení a příznak začátku logického řádku.
+  \item[\texttt{types.c/.h}]
+  Základní datové typy  (\texttt{Int}, \texttt{Double}, \texttt{String}, \texttt{Bool},
+  \texttt{Unit} a \texttt{Any} pro vestavěné funkce) existují jen jednou jako sdílené konstanty, na které ukazují
+  AST i tabulka symbolů. Funkce \fce{type\_compatible} určuje, zda lze hodnotu jednoho typu použít místo jiného, což zahrnuje
+  i implicitní konverzi \texttt{Int} -> \texttt{Double}.
+  \item[\texttt{utils.c/.h}]
+    Alokuje paměť pro řetězec (\texttt{str}) a vrací jeho kopii, která je
+    uložena na haldě (heap).
+  \item[\texttt{run.sh}]
+    Spouští end-to-end testy z~\texttt{tests/e2e}. Každý program přeloží,
+    spustí v~interpretu \texttt{ic26int} a porovná výstup s~očekávaným,
+    u~chybových programů kontroluje návratový kód.
+\end{description}

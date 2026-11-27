@@ -2,6 +2,11 @@
 // error.h
 // Author(s): Adam Zatloukal (xzatloa01)
 
+// Enum error_code_t with the compiler exit codes from the specification.
+// Shared by all parts of the compiler. main.c returns the first error
+// as the programs error exit code. Code 40 is never returned by the compiler,
+// the generated program exits with it on a runtime error
+
 // AI-generated using: Claude Code
 //              model: Claude Opus 5.5
 // Prompt: "Create the error enum according to the assignment rules"

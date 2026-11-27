@@ -2,6 +2,10 @@
 // codegen.h
 // Author(s): Marek Zachensky (xzachem00)
 
+// Low lever IFJcode26 emitter (codegen.c) Each function writes one
+// instruction with correctly formatter operands (variables, constants, labels).
+// What is generate is decided by codegen_ast.c.
+
 #ifndef CODEGEN_H
 #define CODEGEN_H
 

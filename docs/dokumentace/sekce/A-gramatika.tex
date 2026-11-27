@@ -1,0 +1,90 @@
+% =====================================================================
+%  Příloha A: LL gramatika a LL tabulka (bez AI)
+% =====================================================================
+\section{LL gramatika}\label{app:gramatika}
+
+
+
+\begin{gramatika}
+  
+    \item \verb|<prog> -> import ifj26 . * EOL <top_list> EOF|
+    \item \verb|<top_list> -> <top_item> <top_list>|
+    \item \verb|<top_list> -> |$\varepsilon$
+    \item \verb|<top_item> -> @main EOL <main_def>|
+    \item \verb|<top_item> -> <func_def>|
+    \item \verb|<main_def> -> def main () : Unit = <func_body>|
+    \item \verb|<func_def> -> def id (<param_list>) : <type> = <func_body>|
+    \item \verb|<param_list> -> <param> <param_tail>|
+    \item \verb|<param_list> -> |$\varepsilon$
+    \item \verb|<param_tail> -> , <param_next>|
+    \item \verb|<param_tail> -> |$\varepsilon$
+    \item \verb|<param_next> -> <param> <param_tail>|
+    \item \verb|<param_next> -> |$\varepsilon$
+    \item \verb|<param> -> id : <type>|
+    \item \verb|<type> -> Int|
+    \item \verb|<type> -> Double|
+    \item \verb|<type> -> String|
+    \item \verb|<type> -> Boolean|
+    \item \verb|<type> -> Unit|
+    \item \verb|<func_body> -> EOL INDENT <stmt_list> DEDENT|
+    \item \verb|<func_body> -> <expr> EOL|
+    \item \verb|<stmt_list> -> <stmt> <stmt_list>|
+    \item \verb|<stmt_list> -> |$\varepsilon$|
+    \item \verb|<stmt> -> val id <opt_type> = <expr> EOL|
+    \item \verb|<stmt> -> var id <opt_type> = <expr> EOL|
+    \item \verb|<stmt> -> <func_def>|
+    \item \verb|<stmt> -> while (<expr>) do <block>|
+    \item \verb|<stmt> -> for (id <- <expr> <range_op> <expr> <opt_by>) do <block>|
+    \item \verb|<stmt> -> return <opt_expr> EOL|
+    \item \verb|<stmt> -> <expr> <stmt_assign> EOL|
+    \item \verb|<opt_type> -> : <type>|
+    \item \verb|<opt_type> -> |$\varepsilon$
+    \item \verb|<stmt_assign> -> = <expr>|
+    \item \verb|<stmt_assign> -> |$\varepsilon$
+    \item \verb|<range_op> -> until|
+    \item \verb|<range_op> -> to|
+    \item \verb|<opt_by> -> by <expr>|
+    \item \verb|<opt_by> ->| $\varepsilon$
+    \item \verb|<opt_expr> -> <expr>|
+    \item \verb|<opt_expr> -> |$\varepsilon$
+    \item \verb|<block> -> EOL INDENT <stmt_list> DEDENT| 
+\end{gramatika}
+
+% ---------------------------------------------------------------------
+\begin{landscape}
+\section{LL tabulka}\label{app:ll-tabulka}
+ 
+% řádky = neterminály, sloupce = terminály, buňka = číslo pravidla
+\begin{table}[H]
+  \centering
+  \footnotesize
+  \setlength{\tabcolsep}{4pt}
+  \renewcommand{\arraystretch}{1.25}
+  \setlength{\arrayrulewidth}{0.2pt}
+  \begin{tabular}{|l|c|c|c|c|c|c|c|c|c|c|c|c|c|c|c|c|c|c|c|c|}
+    \hline
+    Neterminál & import & @main & def & id & val & var & while & for & return & type & : & = & , & ) & range & by & expr & EOL & DEDENT & EOF \\ \hline
+    <prog> & 1 & & & & & & & & & & & & & & & & & & & \\ \hline
+    <top\_list> & & 2 & 2 & & & & & & & & & & & & & & & & & 3 \\ \hline
+    <top\_item> & & 4 & 5 & & & & & & & & & & & & & & & & & \\ \hline
+    <main\_def> & & & 6 & & & & & & & & & & & & & & & & & \\ \hline
+    <func\_def> & & & 7 & & & & & & & & & & & & & & & & & \\ \hline
+    <param\_list> & & & & 8 & & & & & & & & & & 9 & & & & & & \\ \hline
+    <param\_tail> & & & & & & & & & & & & & 10 & 11 & & & & & & \\ \hline
+    <param\_next> & & & & 12 & & & & & & & & & & 13 & & & & & & \\ \hline
+    <param> & & & & 14 & & & & & & & & & & & & & & & & \\ \hline
+    <type> & & & & & & & & & & 15-19 & & & & & & & & & & \\ \hline
+    <func\_body> & & & & 21 & & & & & & & & & & & & & 21 & 20 & & \\ \hline
+    <stmt\_list> & & & 22 & 22 & 22 & 22 & 22 & 22 & 22 & & & & & & & & 22 & & 23 & \\ \hline
+    <stmt> & & & 26 & 30 & 24 & 25 & 27 & 28 & 29 & & & & & & & & 30 & & & \\ \hline
+    <opt\_type> & & & & & & & & & & & 31 & 32 & & & & & & & & \\ \hline
+    <stmt\_assign> & & & & & & & & & & & & 33 & & & & & & 34 & & \\ \hline
+    <range\_op> & & & & & & & & & & & & & & & 35,36 & & & & & \\ \hline
+    <opt\_by> & & & & & & & & & & & & & & 38 & & 37 & & & & \\ \hline
+    <opt\_expr> & & & & 39 & & & & & & & & & & & & & 39 & 40 & & \\ \hline
+    <block> & & & & & & & & & & & & & & & & & & 41 & & \\ \hline
+  \end{tabular}
+  \caption{LL tabulka (čísla odkazují na pravidla v~příloze~\ref{app:gramatika})}
+  \label{tab:ll}
+\end{table}
+\end{landscape}

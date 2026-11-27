@@ -1,0 +1,48 @@
+% KA lexeru -- běžné a víceřádkové řetězce
+\begin{tikzpicture}[ka,px,x=0.0091cm,y=-0.0106cm]
+  \node[state,initial]   (s)   at (96,377)   {$s$};
+  \node[state]           (q13) at (346,377)  {$q_{13}$};
+  \node[state,accepting] (f23) at (646,377)  {$f_{23}$};
+  \node[state]           (q16) at (946,377)  {$q_{16}$};
+  \node[state]           (q17) at (1196,377) {$q_{17}$};
+  \node[state]           (q18) at (1446,377) {$q_{18}$};
+  \node[state,accepting] (f25) at (1446,587) {$f_{25}$};
+  \node[state]           (q14) at (346,687)  {$q_{14}$};
+  \node[state]           (q15) at (646,687)  {$q_{15}$};
+  \node[state,accepting] (f24) at (96,877)   {$f_{24}$};
+
+  \node[pozn,below=1mm of q13]                 {první uvozovka};
+  \node[tok, below=1mm of f23]                 {TOKEN\_STRING: \kaUv\kaUv};
+  \node[pozn,anchor=north west,align=left] at (q16.south east) {raw: žádná\\závěrečná \kaUv};
+  \node[pozn,anchor=north west,align=left] at (q17.south east) {raw: jedna\\závěrečná \kaUv};
+  \node[pozn,below=1.5mm of q18,xshift=2mm,align=center] {raw: dvě\\závěrečné \kaUv};
+  \node[tok, below=1mm of f25]                 {TOKEN\_STRING};
+  \node[pozn,anchor=north west,align=left] at (q14.south east) {obsah běžného\\řetězce};
+  \node[pozn,right=1mm of q15]                 {escape};
+  \node[tok, below=1mm of f24]                 {TOKEN\_STRING};
+
+  % běžný řetězec
+  \draw[hrana] (s) -- node[lbl,above,pos=0.3] {\kaUv} (q13);
+  \draw[hrana] (q13) -- node[lbl,above] {\kaUv} (f23);
+  \draw[hrana] (q13.west) -- (228,377) |- (q14);
+  \node[lbl,left,align=right] at (228,540) {\kaKrome{\kaUv\,+\,\kaBs\\+\,LF}};
+  \path (q14) edge[loop above] ();
+  \node[lbl,right] at (360,610) {\kaKrome{\kaUv\,+\,\kaBs\,+\,LF}};
+  \draw[hrana] (q13.east) -- (470,377) |- (470,490) -| (q15);
+  \node[lbl,below] at (560,490) {\kaBs};
+  \draw[hrana] (q14) -- node[lbl,above] {\kaBs} (q15);
+  \draw[hrana] (q15) |- (346,858) -- (q14);
+  \node[lbl,above] at (496,858) {\kaBs\,+\,\kaUv\,+\,\texttt{n}\,+\,\texttt{r}\,+\,\texttt{t}};
+  \draw[hrana] (q14.west) -- (96,687) -- node[lbl,left,pos=0.5] {\kaUv} (f24);
+  % víceřádkový řetězec
+  \draw[hrana] (f23) -- node[lbl,above] {\kaUv} (q16);
+  \path (q16) edge[out=105,in=145,looseness=7] node[lbl,above left=-1pt] {\kaKrome{\kaUv}} (q16);
+  \draw[hrana] (q16) -- node[lbl,above] {\kaUv} (q17);
+  \draw[hrana] (q17) -- node[lbl,above] {\kaUv} (q18);
+  \draw[hrana] (q17) |- (946,545) -- (q16);
+  \node[lbl,below] at (1071,545) {\kaKrome{\kaUv}};
+  \draw[hrana] (q18) |- (946,195) -- (q16);
+  \node[lbl,above] at (1196,195) {\kaKrome{\kaUv}};
+  \draw[hrana] (q18.east) -- (1560,377) |- node[lbl,right,pos=0.25] {\kaUv} (f25);
+  \path (f25) edge[loop left] node[lbl] {\kaUv} ();
+\end{tikzpicture}

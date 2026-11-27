@@ -1,0 +1,30 @@
+% =====================================================================
+%  Architektura
+% =====================================================================
+\section{Architektura překladače}\label{sec:architektura}
+
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=\linewidth]{obrazky/architektura.pdf}
+  \caption{Blokové schéma překladače a datové toky mezi moduly}
+  \label{fig:architektura}
+\end{figure}
+
+Překladač čte ze \texttt{stdin} zdrojový kód v~IFJ26 a výsledný program v~IFJcode26 zapisuje
+na \texttt{stdout} (obrázek~\ref{fig:architektura}). Jednotlivé části spouští postupně \soubor{main.c}.
+
+Lexikální a syntaktická analýza probíhají najednou v~jednom průchodu. Syntaktický
+analyzátor požaduje tokeny od lexeru (\fce{lexer\_next}), tokeny se nikam neukládají.
+Příkazy a deklarace jsou zpracovány pomocí rekurzivního sestupu, výrazy zpracovává
+precedenční syntaktická analýza. Výsledkem je AST, tedy vnitřní reprezentace programu
+pro všechny další fáze překladu.
+
+Sémantický analyzátor prochází AST ve třech průchodech. První vloží do tabulky symbolů vestavěné
+funkce, potom signatury všech uživatelských funkcí a jako poslední kontroluje jejich těla.
+Právě díky tomu můžeme volat funkci definovanou až později ve zdrojovém kódu.
+Do stromu se doplní (a odvodí) datové typy, seznamy lokálních proměnných a implicitní
+konverze \texttt{Int} na \texttt{Double}.
+
+Generátor kódu projde anotovaný strom vytvořený v~sémantické analýze. Průchod AST rozhoduje,
+co se vygeneruje, a generátor instrukcí zapisuje výsledné instrukce v~IFJcode26 na výstup.

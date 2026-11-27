@@ -2,6 +2,10 @@
 // parser_stack.h
 // Author(s): Dusan Popovic (xpopovd00)
 
+// Data types of the precedence parser stack. Implemented as a linked list.
+// Each item holds the symbol kind, token type, shift mark and for a non-terminal a pointer
+// to its AST subtree. Stack operations are in parser_expression.c.
+
 #ifndef SYNTATIC_STACK_H
 #define SYNTATIC_STACK_H
 

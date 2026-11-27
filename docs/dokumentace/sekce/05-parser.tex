@@ -1,0 +1,48 @@
+% =====================================================================
+%  Syntaktická analýza
+% =====================================================================
+\section{Syntaktická analýza}\label{sec:parser}
+
+\subsection{Rekurzivní sestup}\label{sec:rek-sestup}
+Syntaktická analýza (SA) je tvořena pravidly LL-gramatiky a implementována metodou rekurzivního sestupu. SA zpracovává tokeny, které vyžaduje od lexikálního analyzátoru pomocí volání funkce lexer\_next. Tokeny zpracovává na základě pravidel z LL-gramatiky. Ke každému neterminálu existuje samostatná funkce, která postupně sestavuje abstraktní syntaktický strom (AST). Tyto funkce se nacházejí v hlavním modulu \verb|parser.c|.
+
+Parser vždy pracuje s aktuálním tokenem a jedním tokenem dopředu, což umožňuje rozlišit jednotlivé konstrukce se stejným prefixem a rozhodnout, které pravidlo z gramatiky je potřeba použít, jako například rozdíl mezi pravidlem \verb|ident = expr| a \verb|ident(...)|. Parser sleduje odsazení bloků pomocí atributů \verb|indentation| a starts\_line, a tímto pozná, kdy začíná nový blok a kdy končí.
+
+
+
+
+\subsection{Precedenční analýza výrazů}\label{sec:precedence}
+
+Precedenční analýza výrazů je volána ze syntaktického analyzátoru odpovídajícím pravidlem z LL-gramatiky tehdy, když se v pravidle LL-gramatiky objeví neterminál \verb|<expr>|. Situace, kdy parser předává řízení precedenční analýze, jsou deklarace \verb|var|/\verb|val| proměnných, příkazy \verb|if then| nebo \verb|else if then| (z rozšíření \verb|BOOLTHEN|),  while cyklus, for cyklus(z rozšíření \verb|CONTROL|), v příkazu \verb|return| nebo jako samostatný výrazový příkaz.
+
+Precedenční analýza je tvořena pomocným zásobníkem a precedenční tabulkou. Na zásobník se ukládají terminály a analýza se řídí pomocí \verb|'<'| (\textit{angl. shift}), \verb|'>'| (\textit{angl. reduce}) a \verb|'='| (\textit{angl. equal}). Zpracování výrazu končí ve chvíli, kdy je nejvyšším terminálem na zásobníku \verb|'$'| a na vstupu se nachází token, který již nemůže být součástí výrazu. Nakonec funkce vrátí výsledný podstrom AST zpět rekurzivnímu sestupu, který řídí syntaktickou analýzu.
+
+
+
+% --- precedenční tabulka ---------------------------------------------
+% \shift <  \reduce >  \equal =  prázdná buňka = chyba
+\begin{table}[H]
+  \centering
+  \renewcommand{\arraystretch}{1.2}
+  \begin{tabular}{c|cccclllllllllll}
+           & +& -& *&  /& (& )& \$& id& rel& u-& eq& !& \&\&& ||&.\\ \hline
+    +& >& >& <&  <& <& >& >& <& >& <& >& <& >& >&<\\
+    -& >& >& <&  <& <& >& >& <& >& <& >& <& >& >&<\\
+    *& >& >& >&  >& <& >& >& <& >& <& >& <& >& >&<\\
+    /& >& >& >&  >&   <& >& >& <& >& <& >& <& >& >&<\\
+ (& <& <& <& <&  <& =& & <& <& <& <& <& <& <&<\\
+ )& >& >& >& >& & >& >& & >& & >& & >& >&>\\
+ \$& <& <& <& <& <& & & <& <& <& <& <& <& <&<\\
+ id& >& >& >& >& & >& >& & >& & >& & >& >&>\\
+ rel& <& <& <& <& <& >& >& <& & <& >& <& >& >&<\\
+ u-& >& >& >& >& <& >& >& <& >& <& >& <& >& >&<\\
+ eq& <& <& <& <& <& >& >& <& <& <& & <& >& >&<\\
+ !& >& >& >& >& <& >& >& <& >& <& >& <& >& >&<\\
+ \&\&& <& <& <& <& <& >& >& <& <& <& <& <& >& >&<\\
+ ||& <& <& <& <& <& >& >& <& <& <& <& <& <& >&<\\
+ .& >& >& >& >& & >& >& & >& & >& & >& >&>\\
+  \end{tabular}
+  \caption{Precedenční tabulka (řádek = terminál na zásobníku,
+           sloupec = vstupní token)}
+  \label{tab:precedence}
+\end{table}

@@ -23,9 +23,8 @@ předmětů IFJ a IAL na FIT VUT v Brně, 2026/2027, varianta **vv-BVS**.
 - **D, generování kódu (Marek):** generování IFJcode26, vestavěné funkce,
   `main`, Makefile a propojení všech částí, end-to-end testy.
 
-Rozšíření: `VALMEM`, `FUNEXP` a `PARAMLISTS`. Každý upraví svou část
-a Marek je propojí. Podle času zvažujeme i `BOOLTHEN` a `CONTROL`
-(vyžaduje `BOOLTHEN`).
+Rozšíření: `FUNEXP`, `VALMEM`, `BOOLTHEN` a `CONTROL` (vyžaduje
+`BOOLTHEN`). Každý upraví svou část a Marek je propojí.
 
 ## Struktura
 

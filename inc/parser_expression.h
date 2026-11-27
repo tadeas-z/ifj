@@ -2,6 +2,10 @@
 // parser_expression.h
 // Author(s): Dusan Popovic (xpopovd00)
 
+// Precedence parser for expressions using a stack and a precedence table.
+// Called from the recursive descend parser, shares its current token and returns
+/// the expressions AST subtree. Also converts literals to values
+
 #ifndef IFJ_PARSER_EXPRESSION_H
 #define IFJ_PARSER_EXPRESSION_H
 
