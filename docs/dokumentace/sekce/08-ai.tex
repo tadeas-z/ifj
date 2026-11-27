@@ -19,7 +19,8 @@
   \addlinespace
   Marek Záchenský & Claude Code / Claude Opus 5.5
                   & komentáře v~\texttt{codegen.h}, \texttt{codegen\_ast.h},
-                    testy generátoru, end-to-end testy (\texttt{tests/e2e}) \\
+                    testy generátoru (\texttt{tests/codegen}),
+                    end-to-end testy (\texttt{tests/e2e}) \\
   \addlinespace
   Adam Zatloukal  & Claude Code / Claude Opus 5.5
                   & pomocná makra a funkce v~\texttt{ast}, \texttt{dynamic\_array},
@@ -60,7 +61,15 @@
     AI jsem také použil k~vysvětlení některých částí projektu, například
     rozšíření \texttt{BOOLTHEN}. Vygenerované testy i~úpravy jsem vždy ručně
     zkontroloval a~ověřil proti specifikaci jazyka.
-  \item[Marek Záchenský] \TODOinline{doplnit vlastní pracovní postup s~AI}
+  \item[Marek Záchenský]
+    AI jsem používal hlavně na Doxygen komentáře v~hlavičkových souborech
+    a testy v~GoogleTestu. Nechal jsem je dopsat vždy až po napsání funkcí
+    a upravit po každém rozšíření. End-to-end testy měla AI psát jen podle
+    specifikace IFJ26, ne podle mého kódu. Komentáře jsem kontroloval proti
+    kódu, u~neprocházejících testů jsem hledal, jestli je chyba v~kódu, nebo
+    v~testu, a očekávané výstupy end-to-end testů jsem ověřoval ve
+    specifikaci. AI jsem si také nechal zkontrolovat některé části kódu
+    a pomáhala mi pochopit látku z~předmětů IFJ a IAL potřebnou pro projekt.
   \item[Adam Zatloukal]
     Při vytváření vnitřní implementace tabulky symbolů -- tedy AVL stromu jsem AI použil jen
     v~jednom případě a to pro tvorbu pomocných maker, jejiž cíl bylo zredukovat opakující se kód
@@ -82,7 +91,9 @@
     v~promptu. Tyto změny jsem odmítl, kód vrátil a diagram upravil sám,
     aby nové testy taky procházely.
   \item[Dušan Popović] U generovaných testů parseru se stávalo, že AI (konkrétně Gemini Pro 3.1 a Gemini Hydrogen) zaměňovala lexikální chyby (chyba 1) či sémantické chyby (chyba 3) se syntaktickými chybami (chyba 2). Tyto chybné testy jsem proto odmítl a upravil ručně podle zadání.
-  \item[Marek Záchenský] \TODOinline{doplnit problémy / odmítnuté návrhy}
+  \item[Marek Záchenský]
+    Občas AI navrhla test generátoru, který testoval něco, co specifikace
+    IFJ26 vůbec nevyžaduje. Takové testy jsem smazal.
   \item[Adam Zatloukal]
   Největší problémy mi dělalo pochopení a následná implementace některých sémantických pravidel. U ast\_free
   mi AI navrhovalo řešení, které bylo špatně čitelné a mělo problémy se správou paměti. Nakonec jsem tuto funkci
@@ -97,7 +108,10 @@
     sami. AI jsme použili až na vizualizaci~\cite{ifj26vizualizace},
     kontrolu přechodů a převod návrhu do kódu.
   \item[Dušan Popović] Samotný návrh LL gramatiky jazyka IFJ26, sestavení LL tabulky, návrh precedenční tabulky výrazů i celkovou architekturu rekurzivního sestupu a zásobníkové precedenční analýzy jsem vytvořil ručně.
-  \item[Marek Záchenský] \TODOinline{doplnit}
+  \item[Marek Záchenský]
+    Rámce a návěští jsem navrhl a samotný generátor (\texttt{codegen.c},
+    \texttt{codegen\_ast.c}), vestavěné funkce, \texttt{main.c} a cíle
+    v~Makefile napsal bez AI.
   \item[Adam Zatloukal]
     Implementace AVL stromu a tabulky symbolů (mimo makra), Pravidla sémantické analýzy
     a určování chybových výstupů, vkládaní a čtení z dynamického pole, deklarace sturktur pro AST.
