@@ -1,2 +1,54 @@
 \section{Generování cílového kódu}\label{sec:codegen}
-\TODO{Jak se řeší rámce, návěští a vestavěné funkce?}
+Generátor dostane AST ze sémantické analýzy. Chyby ve zdrojovém kódu
+odhalí už předchozí fáze a ke generátoru by se žádná neměla dostat.
+Strom projde jednou a instrukce rovnou vypisuje na výstup.
+
+Generování se řídí druhem uzlu. Definice funkcí, příkazy i výrazy mají
+vždy jednu vstupní funkci, která vypíše odpovídající instrukce
+a rekurzivně zpracuje podstromy.
+
+\subsection{Rámce a volání funkcí}
+Každá funkce pracuje ve vlastním lokálním rámci. Všechny její lokální
+proměnné se definují hned na začátku funkce podle seznamu \texttt{locals}
+ze sémantické analýzy. Kdyby se proměnná definovala až uvnitř cyklu,
+provedla by se definice opakovaně a interpret by skončil chybou. Jméno
+proměnné má ve vygenerovaném kódu tvar \texttt{name\$id}, kde \texttt{id}
+přidělí tabulka symbolů. Díky tomu se nepletou stejně pojmenované proměnné
+z~různých bloků.
+
+Argumenty i výsledek se předávají přes datový zásobník. Volající na něj
+uloží argumenty, volaná funkce si je přesune do svého rámce a před
+návratem na něm nechá výsledek. Poslední příkaz těla se přeloží tak, aby
+jeho hodnota na zásobníku zůstala jako výsledek funkce.
+
+\subsection{Výrazy a řízení toku}
+Výrazy se vyhodnocují na datovém zásobníku. Operandy se uloží na zásobník
+a operace nad nimi nechá na zásobníku výsledek, který rovnou slouží jako
+operand další operace. Operace, které nemají zásobníkovou instrukci, se
+složí z~jiných instrukcí nebo použijí pomocné globální proměnné.
+
+Řídicí konstrukce se překládají na podmíněné skoky. Každá konstrukce
+dostane z~čítače unikátní číslo, ze kterého se odvodí její návěští
+(\texttt{\$num\$suffix}). Návěští nemohou kolidovat se jménem funkce,
+protože se znak \texttt{\$} v~identifikátorech IFJ26 nevyskytuje.
+
+\subsection{Vestavěné funkce}
+Vestavěné funkce jsou napsané ručně v~IFJcode26 a v~každém programu se
+vypíšou za uživatelské funkce. Na rozdíl od uživatelských funkcí jim
+volající připraví argumenty přímo v~dočasném rámci pod pevnými jmény,
+výsledek ale vracejí stejně na zásobníku.
+
+\subsection{Rozšíření}
+BOOLTHEN: \texttt{\&\&} a \texttt{||} se vyhodnocují zkráceně, pravý
+operand se přeskočí, pokud o~výsledku rozhodne už levý.
+
+CONTROL: počáteční hodnota, mez i krok cyklu \texttt{for} se vyhodnotí
+jen jednou. Krok nemusí být znám při překladu, proto se směr cyklu
+rozhoduje až za běhu podle jeho znaménka. \texttt{if} použitý jako výraz
+nechá na zásobníku hodnotu provedené větve.
+
+VALMEM: přístup ke členu hodnoty se přeloží na volání odpovídající
+vestavěné nebo pomocné funkce, které se hodnota předá jako argument.
+
+FUNEXP: volání funkce může být kdekoliv ve výrazu, argumenty se
+vyhodnocují zleva doprava.
