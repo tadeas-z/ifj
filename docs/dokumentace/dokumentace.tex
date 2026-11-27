@@ -41,7 +41,18 @@
 \usepackage{pdflscape}          % LL tabulka na šířku
 \usepackage[table]{xcolor}
 \usepackage{caption}
+\captionsetup{justification=centering}
 \usepackage{subcaption}
+% uvolnění limitů plovoucích obrázků a pevné rozestupy bez gumových děr
+\renewcommand{\topfraction}{0.9}
+\renewcommand{\bottomfraction}{0.85}
+\renewcommand{\textfraction}{0.07}
+\renewcommand{\floatpagefraction}{0.75}
+\makeatletter
+\setlength{\@fptop}{8pt}
+\setlength{\@fpsep}{18pt}
+\setlength{\@fpbot}{0pt plus 1fil}
+\makeatother
 \usepackage{tikz}
 \usetikzlibrary{positioning,arrows.meta,shapes.geometric,babel} % babel: czech dělá - aktivní
 
@@ -123,7 +134,6 @@
 \input{sekce/08-ai}
 
 % --- literatura -------------------------------------------------------
-\nocite{ifj26zadani,ifj26specifikace} % smazat, až budou v textu \cite{}
 \bibliographystyle{plainurl}
 \bibliography{literatura}
 
