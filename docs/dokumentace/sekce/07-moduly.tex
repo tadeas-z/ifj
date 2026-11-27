@@ -33,8 +33,9 @@
     identifikátory, operátory, čísla, řetězce a komentáře, pomocné funkce
     kontrolují literály, logické řádky, odsazení a hlásí případné chyby.
   \item[\texttt{main.c}]
-    Načítá zdrojový kód ze standardního vstupu (\texttt{stdin}) a vypisuje
-    vygenerovaný kód IFJcode26 na standardní výstup (\texttt{stdout}).
+    Inicializuje lexer a postupně spouští syntaktickou analýzu, sémantickou
+    analýzu a generátor kódu. Čte ze standardního vstupu, kód IFJcode26
+    vypisuje na standardní výstup a když nastane chyba, vrátí její kód.
   \item[\texttt{parser.c/.h}]               Implementuje syntaktický analyzátor řízený rekurzivním sestupem. Zpracovává hlavičku, definice funkcí, vstupní bod, vnořené bloky řízené odsazením, deklarace proměnných, přiřazení i řídicí konstrukce a sestavuje AST a hlásí případné chyby.
   \item[\texttt{parser\_expression.c/.h}]
     Precedenční syntaktická analýza výrazů pomocí zásobníku a precedenční tabulky. Je volán z~rekurzivního
@@ -65,4 +66,8 @@
   \item[\texttt{utils.c/.h}]
     Alokuje paměť pro řetězec (\texttt{str}) a vrací jeho kopii, která je
     uložena na haldě (heap).
+  \item[\texttt{run.sh}]
+    Spouští end-to-end testy z~\texttt{tests/e2e}. Každý program přeloží,
+    spustí v~interpretu \texttt{ic26int} a porovná výstup s~očekávaným,
+    u~chybových programů kontroluje návratový kód.
 \end{description}
